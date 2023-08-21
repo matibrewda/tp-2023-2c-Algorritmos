@@ -1,0 +1,7 @@
+#ifndef NOMBRES_MODULOS_H_
+#define NOMBRES_MODULOS_H_
+
+#define NOMBRE_MODULO_CLIENTE "MiCliente"
+#define NOMBRE_MODULO_SERVIDOR "MiServidor"
+
+#endif /* NOMBRES_MODULOS_H_ */
