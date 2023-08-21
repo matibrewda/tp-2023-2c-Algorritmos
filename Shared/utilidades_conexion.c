@@ -36,8 +36,7 @@ int crear_socket_cliente(t_log* logger, char* ip_proceso_servidor, char* puerto_
     // Error de conexion
     if (resultado_connect == -1) 
 	{
-        // Comento este log porque mientras no se pueda conectar, va a loggear indefinidamente
-        //log_error(logger, "No se pudo conectar %s con %s en %s:%s", NOMBRE_MODULO_CLIENTE, NOMBRE_MODULO_SERVIDOR, ip_proceso_servidor, puerto_proceso_servidor);
+        log_error(logger, "No se pudo conectar %s con %s en %s:%s", NOMBRE_MODULO_CLIENTE, NOMBRE_MODULO_SERVIDOR, ip_proceso_servidor, puerto_proceso_servidor);
         
         freeaddrinfo(server_info);
 		close(socket_cliente);
@@ -188,6 +187,7 @@ bool enviar_paquete(t_log* logger, int conexion, t_paquete* paquete, const char*
     return resultado_send != -1;
 }
 
+// NO BLOQUEA
 bool enviar_operacion_sin_paquete(t_log* logger, int conexion, op_code codigo_operacion, const char* nombre_proceso_origen, const char* nombre_proceso_destino)
 {
 	log_trace(logger, "Comenzando el envio de operacion %d (sin paquete) desde %s a %s.", codigo_operacion, nombre_proceso_origen, nombre_proceso_destino);

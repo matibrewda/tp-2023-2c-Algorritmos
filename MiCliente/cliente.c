@@ -34,7 +34,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	conexion_con_servidor = conectar_cliente_con_servidor(logger, configuracion_cliente -> ip_servidor, configuracion_cliente -> puerto_servidor);
+	log_debug(logger, "Intentando conectar %s con %s ...", NOMBRE_MODULO_CLIENTE, NOMBRE_MODULO_SERVIDOR);
+
+	conexion_con_servidor = crear_socket_cliente(logger, configuracion_cliente -> ip_servidor, configuracion_cliente -> puerto_servidor, NOMBRE_MODULO_CLIENTE, NOMBRE_MODULO_SERVIDOR);
 	if (conexion_con_servidor == -1)
 	{
 		terminar_cliente(logger, argumentos_cliente, configuracion_cliente, conexion_con_servidor, paquete_para_servidor);
@@ -66,6 +68,11 @@ void terminar_cliente(t_log* logger, t_argumentos_cliente* argumentos_cliente, t
 	destruir_logger(logger);
 	destruir_argumentos(argumentos_cliente);
 	destruir_configuracion(configuracion_cliente);
-	destruir_conexion_con_servidor(conexion_con_servidor);
+
+	if (conexion_con_servidor != -1)
+	{
+    	close(conexion_con_servidor);
+	}
+
 	destruir_paquete(logger, paquete_para_servidor);
 }
