@@ -1,20 +1,17 @@
-NAME=Ejecutable/cliente.o
-LIBS= -lcommons -lpthread -lreadline
-CC=gcc
-SRCS=$(shell find  *.c)
-SRCS2=$(shell find Source/*.c)
-COMNS=$(shell find ../Shared/*.c)
-CONFIG=$(shell find Configuracion/*.config)
-LOGS=$(shell find Logs/*.log)
-RM=rm -rf
+COMPILADOR=gcc
+LIBRERIAS= -lcommons -lpthread -lreadline
+NOMBRE_MODULO=cliente
+EJECUTABLE=Ejecutable/$(NOMBRE_MODULO).o
+CONFIGURACION="Configuracion/$(NOMBRE_MODULO).config"
+LOGS=Logs/$(NOMBRE_MODULO).log
+FUENTES_MODULO=$(shell find *.c) $(shell find Source/*.c)
+FUENTES_SHARED=$(shell find ../Shared/*.c)
 
-all: clean build
-build:
-	$(CC) $(MODS) $(SRCS) $(SRCS2) $(COMNS) -o $(NAME) $(LIBS) -Werror
-clean:
-	$(RM) $(NAME)
-	clear
-debug:
-	$(RM) $(LOGS)
-	touch $(LOGS)
-	clear
+.PHONY: ejecutar limpiar compilar
+ejecutar: limpiar compilar
+	./$(EJECUTABLE) $(CONFIGURACION)
+limpiar:
+	rm -rf $(EJECUTABLE)
+	rm -rf $(LOGS)
+compilar:
+	$(COMPILADOR) $(FUENTES_MODULO) $(FUENTES_SHARED) -o $(EJECUTABLE) $(LIBRERIAS) -Werror
