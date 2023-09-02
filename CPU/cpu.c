@@ -2,9 +2,9 @@
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
-	t_log* logger = NULL;
-	t_argumentos_cpu*  argumentos_cpu = NULL;
-	t_config_cpu* configuracion_cpu = NULL;
+	t_log *logger = NULL;
+	t_argumentos_cpu *argumentos_cpu = NULL;
+	t_config_cpu *configuracion_cpu = NULL;
 	int socket_cpu = -1;
 
 	// Inicializacion
@@ -24,7 +24,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	configuracion_cpu = leer_configuracion(logger, argumentos_cpu -> ruta_archivo_configuracion);
+	configuracion_cpu = leer_configuracion(logger, argumentos_cpu->ruta_archivo_configuracion);
 	if (configuracion_cpu == NULL)
 	{
 		terminar_cpu(logger, argumentos_cpu, configuracion_cpu, socket_cpu);

@@ -6,11 +6,11 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	setbuf(stdout, NULL); // Why?
 
-	t_log* logger = NULL;
-	t_argumentos_kernel* argumentos_kernel = NULL;
-	t_config_kernel* configuracion_kernel = NULL;
+	t_log *logger = NULL;
+	t_argumentos_kernel *argumentos_kernel = NULL;
+	t_config_kernel *configuracion_kernel = NULL;
 	int conexion_con_servidor = -1;
-	t_paquete* paquete_para_servidor = NULL;
+	t_paquete *paquete_para_servidor = NULL;
 
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_KERNEL, LOG_LEVEL);
@@ -29,7 +29,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	configuracion_kernel = leer_configuracion(logger, argumentos_kernel -> ruta_archivo_configuracion);
+	configuracion_kernel = leer_configuracion(logger, argumentos_kernel->ruta_archivo_configuracion);
 	if (configuracion_kernel == NULL)
 	{
 		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
@@ -46,7 +46,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// }
 
 	crear_hilo_consola(logger, configuracion_kernel);
-	
+
 	// // Logica principal
 	// paquete_para_servidor = crear_paquete_para_servidor(logger);
 	// log_info(logger, "Enviando señal para hacer quack a %s", NOMBRE_MODULO_SERVIDOR);
@@ -57,14 +57,15 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_servidor, NOMBRE_MODULO_SERVIDOR);
 
-	while(true);
+	while (true)
+		;
 
 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
-	
+
 	return EXIT_SUCCESS;
 }
 
-void terminar_kernel(t_log* logger, t_argumentos_kernel* argumentos_kernel, t_config_kernel* configuracion_kernel, int conexion_con_servidor, t_paquete* paquete_para_servidor)
+void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_servidor, t_paquete *paquete_para_servidor)
 {
 	if (logger != NULL)
 	{
@@ -77,53 +78,52 @@ void terminar_kernel(t_log* logger, t_argumentos_kernel* argumentos_kernel, t_co
 
 	if (conexion_con_servidor != -1)
 	{
-    	close(conexion_con_servidor);
+		close(conexion_con_servidor);
 	}
 
-	//destruir_paquete(logger, paquete_para_servidor);
+	// destruir_paquete(logger, paquete_para_servidor);
 }
 
-void crear_hilo_consola(t_log* logger, t_config_kernel* configuracion_kernel)
+void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel)
 {
-	t_argumentos_hilo_consola* argumentos_hilo_consola = malloc(sizeof(t_argumentos_hilo_consola));
-	
-	argumentos_hilo_consola -> logger = logger;
-	argumentos_hilo_consola -> configuracion_kernel = configuracion_kernel;
+	t_argumentos_hilo_consola *argumentos_hilo_consola = malloc(sizeof(t_argumentos_hilo_consola));
 
-    pthread_create(&hilo_consola, NULL , (void*) consola, (void*) argumentos_hilo_consola);
-    pthread_detach(hilo_consola);
+	argumentos_hilo_consola->logger = logger;
+	argumentos_hilo_consola->configuracion_kernel = configuracion_kernel;
+
+	pthread_create(&hilo_consola, NULL, (void *)consola, (void *)argumentos_hilo_consola);
+	pthread_detach(hilo_consola);
 }
 
-void consola(void* argumentos)
+void consola(void *argumentos)
 {
-	t_argumentos_hilo_consola* argumentos_hilo_consola = (t_argumentos_hilo_consola*) argumentos;
-	
-	t_log* logger = argumentos_hilo_consola -> logger;
-	t_config_kernel* configuracion_kernel = argumentos_hilo_consola -> configuracion_kernel;
+	t_argumentos_hilo_consola *argumentos_hilo_consola = (t_argumentos_hilo_consola *)argumentos;
+
+	t_log *logger = argumentos_hilo_consola->logger;
+	t_config_kernel *configuracion_kernel = argumentos_hilo_consola->configuracion_kernel;
 
 	while (true)
 	{
-		char* valor_ingresado_por_teclado = NULL;
+		char *valor_ingresado_por_teclado = NULL;
 
 		do
 		{
 			valor_ingresado_por_teclado = readline("KERNEL> ");
-		} 
-		while (valor_ingresado_por_teclado == NULL);
+		} while (valor_ingresado_por_teclado == NULL);
 
 		log_trace(logger, "Valor ingresado por consola: %s", valor_ingresado_por_teclado);
 
-		char* saveptr = valor_ingresado_por_teclado;
-		char* funcion_seleccionada = strtok_r(saveptr, " ", &saveptr);
+		char *saveptr = valor_ingresado_por_teclado;
+		char *funcion_seleccionada = strtok_r(saveptr, " ", &saveptr);
 
-		if (strcmp(funcion_seleccionada, INICIAR_PROCESO) == 0) 
+		if (strcmp(funcion_seleccionada, INICIAR_PROCESO) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
-			char* path;
-			char* size_str;
+			char *path;
+			char *size_str;
 			int size;
-			char* prioridad_str;
+			char *prioridad_str;
 			int prioridad;
 
 			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
@@ -190,11 +190,11 @@ void consola(void* argumentos)
 
 			// LOGICA DE INICIAR_PROCESO...
 		}
-		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0) 
+		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
-			char* pid_str;
+			char *pid_str;
 			int pid;
 
 			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
@@ -225,23 +225,23 @@ void consola(void* argumentos)
 
 			// LOGICA DE FINALIZAR_PROCESO...
 		}
-		else if (strcmp(funcion_seleccionada, DETENER_PLANIFICACION) == 0) 
+		else if (strcmp(funcion_seleccionada, DETENER_PLANIFICACION) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
 			// LOGICA DE DETENER_PLANIFICACION...
 		}
-		else if (strcmp(funcion_seleccionada, INICIAR_PLANIFICACION) == 0) 
+		else if (strcmp(funcion_seleccionada, INICIAR_PLANIFICACION) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
 			// LOGICA DE INICIAR_PLANIFICACION...
 		}
-		else if (strcmp(funcion_seleccionada, MULTIPROGRAMACION) == 0) 
+		else if (strcmp(funcion_seleccionada, MULTIPROGRAMACION) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
-			char* nuevo_grado_multiprogramacion_str;
+			char *nuevo_grado_multiprogramacion_str;
 			int nuevo_grado_multiprogramacion;
 
 			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
@@ -272,7 +272,7 @@ void consola(void* argumentos)
 
 			// LOGICA DE MULTIPROGRAMACION...
 		}
-		else if (strcmp(funcion_seleccionada, PROCESO_ESTADO) == 0) 
+		else if (strcmp(funcion_seleccionada, PROCESO_ESTADO) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
