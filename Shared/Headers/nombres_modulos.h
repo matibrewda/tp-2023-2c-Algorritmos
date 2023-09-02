@@ -1,7 +1,7 @@
 #ifndef NOMBRES_MODULOS_H_
 #define NOMBRES_MODULOS_H_
 
-#define NOMBRE_MODULO_CLIENTE "MiCliente"
-#define NOMBRE_MODULO_SERVIDOR "MiServidor"
+#define NOMBRE_MODULO_KERNEL "Kernel"
+#define NOMBRE_MODULO_CPU "CPU"
 
 #endif /* NOMBRES_MODULOS_H_ */

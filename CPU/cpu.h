@@ -1,5 +1,5 @@
-#ifndef SERVIDOR_H_
-#define SERVIDOR_H_
+#ifndef CPU_H_
+#define CPU_H_
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -13,18 +13,18 @@
 #include<commons/collections/queue.h>
 #include<commons/config.h>
 
-#include "Source/Headers/argumentos_servidor.h"
-#include "Source/Headers/configuracion_servidor.h"
+#include "Source/Headers/argumentos_cpu.h"
+#include "Source/Headers/configuracion_cpu.h"
 
 #include "../Shared/Headers/utilidades_logger.h"
 #include "../Shared/Headers/utilidades_configuracion.h"
 #include "../Shared/Headers/utilidades_conexion.h"
 #include "../Shared/Headers/nombres_modulos.h"
 
-#define RUTA_ARCHIVO_DE_LOGS "Logs/servidor.log"
+#define RUTA_ARCHIVO_DE_LOGS "Logs/cpu.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
 // Terminar
-void terminar_servidor(t_log* logger, t_argumentos_servidor* argumentos_servidor, t_config_servidor* configuracion_servidor, int servidor_para_cliente);
+void terminar_cpu(t_log* logger, t_argumentos_cpu* argumentos_cpu, t_config_cpu* configuracion_cpu, int cpu_para_cliente);
 
-#endif /* SERVIDOR_H_ */
+#endif /* CPU_H_ */

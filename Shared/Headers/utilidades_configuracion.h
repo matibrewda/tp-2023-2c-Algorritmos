@@ -13,7 +13,7 @@ bool existen_claves_en_configuracion(t_log* logger, t_config* configuracion, cha
 bool existe_clave_en_configuracion(t_log* logger, t_config* configuracion, char* clave);
 char* leer_clave_string(t_log* logger, t_config* configuracion, char* clave);
 int leer_clave_int(t_log* logger, t_config* configuracion, char* clave);
-char** leer_clave_arreglo_de_strings(t_log* logger, t_config* configuracion, char* clave);
-int* leer_clave_arreglo_de_enteros(t_log* logger, t_config* configuracion, char* clave);
+char** leer_clave_arreglo_de_strings(t_log* logger, t_config* configuracion, char* clave, int* tamanio_arreglo);
+int* leer_clave_arreglo_de_enteros(t_log* logger, t_config* configuracion, char* clave, int* tamanio_arreglo);
 
 #endif /* UTILIDADES_CONFIGURACION_H_ */

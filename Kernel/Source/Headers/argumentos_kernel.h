@@ -1,5 +1,5 @@
-#ifndef ARGUMENTOS_CLIENTE_H
-#define ARGUMENTOS_CLIENTE_H
+#ifndef ARGUMENTOS_KERNEL_H
+#define ARGUMENTOS_KERNEL_H
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -17,9 +17,9 @@
 typedef struct
 {
   	char* ruta_archivo_configuracion;
-} t_argumentos_cliente;
+} t_argumentos_kernel;
 
-t_argumentos_cliente* leer_argumentos(t_log* logger, int cantidad_argumentos_recibidos, char **argumentos);
-void destruir_argumentos(t_argumentos_cliente* argumentos_cliente);
+t_argumentos_kernel* leer_argumentos(t_log* logger, int cantidad_argumentos_recibidos, char **argumentos);
+void destruir_argumentos(t_argumentos_kernel* argumentos_kernel);
 
-#endif /* ARGUMENTOS_CLIENTE_H */
+#endif /* ARGUMENTOS_KERNEL_H */

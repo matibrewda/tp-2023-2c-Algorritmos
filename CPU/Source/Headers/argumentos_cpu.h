@@ -1,5 +1,5 @@
-#ifndef ARGUMENTOS_SERVIDOR_H
-#define ARGUMENTOS_SERVIDOR_H
+#ifndef ARGUMENTOS_CPU_H
+#define ARGUMENTOS_CPU_H
 
 #include<stdio.h>
 #include<stdlib.h>
@@ -17,9 +17,9 @@
 typedef struct
 {
   	char* ruta_archivo_configuracion;
-} t_argumentos_servidor;
+} t_argumentos_cpu;
 
-t_argumentos_servidor* leer_argumentos(t_log* logger, int cantidad_argumentos_recibidos, char **argumentos);
-void destruir_argumentos(t_argumentos_servidor* argumentos_servidor);
+t_argumentos_cpu* leer_argumentos(t_log* logger, int cantidad_argumentos_recibidos, char **argumentos);
+void destruir_argumentos(t_argumentos_cpu* argumentos_cpu);
 
-#endif /* ARGUMENTOS_SERVIDOR_H */
+#endif /* ARGUMENTOS_CPU_H */

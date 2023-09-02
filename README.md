@@ -10,6 +10,9 @@
 
 # Modulos
 
+* [Kernel](Kernel/README.md)
+* [CPU](CPU/README.md)
+
 # Comandos Útiles
 
 * strace -> tracea syscalls

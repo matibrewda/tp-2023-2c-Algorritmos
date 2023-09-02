@@ -1,6 +1,6 @@
 COMPILADOR=gcc
 LIBRERIAS= -lcommons -lpthread -lreadline
-NOMBRE_MODULO=servidor
+NOMBRE_MODULO=cpu
 EJECUTABLE=Ejecutable/$(NOMBRE_MODULO).o
 CONFIGURACION="Configuracion/$(NOMBRE_MODULO).config"
 LOGS=Logs/$(NOMBRE_MODULO).log

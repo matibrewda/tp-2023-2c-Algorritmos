@@ -1,6 +1,6 @@
 COMPILADOR=gcc
 LIBRERIAS= -lcommons -lpthread -lreadline
-NOMBRE_MODULO=cliente
+NOMBRE_MODULO=kernel
 EJECUTABLE=Ejecutable/$(NOMBRE_MODULO).o
 CONFIGURACION="Configuracion/$(NOMBRE_MODULO).config"
 LOGS=Logs/$(NOMBRE_MODULO).log
