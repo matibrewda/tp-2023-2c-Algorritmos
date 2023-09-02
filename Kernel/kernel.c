@@ -101,5 +101,187 @@ void consola(void* argumentos)
 	t_log* logger = argumentos_hilo_consola -> logger;
 	t_config_kernel* configuracion_kernel = argumentos_hilo_consola -> configuracion_kernel;
 
-	
+	while (true)
+	{
+		char* valor_ingresado_por_teclado = NULL;
+
+		do
+		{
+			valor_ingresado_por_teclado = readline("KERNEL> ");
+		} 
+		while (valor_ingresado_por_teclado == NULL);
+
+		log_trace(logger, "Valor ingresado por consola: %s", valor_ingresado_por_teclado);
+
+		char* saveptr = valor_ingresado_por_teclado;
+		char* funcion_seleccionada = strtok_r(saveptr, " ", &saveptr);
+
+		if (strcmp(funcion_seleccionada, INICIAR_PROCESO) == 0) 
+		{
+			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
+
+			char* path;
+			char* size_str;
+			int size;
+			char* prioridad_str;
+			int prioridad;
+
+			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
+
+			log_trace(logger, "Intentando leer argumento 'path' de funcion %s", funcion_seleccionada);
+			if ((path = strtok_r(saveptr, " ", &saveptr)) == NULL)
+			{
+				printf("No se encontro parametro 'path' para la funcion %s.\n", funcion_seleccionada);
+				log_error(logger, "No se encontro parametro 'path' para la funcion %s.", funcion_seleccionada);
+				continue;
+			}
+			else
+			{
+				log_trace(logger, "Se leyo el argumento 'path' de funcion %s y es: '%s'", funcion_seleccionada, path);
+			}
+
+			log_trace(logger, "Intentando leer argumento 'size' de funcion %s", funcion_seleccionada);
+			if ((size_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
+			{
+				printf("No se encontro parametro 'size' para la funcion %s.\n", funcion_seleccionada);
+				log_error(logger, "No se encontro parametro 'size' para la funcion %s.", funcion_seleccionada);
+				continue;
+			}
+			else
+			{
+				log_trace(logger, "Se leyo el argumento 'size' de funcion %s y es: '%s'", funcion_seleccionada, size_str);
+				log_trace(logger, "Intentando convertir el argumento 'size' = '%s' de funcion %s a entero", size_str, funcion_seleccionada);
+
+				if (size = atoi(size_str))
+				{
+					log_trace(logger, "Se pudo convertir el argumento 'size' de funcion %s al entero %d", funcion_seleccionada, size);
+				}
+				else
+				{
+					log_trace(logger, "No se pudo convertir el argumento 'size' = '%s' de funcion %s a entero", size_str, funcion_seleccionada);
+					printf("No se pudo convertir el argumento 'size' = '%s' de funcion %s a entero\n", size_str, funcion_seleccionada);
+					continue;
+				}
+			}
+
+			log_trace(logger, "Intentando leer argumento 'prioridad' de funcion %s", funcion_seleccionada);
+			if ((prioridad_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
+			{
+				printf("No se encontro parametro 'prioridad' para la funcion %s.\n", funcion_seleccionada);
+				log_error(logger, "No se encontro parametro 'prioridad' para la funcion %s.", funcion_seleccionada);
+				continue;
+			}
+			else
+			{
+				log_trace(logger, "Se leyo el argumento 'prioridad' de funcion %s y es: '%s'", funcion_seleccionada, prioridad_str);
+				log_trace(logger, "Intentando convertir el argumento 'prioridad' = '%s' de funcion %s a entero", prioridad_str, funcion_seleccionada);
+
+				if (prioridad = atoi(prioridad_str))
+				{
+					log_trace(logger, "Se pudo convertir el argumento 'prioridad' de funcion %s al entero %d", funcion_seleccionada, prioridad);
+				}
+				else
+				{
+					log_trace(logger, "No se pudo convertir el argumento 'prioridad' = '%s' de funcion %s a entero", prioridad_str, funcion_seleccionada);
+					printf("No se pudo convertir el argumento 'prioridad' = '%s' de funcion %s a entero\n", prioridad_str, funcion_seleccionada);
+					continue;
+				}
+			}
+
+			// LOGICA DE INICIAR_PROCESO...
+		}
+		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0) 
+		{
+			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
+
+			char* pid_str;
+			int pid;
+
+			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
+
+			log_trace(logger, "Intentando leer argumento 'pid' de funcion %s", funcion_seleccionada);
+			if ((pid_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
+			{
+				printf("No se encontro parametro 'pid' para la funcion %s.\n", funcion_seleccionada);
+				log_error(logger, "No se encontro parametro 'pid' para la funcion %s.", funcion_seleccionada);
+				continue;
+			}
+			else
+			{
+				log_trace(logger, "Se leyo el argumento 'pid' de funcion %s y es: '%s'", funcion_seleccionada, pid_str);
+				log_trace(logger, "Intentando convertir el argumento 'pid' = '%s' de funcion %s a entero", pid_str, funcion_seleccionada);
+
+				if (pid = atoi(pid_str))
+				{
+					log_trace(logger, "Se pudo convertir el argumento 'pid' de funcion %s al entero %d", funcion_seleccionada, pid);
+				}
+				else
+				{
+					log_trace(logger, "No se pudo convertir el argumento 'pid' = '%s' de funcion %s a entero", pid_str, funcion_seleccionada);
+					printf("No se pudo convertir el argumento 'pid' = '%s' de funcion %s a entero\n", pid_str, funcion_seleccionada);
+					continue;
+				}
+			}
+
+			// LOGICA DE FINALIZAR_PROCESO...
+		}
+		else if (strcmp(funcion_seleccionada, DETENER_PLANIFICACION) == 0) 
+		{
+			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
+
+			// LOGICA DE DETENER_PLANIFICACION...
+		}
+		else if (strcmp(funcion_seleccionada, INICIAR_PLANIFICACION) == 0) 
+		{
+			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
+
+			// LOGICA DE INICIAR_PLANIFICACION...
+		}
+		else if (strcmp(funcion_seleccionada, MULTIPROGRAMACION) == 0) 
+		{
+			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
+
+			char* nuevo_grado_multiprogramacion_str;
+			int nuevo_grado_multiprogramacion;
+
+			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
+
+			log_trace(logger, "Intentando leer argumento 'nuevo_grado_multiprogramacion' de funcion %s", funcion_seleccionada);
+			if ((nuevo_grado_multiprogramacion_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
+			{
+				printf("No se encontro parametro 'nuevo_grado_multiprogramacion para la funcion %s.\n", funcion_seleccionada);
+				log_error(logger, "No se encontro parametro 'nuevo_grado_multiprogramacion' para la funcion %s.", funcion_seleccionada);
+				continue;
+			}
+			else
+			{
+				log_trace(logger, "Se leyo el argumento 'nuevo_grado_multiprogramacion' de funcion %s y es: '%s'", funcion_seleccionada, nuevo_grado_multiprogramacion_str);
+				log_trace(logger, "Intentando convertir el argumento 'nuevo_grado_multiprogramacion' = '%s' de funcion %s a entero", nuevo_grado_multiprogramacion_str, funcion_seleccionada);
+
+				if (nuevo_grado_multiprogramacion = atoi(nuevo_grado_multiprogramacion_str))
+				{
+					log_trace(logger, "Se pudo convertir el argumento 'nuevo_grado_multiprogramacion' de funcion %s al entero %d", funcion_seleccionada, nuevo_grado_multiprogramacion);
+				}
+				else
+				{
+					log_trace(logger, "No se pudo convertir el argumento 'nuevo_grado_multiprogramacion' = '%s' de funcion %s a entero", nuevo_grado_multiprogramacion_str, funcion_seleccionada);
+					printf("No se pudo convertir el argumento 'nuevo_grado_multiprogramacion' = '%s' de funcion %s a entero\n", nuevo_grado_multiprogramacion_str, funcion_seleccionada);
+					continue;
+				}
+			}
+
+			// LOGICA DE MULTIPROGRAMACION...
+		}
+		else if (strcmp(funcion_seleccionada, PROCESO_ESTADO) == 0) 
+		{
+			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
+
+			// LOGICA DE PROCESO_ESTADO...
+		}
+		else
+		{
+			log_error(logger, "'%s' no coincide con ninguna funcion conocida.", funcion_seleccionada);
+			printf("'%s' no coincide con ninguna funcion conocida.\n", funcion_seleccionada);
+		}
+	}
 }
