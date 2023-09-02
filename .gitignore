@@ -52,5 +52,5 @@ Mkfile.old
 dkms.conf
 
 # Logs
-MiServidor/Logs/servidor.log
-MiCliente/Logs/cliente.log
+Kernel/Logs/kernel.log
+CPU/Logs/cpu.log

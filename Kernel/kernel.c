@@ -57,9 +57,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_servidor, NOMBRE_MODULO_SERVIDOR);
 
-	while (true)
-		;
-
 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
 
 	return EXIT_SUCCESS;
