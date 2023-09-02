@@ -1,5 +1,7 @@
 #include "kernel.h"
 
+pthread_t hilo_consola;
+
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	setbuf(stdout, NULL); // Why?
@@ -7,8 +9,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	t_log* logger = NULL;
 	t_argumentos_kernel* argumentos_kernel = NULL;
 	t_config_kernel* configuracion_kernel = NULL;
-
-
 	int conexion_con_servidor = -1;
 	t_paquete* paquete_para_servidor = NULL;
 
@@ -44,6 +44,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
 	// 	return EXIT_FAILURE;
 	// }
+
+	crear_hilo_consola(logger, configuracion_kernel);
 	
 	// // Logica principal
 	// paquete_para_servidor = crear_paquete_para_servidor(logger);
@@ -54,6 +56,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// int resultado_servidor = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_SERVIDOR, conexion_con_servidor);
 
 	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_servidor, NOMBRE_MODULO_SERVIDOR);
+
+	while(true);
 
 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
 	
@@ -77,4 +81,25 @@ void terminar_kernel(t_log* logger, t_argumentos_kernel* argumentos_kernel, t_co
 	}
 
 	//destruir_paquete(logger, paquete_para_servidor);
+}
+
+void crear_hilo_consola(t_log* logger, t_config_kernel* configuracion_kernel)
+{
+	t_argumentos_hilo_consola* argumentos_hilo_consola = malloc(sizeof(t_argumentos_hilo_consola));
+	
+	argumentos_hilo_consola -> logger = logger;
+	argumentos_hilo_consola -> configuracion_kernel = configuracion_kernel;
+
+    pthread_create(&hilo_consola, NULL , (void*) consola, (void*) argumentos_hilo_consola);
+    pthread_detach(hilo_consola);
+}
+
+void consola(void* argumentos)
+{
+	t_argumentos_hilo_consola* argumentos_hilo_consola = (t_argumentos_hilo_consola*) argumentos;
+	
+	t_log* logger = argumentos_hilo_consola -> logger;
+	t_config_kernel* configuracion_kernel = argumentos_hilo_consola -> configuracion_kernel;
+
+	
 }

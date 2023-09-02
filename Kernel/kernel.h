@@ -29,6 +29,14 @@
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
+typedef struct
+{
+	t_log* logger;
+    t_config_kernel* configuracion_kernel;
+} t_argumentos_hilo_consola;
+
 void terminar_kernel(t_log* logger, t_argumentos_kernel* argumentos_kernel, t_config_kernel* configuracion_kernel, int conexion_con_servidor, t_paquete* paquete_para_servidor);
+void crear_hilo_consola(t_log* logger, t_config_kernel* config_kernel);
+void consola(void* argumentos);
 
 #endif /* KERNEL_H_ */

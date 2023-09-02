@@ -1,28 +1,28 @@
-[DEBUG] 02:11:59:348 Kernel/(14000:14000): Inicializando Kernel
-[DEBUG] 02:11:59:348 Kernel/(14000:14000): Comenzando la lectura de argumentos
-[TRACE] 02:11:59:348 Kernel/(14000:14000): La cantidad de argumentos recibida es la esperada: 1
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo el argumento ruta archivo de configuracion con valor Configuracion/kernel.config
-[DEBUG] 02:11:59:348 Kernel/(14000:14000): Exito en la lectura de argumentos
-[DEBUG] 02:11:59:348 Kernel/(14000:14000): Comenzando la lectura de archivo de configuracion
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave IP_MEMORIA con valor tipo string = 127.0.0.1 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave PUERTO_MEMORIA con valor tipo entero = 8002 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave IP_FILESYSTEM con valor tipo string = 127.0.0.1 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave PUERTO_FILESYSTEM con valor tipo entero = 8003 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave IP_CPU con valor tipo string = 127.0.0.1 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave PUERTO_CPU_DISPATCH con valor tipo entero = 8006 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave PUERTO_CPU_INTERRUPT con valor tipo entero = 8007 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave ALGORITMO_PLANIFICACION con valor tipo string = FIFO 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave QUANTUM con valor tipo entero = 2000 
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave RECURSOS con los siguientes valores de tipo string:
-[TRACE] 02:11:59:348 Kernel/(14000:14000): RA
-[TRACE] 02:11:59:348 Kernel/(14000:14000): RB
-[TRACE] 02:11:59:348 Kernel/(14000:14000): RC
-[TRACE] 02:11:59:348 Kernel/(14000:14000): El tamaño del arreglo de strings para la clave RECURSOS fue de 3
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave INSTANCIAS_RECURSOS con los siguientes valores de tipo entero:
-[TRACE] 02:11:59:348 Kernel/(14000:14000): 1
-[TRACE] 02:11:59:348 Kernel/(14000:14000): 2
-[TRACE] 02:11:59:348 Kernel/(14000:14000): 1
-[TRACE] 02:11:59:348 Kernel/(14000:14000): El tamaño del arreglo de enteros para la clave INSTANCIAS_RECURSOS fue de 3
-[TRACE] 02:11:59:348 Kernel/(14000:14000): Se leyo desde archivo de configuracion la clave GRADO_MULTIPROGRAMACION_INI con valor tipo entero = 10 
-[DEBUG] 02:11:59:348 Kernel/(14000:14000): Exito en la lectura de archivo de configuracion
-[DEBUG] 02:11:59:348 Kernel/(14000:14000): Finalizando Kernel
+[DEBUG] 02:45:44:538 Kernel/(21492:21492): Inicializando Kernel
+[DEBUG] 02:45:44:538 Kernel/(21492:21492): Comenzando la lectura de argumentos
+[TRACE] 02:45:44:539 Kernel/(21492:21492): La cantidad de argumentos recibida es la esperada: 1
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo el argumento ruta archivo de configuracion con valor Configuracion/kernel.config
+[DEBUG] 02:45:44:539 Kernel/(21492:21492): Exito en la lectura de argumentos
+[DEBUG] 02:45:44:539 Kernel/(21492:21492): Comenzando la lectura de archivo de configuracion
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave IP_MEMORIA con valor tipo string = 127.0.0.1 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave PUERTO_MEMORIA con valor tipo entero = 8002 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave IP_FILESYSTEM con valor tipo string = 127.0.0.1 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave PUERTO_FILESYSTEM con valor tipo entero = 8003 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave IP_CPU con valor tipo string = 127.0.0.1 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave PUERTO_CPU_DISPATCH con valor tipo entero = 8006 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave PUERTO_CPU_INTERRUPT con valor tipo entero = 8007 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave ALGORITMO_PLANIFICACION con valor tipo string = FIFO 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave QUANTUM con valor tipo entero = 2000 
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave RECURSOS con los siguientes valores de tipo string:
+[TRACE] 02:45:44:539 Kernel/(21492:21492): RA
+[TRACE] 02:45:44:539 Kernel/(21492:21492): RB
+[TRACE] 02:45:44:539 Kernel/(21492:21492): RC
+[TRACE] 02:45:44:539 Kernel/(21492:21492): El tamaño del arreglo de strings para la clave RECURSOS fue de 3
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave INSTANCIAS_RECURSOS con los siguientes valores de tipo entero:
+[TRACE] 02:45:44:539 Kernel/(21492:21492): 1
+[TRACE] 02:45:44:539 Kernel/(21492:21492): 2
+[TRACE] 02:45:44:539 Kernel/(21492:21492): 1
+[TRACE] 02:45:44:539 Kernel/(21492:21492): El tamaño del arreglo de enteros para la clave INSTANCIAS_RECURSOS fue de 3
+[TRACE] 02:45:44:539 Kernel/(21492:21492): Se leyo desde archivo de configuracion la clave GRADO_MULTIPROGRAMACION_INI con valor tipo entero = 10 
+[DEBUG] 02:45:44:539 Kernel/(21492:21492): Exito en la lectura de archivo de configuracion
+[DEBUG] 02:45:44:557 Kernel/(21492:21493): Soy una consola3
