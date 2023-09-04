@@ -55,6 +55,15 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	// Logica principal
+	int resultado_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_kernel, NOMBRE_MODULO_KERNEL);
+	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_KERNEL);
+	enviar_operacion_sin_paquete(logger, conexion_con_kernel, MENSAJE_DE_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+
+	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_MEMORIA);
+	enviar_operacion_sin_paquete(logger, conexion_con_memoria, MENSAJE_DE_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+	int resultado_memoria = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_memoria, NOMBRE_MODULO_MEMORIA);
 
 	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);

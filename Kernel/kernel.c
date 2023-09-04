@@ -69,14 +69,25 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	crear_hilo_consola(logger, configuracion_kernel);
 
 	// Logica principal
-	// paquete_para_servidor = crear_paquete_para_servidor(logger);
-	// log_info(logger, "Enviando señal para hacer quack a %s", NOMBRE_MODULO_SERVIDOR);
-	// enviar_paquete(logger, conexion_con_servidor, paquete_para_servidor, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_SERVIDOR);
-	// log_info(logger, "Exito en el envio de señal para hacer quack a %s", NOMBRE_MODULO_SERVIDOR);
+	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_CPU_DISPATCH);
+	enviar_operacion_sin_paquete(logger, conexion_con_cpu_dispatch, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	int resultado_cpu_dispatch = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_cpu_dispatch, NOMBRE_MODULO_CPU_DISPATCH);
 
-	// int resultado_servidor = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_SERVIDOR, conexion_con_servidor);
+	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_CPU_INTERRUPT);
+	enviar_operacion_sin_paquete(logger, conexion_con_cpu_interrupt, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+	int resultado_cpu_interrupt = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT, conexion_con_cpu_interrupt);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_cpu_interrupt, NOMBRE_MODULO_CPU_INTERRUPT);
 
-	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_servidor, NOMBRE_MODULO_SERVIDOR);
+	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_FILESYSTEM);
+	enviar_operacion_sin_paquete(logger, conexion_con_filesystem, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+	int resultado_filesystem = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_filesystem, NOMBRE_MODULO_FILESYSTEM);
+
+	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_MEMORIA);
+	enviar_operacion_sin_paquete(logger, conexion_con_memoria, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+	int resultado_memoria = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_memoria, NOMBRE_MODULO_MEMORIA);
 
 	// Finalizacion
 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
