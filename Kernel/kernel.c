@@ -4,19 +4,21 @@ pthread_t hilo_consola;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
-	setbuf(stdout, NULL); // Why?
+	setbuf(stdout, NULL); // Why? Era algo de consola esto.
 
 	t_log *logger = NULL;
 	t_argumentos_kernel *argumentos_kernel = NULL;
 	t_config_kernel *configuracion_kernel = NULL;
-	int conexion_con_servidor = -1;
-	t_paquete *paquete_para_servidor = NULL;
+	int conexion_con_cpu_dispatch = -1;
+	int conexion_con_cpu_interrupt = -1;
+	int conexion_con_memoria = -1;
+	int conexion_con_filesystem = -1;
 
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_KERNEL, LOG_LEVEL);
 	if (logger == NULL)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
 		return EXIT_FAILURE;
 	}
 
@@ -25,29 +27,48 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	argumentos_kernel = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_kernel == NULL)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
 		return EXIT_FAILURE;
 	}
 
 	configuracion_kernel = leer_configuracion(logger, argumentos_kernel->ruta_archivo_configuracion);
 	if (configuracion_kernel == NULL)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
 		return EXIT_FAILURE;
 	}
 
-	// log_debug(logger, "Intentando conectar %s con %s ...", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_SERVIDOR);
+	conexion_con_cpu_dispatch = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_cpu_dispatch, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	if (conexion_con_cpu_dispatch == -1)
+	{
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		return EXIT_FAILURE;
+	}
 
-	// conexion_con_servidor = crear_socket_kernel(logger, configuracion_kernel -> ip_servidor, configuracion_kernel -> puerto_servidor, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_SERVIDOR);
-	// if (conexion_con_servidor == -1)
-	// {
-	// 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
-	// 	return EXIT_FAILURE;
-	// }
+	conexion_con_cpu_interrupt = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_cpu_interrupt, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+	if (conexion_con_cpu_interrupt == -1)
+	{
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		return EXIT_FAILURE;
+	}
+
+	conexion_con_memoria = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+	if (conexion_con_memoria == -1)
+	{
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		return EXIT_FAILURE;
+	}
+
+	conexion_con_filesystem = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_filesystem, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+	if (conexion_con_filesystem == -1)
+	{
+		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		return EXIT_FAILURE;
+	}
 
 	crear_hilo_consola(logger, configuracion_kernel);
 
-	// // Logica principal
+	// Logica principal
 	// paquete_para_servidor = crear_paquete_para_servidor(logger);
 	// log_info(logger, "Enviando señal para hacer quack a %s", NOMBRE_MODULO_SERVIDOR);
 	// enviar_paquete(logger, conexion_con_servidor, paquete_para_servidor, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_SERVIDOR);
@@ -57,12 +78,12 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_servidor, NOMBRE_MODULO_SERVIDOR);
 
-	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_servidor, paquete_para_servidor);
-
+	// Finalizacion
+	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
 	return EXIT_SUCCESS;
 }
 
-void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_servidor, t_paquete *paquete_para_servidor)
+void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem)
 {
 	if (logger != NULL)
 	{
@@ -73,12 +94,25 @@ void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_co
 	destruir_argumentos(argumentos_kernel);
 	destruir_configuracion(configuracion_kernel);
 
-	if (conexion_con_servidor != -1)
+	if (conexion_con_cpu_dispatch != -1)
 	{
-		close(conexion_con_servidor);
+		close(conexion_con_cpu_dispatch);
 	}
 
-	// destruir_paquete(logger, paquete_para_servidor);
+	if (conexion_con_cpu_interrupt != -1)
+	{
+		close(conexion_con_cpu_interrupt);
+	}
+
+	if (conexion_con_memoria != -1)
+	{
+		close(conexion_con_memoria);
+	}
+
+	if (conexion_con_filesystem != -1)
+	{
+		close(conexion_con_filesystem);
+	}
 }
 
 void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel)

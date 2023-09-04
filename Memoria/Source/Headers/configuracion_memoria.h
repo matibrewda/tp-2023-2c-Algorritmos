@@ -11,9 +11,9 @@
 
 #include "../../../Shared/Headers/utilidades_configuracion.h"
 
-#define CLAVE_CONFIGURACION_PUERTO_ESCUCHA "PUERTO_ESCUCHA"
-#define CLAVE_CONFIGURACION_IP_FILESYSTEM "IP_FILESYSTEM"
-#define CLAVE_CONFIGURACION_PUERTO_FILESYSTEM "PUERTO_FILESYSTEM"
+#define CLAVE_CONFIGURACION_PUERTO_ESCUCHA_KERNEL "PUERTO_ESCUCHA_KERNEL"
+#define CLAVE_CONFIGURACION_PUERTO_ESCUCHA_FILESYSTEM "PUERTO_ESCUCHA_FILESYSTEM"
+#define CLAVE_CONFIGURACION_PUERTO_ESCUCHA_CPU "PUERTO_ESCUCHA_CPU"
 #define CLAVE_CONFIGURACION_TAM_MEMORIA "TAM_MEMORIA"
 #define CLAVE_CONFIGURACION_TAM_PAGINA "TAM_PAGINA"
 #define CLAVE_CONFIGURACION_PATH_INSTRUCCIONES "PATH_INSTRUCCIONES"
@@ -22,9 +22,9 @@
 
 typedef struct
 {
-	int puerto_escucha;
-	char *ip_filesystem;
-	int puerto_filesystem;
+	char *puerto_escucha_kernel;
+	char *puerto_escucha_filesystem;
+	char *puerto_escucha_cpu;
 	int tam_memoria;
 	int tam_pagina;
 	char *path_instrucciones;

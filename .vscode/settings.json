@@ -2,6 +2,11 @@
     "files.associations": {
         "readline.h": "c",
         "string.h": "c",
-        "memoria.h": "c"
+        "memoria.h": "c",
+        "paquete_para_servidor.h": "c",
+        "utilidades_conexion.h": "c",
+        "semaphore.h": "c",
+        "utilidades_logger.h": "c",
+        "config.h": "c"
     }
 }

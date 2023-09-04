@@ -12,9 +12,9 @@ t_config_memoria *leer_configuracion(t_log *logger, char *ruta_archivo_configura
 	}
 
 	char *claves[] = {
-		CLAVE_CONFIGURACION_PUERTO_ESCUCHA,
-		CLAVE_CONFIGURACION_IP_FILESYSTEM,
-		CLAVE_CONFIGURACION_PUERTO_FILESYSTEM,
+		CLAVE_CONFIGURACION_PUERTO_ESCUCHA_KERNEL,
+		CLAVE_CONFIGURACION_PUERTO_ESCUCHA_FILESYSTEM,
+		CLAVE_CONFIGURACION_PUERTO_ESCUCHA_CPU,
 		CLAVE_CONFIGURACION_TAM_MEMORIA,
 		CLAVE_CONFIGURACION_TAM_PAGINA,
 		CLAVE_CONFIGURACION_PATH_INSTRUCCIONES,
@@ -28,9 +28,9 @@ t_config_memoria *leer_configuracion(t_log *logger, char *ruta_archivo_configura
 	}
 
 	t_config_memoria *configuracion_memoria = malloc(sizeof(t_config_memoria));
-	configuracion_memoria->puerto_escucha = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA);
-	configuracion_memoria->ip_filesystem = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_IP_FILESYSTEM);
-	configuracion_memoria->puerto_filesystem = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_FILESYSTEM);
+	configuracion_memoria->puerto_escucha_kernel = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_KERNEL);
+	configuracion_memoria->puerto_escucha_filesystem = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_FILESYSTEM);
+	configuracion_memoria->puerto_escucha_cpu = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_CPU);
 	configuracion_memoria->tam_memoria = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_TAM_MEMORIA);
 	configuracion_memoria->tam_pagina = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_TAM_PAGINA);
 	configuracion_memoria->path_instrucciones = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PATH_INSTRUCCIONES);
@@ -50,7 +50,9 @@ void destruir_configuracion(t_config_memoria *configuracion_memoria)
 		return;
 	}
 
-	free(configuracion_memoria->ip_filesystem);
+	free(configuracion_memoria->puerto_escucha_kernel);
+	free(configuracion_memoria->puerto_escucha_filesystem);
+	free(configuracion_memoria->puerto_escucha_cpu);
 	free(configuracion_memoria->path_instrucciones);
 	free(configuracion_memoria->algoritmo_reemplazo);
 

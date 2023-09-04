@@ -31,5 +31,6 @@
 # Orden de ejecucion
 
 1) Memoria
-2) CPU / Filesystem (en cualquier orden)
-3) Kernel
+2) Filesystem
+3) CPU
+4) Kernel

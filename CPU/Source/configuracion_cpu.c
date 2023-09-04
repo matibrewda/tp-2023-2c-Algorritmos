@@ -25,9 +25,9 @@ t_config_cpu *leer_configuracion(t_log *logger, char *ruta_archivo_configuracion
 
 	t_config_cpu *configuracion_cpu = malloc(sizeof(t_config_cpu));
 	configuracion_cpu->ip_memoria = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_IP_MEMORIA);
-	configuracion_cpu->puerto_memoria = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_MEMORIA);
-	configuracion_cpu->puerto_escucha_dispatch = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_DISPATCH);
-	configuracion_cpu->puerto_escucha_interrupt = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_INTERRUPT);
+	configuracion_cpu->puerto_memoria = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_MEMORIA);
+	configuracion_cpu->puerto_escucha_dispatch = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_DISPATCH);
+	configuracion_cpu->puerto_escucha_interrupt = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_INTERRUPT);
 
 	log_debug(logger, "Exito en la lectura de archivo de configuracion");
 
@@ -43,6 +43,9 @@ void destruir_configuracion(t_config_cpu *configuracion_cpu)
 	}
 
 	free(configuracion_cpu->ip_memoria);
+	free(configuracion_cpu->puerto_memoria);
+	free(configuracion_cpu->puerto_escucha_dispatch);
+	free(configuracion_cpu->puerto_escucha_interrupt);
 
 	free(configuracion_cpu);
 }

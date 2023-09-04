@@ -19,9 +19,9 @@
 typedef struct
 {
 	char *ip_memoria;
-	int puerto_memoria;
-	int puerto_escucha_dispatch;
-	int puerto_escucha_interrupt;
+	char *puerto_memoria;
+	char *puerto_escucha_dispatch;
+	char *puerto_escucha_interrupt;
 } t_config_cpu;
 
 t_config_cpu *leer_configuracion(t_log *logger, char *ruta_archivo_configuracion);

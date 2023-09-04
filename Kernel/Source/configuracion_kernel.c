@@ -33,12 +33,12 @@ t_config_kernel *leer_configuracion(t_log *logger, char *ruta_archivo_configurac
 
 	t_config_kernel *configuracion_kernel = malloc(sizeof(t_config_kernel));
 	configuracion_kernel->ip_memoria = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_IP_MEMORIA);
-	configuracion_kernel->puerto_memoria = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_MEMORIA);
+	configuracion_kernel->puerto_memoria = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_MEMORIA);
 	configuracion_kernel->ip_filesystem = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_IP_FILESYSTEM);
-	configuracion_kernel->puerto_filesystem = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_FILESYSTEM);
+	configuracion_kernel->puerto_filesystem = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_FILESYSTEM);
 	configuracion_kernel->ip_cpu = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_IP_CPU);
-	configuracion_kernel->puerto_cpu_dispatch = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_CPU_DISPATCH);
-	configuracion_kernel->puerto_cpu_interrupt = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_CPU_INTERRUPT);
+	configuracion_kernel->puerto_cpu_dispatch = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_CPU_DISPATCH);
+	configuracion_kernel->puerto_cpu_interrupt = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_CPU_INTERRUPT);
 	configuracion_kernel->algoritmo_planificacion = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_ALGORITMO_PLANIFICACION);
 	configuracion_kernel->quantum = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_QUANTUM);
 	configuracion_kernel->recursos = leer_clave_arreglo_de_strings(logger, configuracion, CLAVE_CONFIGURACION_RECURSOS, &(configuracion_kernel->cantidad_de_recursos));
@@ -60,8 +60,12 @@ void destruir_configuracion(t_config_kernel *configuracion_kernel)
 	}
 
 	free(configuracion_kernel->ip_memoria);
+	free(configuracion_kernel->puerto_memoria);
 	free(configuracion_kernel->ip_filesystem);
+	free(configuracion_kernel->puerto_filesystem);
 	free(configuracion_kernel->ip_cpu);
+	free(configuracion_kernel->puerto_cpu_dispatch);
+	free(configuracion_kernel->puerto_cpu_interrupt);
 	free(configuracion_kernel->algoritmo_planificacion);
 	free(configuracion_kernel->instancias_recursos);
 

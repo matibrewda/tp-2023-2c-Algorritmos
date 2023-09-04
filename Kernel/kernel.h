@@ -18,13 +18,15 @@
 
 #include "Source/Headers/argumentos_kernel.h"
 #include "Source/Headers/configuracion_kernel.h"
-#include "Source/Headers/paquete_para_servidor.h"
 
 #include "../Shared/Headers/utilidades_logger.h"
 #include "../Shared/Headers/utilidades_argumentos.h"
 #include "../Shared/Headers/utilidades_configuracion.h"
 #include "../Shared/Headers/utilidades_conexion.h"
+#include "../Shared/Headers/utilidades_serializacion.h"
+#include "../Shared/Headers/utilidades_deserializacion.h"
 #include "../Shared/Headers/nombres_modulos.h"
+#include "../Shared/Headers/estructuras.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
@@ -43,7 +45,7 @@ typedef struct
     t_config_kernel *configuracion_kernel;
 } t_argumentos_hilo_consola;
 
-void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_servidor, t_paquete *paquete_para_servidor);
+void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem);
 void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel);
 void consola(void *argumentos);
 

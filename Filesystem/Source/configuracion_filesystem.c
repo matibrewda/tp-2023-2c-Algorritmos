@@ -14,7 +14,7 @@ t_config_filesystem *leer_configuracion(t_log *logger, char *ruta_archivo_config
 	char *claves[] = {
 		CLAVE_CONFIGURACION_IP_MEMORIA,
 		CLAVE_CONFIGURACION_PUERTO_MEMORIA,
-		CLAVE_CONFIGURACION_PUERTO_ESCUCHA,
+		CLAVE_CONFIGURACION_PUERTO_ESCUCHA_KERNEL,
 		CLAVE_CONFIGURACION_PATH_FAT,
 		CLAVE_CONFIGURACION_PATH_BLOQUES,
 		CLAVE_CONFIGURACION_PATH_FCB,
@@ -32,8 +32,8 @@ t_config_filesystem *leer_configuracion(t_log *logger, char *ruta_archivo_config
 
 	t_config_filesystem *configuracion_filesystem = malloc(sizeof(t_config_filesystem));
 	configuracion_filesystem->ip_memoria = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_IP_MEMORIA);
-	configuracion_filesystem->puerto_memoria = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_MEMORIA);
-	configuracion_filesystem->puerto_escucha = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA);
+	configuracion_filesystem->puerto_memoria = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_MEMORIA);
+	configuracion_filesystem->puerto_escucha_kernel = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_KERNEL);
 	configuracion_filesystem->path_fat = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PATH_FAT);
 	configuracion_filesystem->path_bloques = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PATH_BLOQUES);
 	configuracion_filesystem->path_fcb = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PATH_FCB);
@@ -57,6 +57,8 @@ void destruir_configuracion(t_config_filesystem *configuracion_filesystem)
 	}
 
 	free(configuracion_filesystem->ip_memoria);
+	free(configuracion_filesystem->puerto_memoria);
+	free(configuracion_filesystem->puerto_escucha_kernel);
 	free(configuracion_filesystem->path_fat);
 	free(configuracion_filesystem->path_bloques);
 	free(configuracion_filesystem->path_fcb);

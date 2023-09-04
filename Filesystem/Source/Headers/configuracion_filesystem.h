@@ -13,7 +13,7 @@
 
 #define CLAVE_CONFIGURACION_IP_MEMORIA "IP_MEMORIA"
 #define CLAVE_CONFIGURACION_PUERTO_MEMORIA "PUERTO_MEMORIA"
-#define CLAVE_CONFIGURACION_PUERTO_ESCUCHA "PUERTO_ESCUCHA"
+#define CLAVE_CONFIGURACION_PUERTO_ESCUCHA_KERNEL "PUERTO_ESCUCHA_KERNEL"
 #define CLAVE_CONFIGURACION_PATH_FAT "PATH_FAT"
 #define CLAVE_CONFIGURACION_PATH_BLOQUES "PATH_BLOQUES"
 #define CLAVE_CONFIGURACION_PATH_FCB "PATH_FCB"
@@ -26,8 +26,8 @@
 typedef struct
 {
 	char *ip_memoria;
-	int puerto_memoria;
-	int puerto_escucha;
+	char *puerto_memoria;
+	char *puerto_escucha_kernel;
 	char *path_fat;
 	char *path_bloques;
 	char *path_fcb;
