@@ -3,5 +3,7 @@
 
 #define NOMBRE_MODULO_KERNEL "Kernel"
 #define NOMBRE_MODULO_CPU "CPU"
+#define NOMBRE_MODULO_FILESYSTEM "Filesystem"
+#define NOMBRE_MODULO_MEMORIA "Memoria"
 
 #endif /* NOMBRES_MODULOS_H_ */

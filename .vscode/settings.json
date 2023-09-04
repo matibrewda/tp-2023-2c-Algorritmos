@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "readline.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "memoria.h": "c"
     }
 }

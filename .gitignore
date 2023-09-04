@@ -54,3 +54,5 @@ dkms.conf
 # Logs
 Kernel/Logs/kernel.log
 CPU/Logs/cpu.log
+Memoria/Logs/memoria.log
+Filesystem/Logs/filesystem.log

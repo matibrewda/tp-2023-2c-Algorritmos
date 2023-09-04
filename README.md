@@ -12,8 +12,24 @@
 
 * [Kernel](Kernel/README.md)
 * [CPU](CPU/README.md)
+* [Filesystem](Filesystem/README.md)
+* [Memoria](Memoria/README.md)
 
 # Comandos Útiles
 
 * strace -> tracea syscalls
 * netstar -> lista sockets abiertos del SO
+
+# Utilidades
+
+* Valgrind: analizador de uso de memoria
+
+# Notas
+
+* NO hay que validar instrucciones (de CPU)
+
+# Orden de ejecucion
+
+1) Memoria
+2) CPU / Filesystem (en cualquier orden)
+3) Kernel
