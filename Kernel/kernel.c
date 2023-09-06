@@ -219,7 +219,7 @@ void listar_procesos()
 
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 {
-	in
+	int gra
 	sem_getvalue()
 	log_trace(logger, "El grado de ")
 }
