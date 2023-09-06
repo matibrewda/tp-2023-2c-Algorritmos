@@ -71,20 +71,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	// Logica principal
-	int resultado_cpu_dispatch = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_cpu_dispatch, NOMBRE_MODULO_KERNEL);
-	log_info(logger, "Mando señal a %s desde %s", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	enviar_operacion_sin_paquete(logger, conexion_con_kernel_dispatch, MENSAJE_DE_CPU_DISPATCH, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-
-	int resultado_cpu_interrupt = esperar_operacion(logger, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL, conexion_con_kernel_interrupt);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_cpu_interrupt, NOMBRE_MODULO_KERNEL);
-	log_info(logger, "Mando señal a %s desde %s", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
-	enviar_operacion_sin_paquete(logger, conexion_con_kernel_interrupt, MENSAJE_DE_CPU_INTERRUPT, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL);
-
-	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_MEMORIA);
-	enviar_operacion_sin_paquete(logger, conexion_con_memoria, MENSAJE_DE_CPU, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-	int resultado_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_memoria, NOMBRE_MODULO_MEMORIA);
+	
 
 	// Finalizacion
 	terminar_cpu(logger, argumentos_cpu, configuracion_cpu, socket_kernel_dispatch, conexion_con_kernel_dispatch, socket_kernel_interrupt, conexion_con_kernel_interrupt, conexion_con_memoria);

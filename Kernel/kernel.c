@@ -1,18 +1,25 @@
 #include "kernel.h"
 
 pthread_t hilo_consola;
+pthread_t hilo_planificador_largo_plazo;
+pthread_t hilo_planificador_corto_plazo;
+t_log *logger = NULL;
+t_argumentos_kernel *argumentos_kernel = NULL;
+t_config_kernel *configuracion_kernel = NULL;
+t_colas_planificacion *colas_planificacion = NULL;
+int conexion_con_cpu_dispatch = -1;
+int conexion_con_cpu_interrupt = -1;
+int conexion_con_memoria = -1;
+int conexion_con_filesystem = -1;
+sem_t semaforo_grado_max_multiprogramacion;
+sem_t semaforo_cantidad_procesos_en_new;
+t_list *pcbs;
+bool planificacion_detenida = false;
+int proximo_pid = 0;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	setbuf(stdout, NULL); // Why? Era algo de consola esto.
-
-	t_log *logger = NULL;
-	t_argumentos_kernel *argumentos_kernel = NULL;
-	t_config_kernel *configuracion_kernel = NULL;
-	int conexion_con_cpu_dispatch = -1;
-	int conexion_con_cpu_interrupt = -1;
-	int conexion_con_memoria = -1;
-	int conexion_con_filesystem = -1;
 
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_KERNEL, LOG_LEVEL);
@@ -66,28 +73,27 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	crear_hilo_consola(logger, configuracion_kernel);
+	// Semaforos
+	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
+	sem_init(&semaforo_cantidad_procesos_en_new, false, 0);
+
+	// Colas de planificacion
+	colas_planificacion = malloc(sizeof(t_colas_planificacion));
+
+	colas_planificacion->cola_new = queue_create();
+	colas_planificacion->cola_ready = queue_create();
+	colas_planificacion->cola_executing = queue_create();
+
+	// Listas
+	pcbs = list_create();
+
+	// Hilos
+	pthread_create(&hilo_consola, NULL, consola, NULL);
+	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
+	pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo, NULL);
 
 	// Logica principal
-	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_CPU_DISPATCH);
-	enviar_operacion_sin_paquete(logger, conexion_con_cpu_dispatch, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	int resultado_cpu_dispatch = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_cpu_dispatch, NOMBRE_MODULO_CPU_DISPATCH);
-
-	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_CPU_INTERRUPT);
-	enviar_operacion_sin_paquete(logger, conexion_con_cpu_interrupt, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
-	int resultado_cpu_interrupt = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT, conexion_con_cpu_interrupt);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_cpu_interrupt, NOMBRE_MODULO_CPU_INTERRUPT);
-
-	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_FILESYSTEM);
-	enviar_operacion_sin_paquete(logger, conexion_con_filesystem, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
-	int resultado_filesystem = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_filesystem, NOMBRE_MODULO_FILESYSTEM);
-
-	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_MEMORIA);
-	enviar_operacion_sin_paquete(logger, conexion_con_memoria, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
-	int resultado_memoria = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_memoria, NOMBRE_MODULO_MEMORIA);
+	esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 
 	// Finalizacion
 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
@@ -126,24 +132,110 @@ void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_co
 	}
 }
 
-void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel)
+void *planificador_largo_plazo()
 {
-	t_argumentos_hilo_consola *argumentos_hilo_consola = malloc(sizeof(t_argumentos_hilo_consola));
+	log_trace(logger, "Planificador de largo plazo inicializado con exito.");
 
-	argumentos_hilo_consola->logger = logger;
-	argumentos_hilo_consola->configuracion_kernel = configuracion_kernel;
+	while (true)
+	{
+		log_trace(logger, "Planificador de largo plazo: esperando algun proceso en NEW...");
+		sem_wait(&semaforo_cantidad_procesos_en_new);
+		log_trace(logger, "Planificador de largo plazo: esperando grado maximo de multiprogramacion..");
+		sem_wait(&semaforo_grado_max_multiprogramacion);
 
-	pthread_create(&hilo_consola, NULL, (void *)consola, (void *)argumentos_hilo_consola);
-	pthread_detach(hilo_consola);
+		if (!queue_is_empty(colas_planificacion->cola_new))
+		{
+			t_pcb *pcb = queue_pop(colas_planificacion->cola_new);
+			pcb->estado = 'R';
+			queue_push(colas_planificacion->cola_ready, pcb);
+		}
+	}
 }
 
-void consola(void *argumentos)
+int obtener_nuevo_pid()
 {
-	t_argumentos_hilo_consola *argumentos_hilo_consola = (t_argumentos_hilo_consola *)argumentos;
+	++proximo_pid;
+	return proximo_pid;
+}
 
-	t_log *logger = argumentos_hilo_consola->logger;
-	t_config_kernel *configuracion_kernel = argumentos_hilo_consola->configuracion_kernel;
+void crear_proceso(char *path, int size, int prioridad)
+{
+	t_pcb *pcb = malloc(sizeof(t_pcb));
 
+	pcb->pid = obtener_nuevo_pid();
+	pcb->estado = 'N';
+
+	list_add(pcbs, pcb);
+	queue_push(colas_planificacion->cola_new, pcb);
+	sem_post(&semaforo_cantidad_procesos_en_new);
+
+	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
+}
+
+void finalizar_proceso(int pid)
+{
+}
+
+void iniciar_planificacion()
+{
+	if (!planificacion_detenida)
+	{
+		printf("ERROR: La planificacion ya esta iniciada.\n");
+		return;
+	}
+
+	log_info(logger, "INICIO DE PLANIFICACIÓN");
+}
+
+void detener_planificacion()
+{
+	if (planificacion_detenida)
+	{
+		printf("ERROR: La planificacion ya se encuentra detenida.\n");
+		return;
+	}
+
+	log_info(logger, "PAUSA DE PLANIFICACIÓN");
+}
+
+void listar_procesos()
+{
+	if (list_is_empty(pcbs))
+	{
+		printf("No hay procesos que listar.\n");
+		return;
+	}
+
+	t_list_iterator *iterador = list_iterator_create(pcbs);
+
+	while (list_iterator_has_next(iterador))
+	{
+		t_pcb *pcb = list_iterator_next(iterador);
+		printf("Proceso PID: %d esta en estado %c\n", pcb->pid, pcb->estado);
+	}
+
+	list_iterator_destroy(iterador);
+}
+
+void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
+{
+	in
+	sem_getvalue()
+	log_trace(logger, "El grado de ")
+}
+
+void *planificador_corto_plazo()
+{
+	log_trace(logger, "Soy el planificador de corto plazo");
+
+	while (true)
+	{
+		esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	}
+}
+
+void *consola()
+{
 	while (true)
 	{
 		char *valor_ingresado_por_teclado = NULL;
@@ -230,7 +322,7 @@ void consola(void *argumentos)
 				}
 			}
 
-			// LOGICA DE INICIAR_PROCESO...
+			crear_proceso(path, size, prioridad);
 		}
 		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0)
 		{
@@ -265,19 +357,17 @@ void consola(void *argumentos)
 				}
 			}
 
-			// LOGICA DE FINALIZAR_PROCESO...
+			finalizar_proceso(pid);
 		}
 		else if (strcmp(funcion_seleccionada, DETENER_PLANIFICACION) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-
-			// LOGICA DE DETENER_PLANIFICACION...
+			detener_planificacion();
 		}
 		else if (strcmp(funcion_seleccionada, INICIAR_PLANIFICACION) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-
-			// LOGICA DE INICIAR_PLANIFICACION...
+			iniciar_planificacion();
 		}
 		else if (strcmp(funcion_seleccionada, MULTIPROGRAMACION) == 0)
 		{
@@ -312,13 +402,12 @@ void consola(void *argumentos)
 				}
 			}
 
-			// LOGICA DE MULTIPROGRAMACION...
+			modificar_grado_max_multiprogramacion(nuevo_grado_multiprogramacion);
 		}
 		else if (strcmp(funcion_seleccionada, PROCESO_ESTADO) == 0)
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-
-			// LOGICA DE PROCESO_ESTADO...
+			listar_procesos();
 		}
 		else
 		{

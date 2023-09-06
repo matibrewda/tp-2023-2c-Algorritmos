@@ -41,12 +41,21 @@
 
 typedef struct
 {
-    t_log *logger;
-    t_config_kernel *configuracion_kernel;
-} t_argumentos_hilo_consola;
+    t_queue *cola_new;
+    t_queue *cola_ready;
+    t_queue *cola_executing;
+} t_colas_planificacion;
 
 void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem);
-void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel);
-void consola(void *argumentos);
+void *consola();
+void *planificador_largo_plazo();
+void *planificador_corto_plazo();
+void crear_proceso(char* path, int size, int prioridad);
+void finalizar_proceso(int pid);
+void iniciar_planificacion();
+void detener_planificacion();
+void listar_procesos();
+void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
+int obtener_nuevo_pid();
 
 #endif /* KERNEL_H_ */

@@ -45,7 +45,7 @@ int crear_socket_cliente(t_log *logger, char *ip_proceso_servidor, char *puerto_
 		return -1;
 	}
 
-	log_info(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_modulo_cliente, nombre_modulo_servidor);
+	log_debug(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_modulo_cliente, nombre_modulo_servidor);
 
 	freeaddrinfo(server_info);
 
@@ -128,7 +128,7 @@ int esperar_conexion_de_cliente(t_log *logger, int socket_servidor, const char *
 	}
 	else
 	{
-		log_info(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_cliente_a_escuchar, nombre_modulo_servidor);
+		log_debug(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_cliente_a_escuchar, nombre_modulo_servidor);
 	}
 
 	return socket_conexion_con_cliente;
