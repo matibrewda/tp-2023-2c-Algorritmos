@@ -1,6 +1,5 @@
 #include "kernel.h"
 
-pthread_t hilo_consola;
 pthread_t hilo_planificador_largo_plazo;
 pthread_t hilo_planificador_corto_plazo;
 t_log *logger = NULL;
@@ -88,12 +87,11 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pcbs = list_create();
 
 	// Hilos
-	pthread_create(&hilo_consola, NULL, consola, NULL);
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
 	pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo, NULL);
 
 	// Logica principal
-	esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	consola();
 
 	// Finalizacion
 	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
@@ -219,9 +217,7 @@ void listar_procesos()
 
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 {
-	int gra
-	sem_getvalue()
-	log_trace(logger, "El grado de ")
+	
 }
 
 void *planificador_corto_plazo()
@@ -234,9 +230,11 @@ void *planificador_corto_plazo()
 	}
 }
 
-void *consola()
+void consola()
 {
-	while (true)
+	bool finalizar = false;
+
+	while (!finalizar)
 	{
 		char *valor_ingresado_por_teclado = NULL;
 
@@ -408,6 +406,10 @@ void *consola()
 		{
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 			listar_procesos();
+		}
+		else if (strcmp(funcion_seleccionada, "EXIT") == 0)
+		{
+			finalizar = true;
 		}
 		else
 		{

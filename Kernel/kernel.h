@@ -47,7 +47,7 @@ typedef struct
 } t_colas_planificacion;
 
 void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem);
-void *consola();
+void consola();
 void *planificador_largo_plazo();
 void *planificador_corto_plazo();
 void crear_proceso(char* path, int size, int prioridad);
