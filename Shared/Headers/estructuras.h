@@ -11,4 +11,11 @@ typedef struct
     char estado;
 } t_pcb;
 
+typedef struct
+{
+    char* nombre_instruccion;
+	char* parametro_1_instruccion;
+	char* parametro_2_instruccion;
+} t_instruccion;
+
 #endif /* ESTRUCTURAS_H_ */

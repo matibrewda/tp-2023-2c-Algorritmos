@@ -24,7 +24,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_KERNEL, LOG_LEVEL);
 	if (logger == NULL)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
@@ -33,42 +33,42 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	argumentos_kernel = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_kernel == NULL)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
 	configuracion_kernel = leer_configuracion(logger, argumentos_kernel->ruta_archivo_configuracion);
 	if (configuracion_kernel == NULL)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
 	conexion_con_cpu_dispatch = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_cpu_dispatch, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	if (conexion_con_cpu_dispatch == -1)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
 	conexion_con_cpu_interrupt = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_cpu_interrupt, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 	if (conexion_con_cpu_interrupt == -1)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
 	conexion_con_memoria = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
 	if (conexion_con_memoria == -1)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
 	conexion_con_filesystem = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_filesystem, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
 	if (conexion_con_filesystem == -1)
 	{
-		terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
@@ -90,15 +90,15 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
 	pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo, NULL);
 
-	// Logica principal
+	// Hilo principal
 	consola();
 
 	// Finalizacion
-	terminar_kernel(logger, argumentos_kernel, configuracion_kernel, conexion_con_cpu_dispatch, conexion_con_cpu_interrupt, conexion_con_memoria, conexion_con_filesystem);
+	terminar_kernel();
 	return EXIT_SUCCESS;
 }
 
-void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem)
+void terminar_kernel()
 {
 	if (logger != NULL)
 	{
@@ -128,6 +128,9 @@ void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_co
 	{
 		close(conexion_con_filesystem);
 	}
+
+	//sem_destroys
+	//thread destroy?
 }
 
 void *planificador_largo_plazo()

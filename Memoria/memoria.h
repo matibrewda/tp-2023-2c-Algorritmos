@@ -21,8 +21,9 @@
 #include "../Shared/Headers/utilidades_conexion.h"
 #include "../Shared/Headers/utilidades_serializacion.h"
 #include "../Shared/Headers/utilidades_deserializacion.h"
-#include "../Shared/Headers/nombres_modulos.h"
+#include "../Shared/Headers/enums.h"
 #include "../Shared/Headers/estructuras.h"
+#include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/memoria.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE

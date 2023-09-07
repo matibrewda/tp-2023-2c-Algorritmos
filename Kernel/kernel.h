@@ -25,8 +25,9 @@
 #include "../Shared/Headers/utilidades_conexion.h"
 #include "../Shared/Headers/utilidades_serializacion.h"
 #include "../Shared/Headers/utilidades_deserializacion.h"
-#include "../Shared/Headers/nombres_modulos.h"
+#include "../Shared/Headers/enums.h"
 #include "../Shared/Headers/estructuras.h"
+#include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
@@ -46,7 +47,7 @@ typedef struct
     t_queue *cola_executing;
 } t_colas_planificacion;
 
-void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem);
+void terminar_kernel();
 void consola();
 void *planificador_largo_plazo();
 void *planificador_corto_plazo();

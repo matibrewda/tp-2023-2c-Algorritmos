@@ -1,5 +1,5 @@
-#ifndef CODIGOS_OPERACION_H_
-#define CODIGOS_OPERACION_H_
+#ifndef ENUMS_H_
+#define ENUMS_H_
 
 typedef enum
 {
@@ -11,4 +11,4 @@ typedef enum
 	MENSAJE_DE_CPU
 } op_code;
 
-#endif /* CODIGOS_OPERACION_H_ */
+#endif /* ENUMS_H_ */

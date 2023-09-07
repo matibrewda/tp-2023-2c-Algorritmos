@@ -13,7 +13,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "codigos_operacion.h"
+#include "enums.h"
+#include "estructuras.h"
+#include "constantes.h"
 
 typedef struct
 {

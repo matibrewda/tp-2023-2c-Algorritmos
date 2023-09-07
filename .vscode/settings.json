@@ -7,6 +7,10 @@
         "utilidades_conexion.h": "c",
         "semaphore.h": "c",
         "utilidades_logger.h": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "nombres_modulos.h": "c",
+        "estructuras.h": "c",
+        "constantes.h": "c",
+        "enums.h": "c"
     }
 }
