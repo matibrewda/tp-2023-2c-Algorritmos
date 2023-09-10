@@ -11,6 +11,10 @@
         "nombres_modulos.h": "c",
         "estructuras.h": "c",
         "constantes.h": "c",
-        "enums.h": "c"
+        "enums.h": "c",
+        "stdlib.h": "c",
+        "signal.h": "c",
+        "utilidades_serializacion.h": "c",
+        "utilidades_deserializacion.h": "c"
     }
 }

@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <math.h>
+#include <stdint.h>
 
 #include <commons/collections/list.h>
 #include <commons/collections/queue.h>

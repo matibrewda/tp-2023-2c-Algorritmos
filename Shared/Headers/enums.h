@@ -11,4 +11,6 @@ typedef enum
 	MENSAJE_DE_CPU
 } op_code;
 
+const char* nombre_opcode(op_code opcode);
+
 #endif /* ENUMS_H_ */

@@ -27,6 +27,7 @@
 # Notas
 
 * NO hay que validar instrucciones (de CPU)
+* 
 
 # Orden de ejecucion
 

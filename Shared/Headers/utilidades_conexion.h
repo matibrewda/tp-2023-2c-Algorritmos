@@ -38,20 +38,18 @@ int esperar_conexion_de_cliente(t_log *logger, int socket_servidor, const char *
 
 // Utilidades para enviar
 t_paquete *crear_paquete(t_log *logger, op_code codigo_operacion);
-void destruir_paquete(t_log *logger, t_paquete *paquete);
 bool enviar_paquete(t_log *logger, int conexion, t_paquete *paquete, const char *nombre_proceso_origen, const char *nombre_proceso_destino);
-bool enviar_operacion_sin_paquete(t_log *logger, int conexion, op_code codigo_operacion, const char *nombre_proceso_origen, const char *nombre_proceso_destino);
+void agregar_caracter_a_paquete(t_log *logger, t_paquete *paquete, char caracter, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
 void agregar_int_a_paquete(t_log *logger, t_paquete *paquete, int entero, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
 void agregar_int32_a_paquete(t_log *logger, t_paquete *paquete, uint32_t entero, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
 void agregar_string_a_paquete(t_log *logger, t_paquete *paquete, char *string, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
 void agregar_lista_de_enteros_a_paquete(t_log *logger, t_list *lista, t_paquete *paquete, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
-void crear_buffer(t_paquete *paquete);
-void *serializar_paquete(t_paquete *paquete, int bytes);
 
 // Utilidades para recibir
 op_code esperar_operacion(t_log *logger, const char *nombre_proceso_que_espera, const char *nombre_proceso_que_manda, int conexion);
 void *recibir_paquete(t_log *logger, const char *nombre_proceso_que_espera, const char *nombre_proceso_que_manda, int *tamanio_buffer, int conexion, op_code codigo_operacion);
 t_list *leer_lista_de_enteros_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, op_code codigo_operacion);
+void leer_caracter_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, char *caracter, op_code codigo_operacion);
 void leer_int_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, int *entero, op_code codigo_operacion);
 void leer_int32_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, uint32_t *entero, op_code codigo_operacion);
 void leer_string_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, char **string, op_code codigo_operacion);

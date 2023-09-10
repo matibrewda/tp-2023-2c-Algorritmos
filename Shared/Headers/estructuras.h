@@ -1,14 +1,23 @@
 #ifndef ESTRUCTURAS_H_
 #define ESTRUCTURAS_H_
 
+#include <stdint.h>
+
 typedef struct
 {
-	int pid;
-    int pc;
+    int pid;
     int prioridad;
-    // registros CPU
-    // tabla de archivos abiertos
     char estado;
+
+    // Registros del CPU
+    int pc;
+    uint32_t registro_ax;
+    uint32_t registro_bx;
+    uint32_t registro_cx;
+    uint32_t registro_dx;
+
+    // tabla de archivos abiertos
+    
 } t_pcb;
 
 typedef struct

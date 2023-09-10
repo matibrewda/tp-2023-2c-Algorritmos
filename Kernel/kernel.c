@@ -129,8 +129,8 @@ void terminar_kernel()
 		close(conexion_con_filesystem);
 	}
 
-	//sem_destroys
-	//thread destroy?
+	// sem_destroys
+	// thread destroy?
 }
 
 void *planificador_largo_plazo()
@@ -220,7 +220,6 @@ void listar_procesos()
 
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 {
-	
 }
 
 void *planificador_corto_plazo()
@@ -229,6 +228,22 @@ void *planificador_corto_plazo()
 
 	while (true)
 	{
+		t_pcb *pcb = malloc(sizeof(t_pcb));
+
+		pcb->pid = 1;
+		pcb->prioridad = 2;
+		pcb->estado = 'A';
+		pcb->pc = 3;
+		pcb->registro_ax = 4;
+		pcb->registro_bx = 5;
+		pcb->registro_cx = 6;
+		pcb->registro_dx = 7;
+
+		t_paquete* paquete_pcb = crear_paquete_pcb(logger, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, pcb);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_pcb, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+
+		log_trace(logger, "ESTOY EN EL KERNEL Y EL PCB TIENE PID %d.", pcb->pid);
+
 		esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	}
 }

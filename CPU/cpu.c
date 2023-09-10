@@ -15,10 +15,8 @@ t_pcb *proceso_ejecutando;
 
 sem_t semaforo_ciclo_de_ejecucion;
 
-// Program counter
+// Registros
 uint32_t program_counter;
-
-// Registros de proposito general
 uint32_t registro_ax;
 uint32_t registro_bx;
 uint32_t registro_cx;
@@ -108,6 +106,21 @@ void *interrupt()
 // Hilo Dispatch
 void *dispatch()
 {
+	log_trace(logger, "SOY DISPATCH");
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
+	log_trace(logger, "BBBBBB");
+	if (codigo_operacion_recibido == MENSAJE_DE_KERNEL)
+	{
+		log_trace(logger, "RECIBI MENSAJE DE KERNEL.");
+
+		t_pcb *pcb = leer_paquete_pcb(logger, conexion_con_kernel_dispatch, codigo_operacion_recibido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+
+		log_trace(logger, "ESTOY EN LA CPU Y EL PCB TIENE PID %d.", pcb->pid);
+	}
+	else
+	{
+		log_error(logger, "NO SE QUE RECIBI.");
+	}
 }
 
 // Hilo Ciclo de Ejecucion (Hilo Principal)
@@ -119,10 +132,10 @@ void ciclo_de_ejecucion()
 	while (true)
 	{
 		// sem_wait(&semaforo_ciclo_de_ejecucion);
-		instruccion = fetch();
-		opcode = decode(instruccion->nombre_instruccion);
-		execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
-		check_interrupt();
+		// instruccion = fetch();
+		// opcode = decode(instruccion->nombre_instruccion);
+		// execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
+		// check_interrupt();
 	}
 }
 
