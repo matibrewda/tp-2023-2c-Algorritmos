@@ -86,6 +86,21 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	int resultado_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	log_info(logger, "Se recibio la operacion %d desde %s", resultado_memoria, NOMBRE_MODULO_MEMORIA);
 
+	enviar_operacion_sin_paquete(logger, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	int resultado_handhake_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_handhake_memoria, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA);
+
+	void *buffer_de_paquete_con_offset = buffer_de_paquete;
+
+	int *tam_pagina = malloc(sizeof(int));
+
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_de_paquete_con_offset, tam_pagina, HANDSHAKE_CPU_MEMORIA);
+	
+	log_info(logger, "El tamanio de las paginas de memoria es: %d", *tam_pagina);
+
 	// Finalizacion
 	terminar_cpu(logger, argumentos_cpu, configuracion_cpu, socket_kernel_dispatch, conexion_con_kernel_dispatch, socket_kernel_interrupt, conexion_con_kernel_interrupt, conexion_con_memoria);
 	return EXIT_SUCCESS;
