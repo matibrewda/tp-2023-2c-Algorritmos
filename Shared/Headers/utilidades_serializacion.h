@@ -18,6 +18,14 @@
 #include "constantes.h"
 #include "utilidades_conexion.h"
 
-t_paquete *crear_paquete_pcb(t_log *logger, op_code opcode, char *nombre_proceso_origen, char *nombre_proceso_destino, t_pcb *pcb);
+// Especificos
+t_paquete *crear_paquete_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
+t_paquete *crear_paquete_devuelvo_proceso_por_ser_interrumpido(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
+t_paquete *crear_paquete_devuelvo_proceso_por_correcta_finalizacion(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
+t_paquete *crear_paquete_interrumpir_ejecucion(t_log *logger);
+
+// Comunes
+t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_contexto_de_ejecucion *contexto_de_ejecucion);
+t_paquete *crear_paquete_con_opcode_y_sin_contenido(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino);
 
 #endif /* UTILIDADES_SERIALIZACION_H_ */

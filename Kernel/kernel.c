@@ -165,10 +165,17 @@ void crear_proceso(char *path, int size, int prioridad)
 
 	pcb->pid = obtener_nuevo_pid();
 	pcb->estado = 'N';
+	pcb->program_counter = 3;
+	pcb->registro_ax = 4;
+	pcb->registro_bx = 5;
+	pcb->registro_cx = 6;
+	pcb->registro_dx = 7;
 
-	list_add(pcbs, pcb);
-	queue_push(colas_planificacion->cola_new, pcb);
-	sem_post(&semaforo_cantidad_procesos_en_new);
+	// list_add(pcbs, pcb);
+	// queue_push(colas_planificacion->cola_new, pcb);
+	// sem_post(&semaforo_cantidad_procesos_en_new);
+
+	ejecutar_proceso_en_cpu(pcb);
 
 	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
 }
@@ -190,6 +197,8 @@ void iniciar_planificacion()
 
 void detener_planificacion()
 {
+	interrumpir_proceso_en_cpu();
+
 	if (planificacion_detenida)
 	{
 		printf("ERROR: La planificacion ya se encuentra detenida.\n");
@@ -228,22 +237,6 @@ void *planificador_corto_plazo()
 
 	while (true)
 	{
-		t_pcb *pcb = malloc(sizeof(t_pcb));
-
-		pcb->pid = 1;
-		pcb->prioridad = 2;
-		pcb->estado = 'A';
-		pcb->pc = 3;
-		pcb->registro_ax = 4;
-		pcb->registro_bx = 5;
-		pcb->registro_cx = 6;
-		pcb->registro_dx = 7;
-
-		t_paquete* paquete_pcb = crear_paquete_pcb(logger, MENSAJE_DE_KERNEL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, pcb);
-		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_pcb, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-
-		log_trace(logger, "ESTOY EN EL KERNEL Y EL PCB TIENE PID %d.", pcb->pid);
-
 		esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	}
 }
@@ -435,4 +428,27 @@ void consola()
 			printf("'%s' no coincide con ninguna funcion conocida.\n", funcion_seleccionada);
 		}
 	}
+}
+
+// No bloquea!
+void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
+{
+	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+	contexto_de_ejecucion->program_counter=pcb_proceso_a_ejecutar->program_counter;
+	contexto_de_ejecucion->registro_ax=pcb_proceso_a_ejecutar->registro_ax;
+	contexto_de_ejecucion->registro_bx=pcb_proceso_a_ejecutar->registro_bx;
+	contexto_de_ejecucion->registro_cx=pcb_proceso_a_ejecutar->registro_cx;
+	contexto_de_ejecucion->registro_dx=pcb_proceso_a_ejecutar->registro_dx;
+
+	t_paquete *paquete_ejecutar_proceso_en_cpu = crear_paquete_ejecutar_proceso(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_ejecutar_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+
+	free(contexto_de_ejecucion);
+}
+
+// No bloquea!
+void interrumpir_proceso_en_cpu()
+{
+	t_paquete *paquete_interrumpir_proceso_en_cpu = crear_paquete_interrumpir_ejecucion(logger);
+	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_interrumpir_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 }

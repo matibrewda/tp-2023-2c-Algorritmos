@@ -144,10 +144,10 @@ t_paquete *crear_paquete(t_log *logger, op_code codigo_operacion)
 
 	// Le asigno un codigo de operacion
 	paquete->codigo_operacion = codigo_operacion;
-	
+
 	// Creo buffer (inicialmente vacio) dentro del paquete
 	paquete->buffer = malloc(sizeof(t_buffer));
-	paquete->buffer->size = 0; // Tamanio del buffer
+	paquete->buffer->size = 0;		// Tamanio del buffer
 	paquete->buffer->stream = NULL; // Contenido (dinamico) del buffer. Es decir, stream puede contener cualquier cosa.
 
 	log_trace(logger, "Se creo un paquete (inicialmente vacio) con el codigo de operacion %s", nombre_opcode(codigo_operacion));
@@ -156,26 +156,38 @@ t_paquete *crear_paquete(t_log *logger, op_code codigo_operacion)
 }
 
 // Serializa el paquete, lo envia a traves de la conexion y luego destruye el paquete
+// No bloquea!
 bool enviar_paquete(t_log *logger, int conexion, t_paquete *paquete, const char *nombre_proceso_origen, const char *nombre_proceso_destino)
 {
 	log_trace(logger, "Comenzando el envio de paquete de codigo de operacion %s desde %s a %s.", nombre_opcode(paquete->codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 
-	// Serializo el paquete
-	int tamanio_paquete_serializado = paquete->buffer->size + 2 * sizeof(int); // El tamanio es: sizeof(buffer) + sizeof(tamanio_buffer) + sizeof(codigo_operacion)
+	int tamanio_paquete_serializado = sizeof(int); // Inicialmente, el tamanio es: sizeof(codigo_operacion)
+
+	// Si el buffer NO esta vacio, entonces el tamanio sera de: sizeof(buffer) + sizeof(tamanio_buffer) + sizeof(codigo_operacion)
+	if (paquete->buffer->size > 0)
+	{
+		tamanio_paquete_serializado += paquete->buffer->size + sizeof(int);
+	}
+
 	void *paquete_serializado = malloc(tamanio_paquete_serializado);
 	int desplazamiento = 0;
+
+	// Serializo el paquete:
 
 	// Primero, agrego el codigo de operacion
 	memcpy(paquete_serializado, &(paquete->codigo_operacion), sizeof(int));
 	desplazamiento += sizeof(int);
 
-	// Luego, agrego el tamanio del buffer
-	memcpy(paquete_serializado + desplazamiento, &(paquete->buffer->size), sizeof(int));
-	desplazamiento += sizeof(int);
+	if (paquete->buffer->size > 0)
+	{
+		// Luego, agrego el tamanio del buffer
+		memcpy(paquete_serializado + desplazamiento, &(paquete->buffer->size), sizeof(int));
+		desplazamiento += sizeof(int);
 
-	// Por ultimo, agrego el buffer entero
-	memcpy(paquete_serializado + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
-	desplazamiento += paquete->buffer->size;
+		// Por ultimo, agrego el buffer entero
+		memcpy(paquete_serializado + desplazamiento, paquete->buffer->stream, paquete->buffer->size);
+		desplazamiento += paquete->buffer->size;
+	}
 
 	ssize_t resultado_send = send(conexion, paquete_serializado, tamanio_paquete_serializado, 0);
 

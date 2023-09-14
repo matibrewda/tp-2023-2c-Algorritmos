@@ -10,7 +10,7 @@ typedef struct
     char estado;
 
     // Registros del CPU
-    int pc;
+    int program_counter;
     uint32_t registro_ax;
     uint32_t registro_bx;
     uint32_t registro_cx;
@@ -26,5 +26,14 @@ typedef struct
 	char* parametro_1_instruccion;
 	char* parametro_2_instruccion;
 } t_instruccion;
+
+typedef struct
+{
+    int program_counter;
+    uint32_t registro_ax;
+    uint32_t registro_bx;
+    uint32_t registro_cx;
+    uint32_t registro_dx;
+} t_contexto_de_ejecucion;
 
 #endif /* ESTRUCTURAS_H_ */

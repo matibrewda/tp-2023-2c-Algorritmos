@@ -11,16 +11,15 @@ int conexion_con_kernel_dispatch = -1;
 int conexion_con_kernel_interrupt = -1;
 int conexion_con_memoria = -1;
 
-t_pcb *proceso_ejecutando;
-
-sem_t semaforo_ciclo_de_ejecucion;
+sem_t semaforo_ejecutar_ciclo_de_instruccion;
 
 // Registros
-uint32_t program_counter;
-uint32_t registro_ax;
-uint32_t registro_bx;
-uint32_t registro_cx;
-uint32_t registro_dx;
+uint32_t program_counter = 0;
+uint32_t registro_ax = 0;
+uint32_t registro_bx = 0;
+uint32_t registro_cx = 0;
+uint32_t registro_dx = 0;
+bool ocurrio_interrupcion = false;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -84,7 +83,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	// Semaforos
-	sem_init(&semaforo_ciclo_de_ejecucion, false, 0);
+	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente NO ejecuta
 
 	// Hilos
 	pthread_create(&hilo_interrupt, NULL, interrupt, NULL);
@@ -101,25 +100,52 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 // Hilo Interrupt
 void *interrupt()
 {
+	while (true)
+	{
+		// Bloqueado hasta que reciba una operacion desde la conexion interrupt.
+		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL, conexion_con_kernel_interrupt);
+
+		if (codigo_operacion_recibido == INTERRUMPIR_PROCESO)
+		{
+			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+			ocurrio_interrupcion = true;
+		}
+		else
+		{
+			log_trace(logger, "Se recibio una orden desconocida de %s en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+		}
+	}
 }
 
 // Hilo Dispatch
 void *dispatch()
 {
-	log_trace(logger, "SOY DISPATCH");
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
-	log_trace(logger, "BBBBBB");
-	if (codigo_operacion_recibido == MENSAJE_DE_KERNEL)
+	while (true)
 	{
-		log_trace(logger, "RECIBI MENSAJE DE KERNEL.");
+		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
+		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
+		
+		if (codigo_operacion_recibido == EJECUTAR_PROCESO)
+		{
+			log_trace(logger, "Se recibio una orden de %s para ejecutar un proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+			t_contexto_de_ejecucion *contexto_de_ejecucion = leer_paquete_ejecutar_proceso(logger, conexion_con_kernel_dispatch);
+			
+			// Restauro el contexto de ejecucion
+			program_counter = contexto_de_ejecucion -> program_counter;
+			registro_ax = contexto_de_ejecucion -> registro_ax;
+			registro_bx = contexto_de_ejecucion -> registro_bx;
+			registro_cx = contexto_de_ejecucion -> registro_cx;
+			registro_dx = contexto_de_ejecucion -> registro_dx;
 
-		t_pcb *pcb = leer_paquete_pcb(logger, conexion_con_kernel_dispatch, codigo_operacion_recibido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+			ocurrio_interrupcion = false;
 
-		log_trace(logger, "ESTOY EN LA CPU Y EL PCB TIENE PID %d.", pcb->pid);
-	}
-	else
-	{
-		log_error(logger, "NO SE QUE RECIBI.");
+			// Aviso que hay que ejecutar el ciclo de instruccion
+			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
+		}
+		else
+		{
+			log_trace(logger, "Se recibio una orden desconocida de %s en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+		}
 	}
 }
 
@@ -131,11 +157,24 @@ void ciclo_de_ejecucion()
 
 	while (true)
 	{
-		// sem_wait(&semaforo_ciclo_de_ejecucion);
-		// instruccion = fetch();
-		// opcode = decode(instruccion->nombre_instruccion);
-		// execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
-		// check_interrupt();
+		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); // Espero a que haya algo para ejecutar
+
+		instruccion = fetch();
+		opcode = decode(instruccion->nombre_instruccion);
+		execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
+		check_interrupt();
+	}
+}
+
+void check_interrupt()
+{
+	if (!ocurrio_interrupcion)
+	{
+		sem_post(&semaforo_ejecutar_ciclo_de_instruccion); // Si NO ocurrio una interrupcion, puedo seguir ejecutando
+	}
+	else
+	{
+		// TO DO:
 	}
 }
 
@@ -246,10 +285,6 @@ int decode(char *nombre_instruccion)
 }
 
 void execute(int opcode, char *parametro_1_instruccion, char *parametro_2_instruccion)
-{
-}
-
-void check_interrupt()
 {
 }
 
@@ -498,4 +533,24 @@ void terminar_cpu()
 	{
 		close(conexion_con_memoria);
 	}
+}
+
+void devolver_contexto_por_ser_interrumpido()
+{
+	// t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+	// contexto_de_ejecucion->pc=pcb_proceso_a_ejecutar->pc;
+	// contexto_de_ejecucion->registro_ax=pcb_proceso_a_ejecutar->registro_ax;
+	// contexto_de_ejecucion->registro_bx=pcb_proceso_a_ejecutar->registro_bx;
+	// contexto_de_ejecucion->registro_cx=pcb_proceso_a_ejecutar->registro_cx;
+	// contexto_de_ejecucion->registro_dx=pcb_proceso_a_ejecutar->registro_dx;
+
+	// t_paquete *paquete_ejecutar_proceso_en_cpu = crear_paquete_ejecutar_proceso(logger, contexto_de_ejecucion);
+	// enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_ejecutar_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+
+	// free(contexto_de_ejecucion);
+}
+
+void interrumpir_proceso_en_cpu()
+{
+	
 }

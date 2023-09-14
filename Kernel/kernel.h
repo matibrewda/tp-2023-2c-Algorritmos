@@ -59,5 +59,7 @@ void detener_planificacion();
 void listar_procesos();
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
 int obtener_nuevo_pid();
+void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
+void interrumpir_proceso_en_cpu();
 
 #endif /* KERNEL_H_ */

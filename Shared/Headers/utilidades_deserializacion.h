@@ -18,6 +18,10 @@
 #include "constantes.h"
 #include "utilidades_conexion.h"
 
-t_pcb *leer_paquete_pcb(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino);
+// Especificas
+t_contexto_de_ejecucion *leer_paquete_ejecutar_proceso(t_log *logger, int conexion_con_kernel_dispatch);
+
+// Comunes
+t_contexto_de_ejecucion *leer_paquete_contexto_de_ejecucion(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino);
 
 #endif /* UTILIDADES_DESERIALIZACION_H_ */
