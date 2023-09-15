@@ -101,6 +101,13 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		realizar_handshake_cpu(logger, configuracion_memoria, conexion_con_cpu);
 	}
 
+	int recibir_iniciar_operacion_kernel = esperar_operacion(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,conexion_con_kernel);
+	log_info(logger, "Se recibio la operacion %d desde %s", recibir_iniciar_operacion_kernel, NOMBRE_MODULO_KERNEL);
+	if (recibir_iniciar_operacion_kernel == INICIAR_PROCESO)
+	{
+		iniciar_proceso_memoria();//todo
+	}
+
 	// Finalizacion
 	terminar_memoria(logger, argumentos_memoria, configuracion_memoria, socket_kernel, conexion_con_kernel, socket_cpu, conexion_con_cpu, socket_filesystem, conexion_con_filesystem);
 	return EXIT_SUCCESS;
