@@ -66,7 +66,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	crear_hilo_consola(logger, configuracion_kernel);
+	crear_hilo_consola(logger, configuracion_kernel,conexion_con_memoria);
 
 	// Logica principal
 	log_info(logger, "Mando señal a %s", NOMBRE_MODULO_CPU_DISPATCH);
@@ -126,7 +126,7 @@ void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_co
 	}
 }
 
-void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel)
+void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel,int *conexion_con_memoria)
 {
 	t_argumentos_hilo_consola *argumentos_hilo_consola = malloc(sizeof(t_argumentos_hilo_consola));
 
@@ -143,6 +143,7 @@ void consola(void *argumentos)
 
 	t_log *logger = argumentos_hilo_consola->logger;
 	t_config_kernel *configuracion_kernel = argumentos_hilo_consola->configuracion_kernel;
+	int conexion_con_memoria = argumentos_hilo_consola->conexion_con_memoria;
 
 	while (true)
 	{
@@ -231,6 +232,7 @@ void consola(void *argumentos)
 			}
 
 			// LOGICA DE INICIAR_PROCESO...
+			enviar_inciar_proceso_memoria(logger,path,size,prioridad,conexion_con_memoria);
 		}
 		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0)
 		{
@@ -326,4 +328,19 @@ void consola(void *argumentos)
 			printf("'%s' no coincide con ninguna funcion conocida.\n", funcion_seleccionada);
 		}
 	}
+}
+
+void enviar_inciar_proceso_memoria(t_log *logger,char *path,int size,int prioridad,int conexion_con_memoria){
+	log_debug(logger, "Comenzando la creacion de paquete para enviar iniciar proceso a memoria!");
+	t_paquete *paquete = crear_paquete(logger, INICIAR_PROCESO);
+
+	agregar_string_a_paquete(logger,paquete,path,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO);
+	agregar_int_a_paquete(logger,paquete,size,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO);
+	agregar_int_a_paquete(logger,paquete,prioridad,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO);
+	log_debug(logger, "Exito en la creacion de paquete para enviar iniciar proceso a memoria!");
+
+	enviar_paquete(logger, conexion_con_memoria, paquete,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA);
+	log_debug(logger, "Exito en el envio de paquete para iniciar proceso a memoria!");
+	destruir_paquete(logger, paquete);
+
 }
