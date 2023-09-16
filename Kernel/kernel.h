@@ -43,11 +43,12 @@ typedef struct
 {
     t_log *logger;
     t_config_kernel *configuracion_kernel;
-    int *conexion_con_memoria;
+    int conexion_con_memoria;
 } t_argumentos_hilo_consola;
 
 void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_config_kernel *configuracion_kernel, int conexion_con_cpu_dispatch, int conexion_con_cpu_interrupt, int conexion_con_memoria, int conexion_con_filesystem);
-void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel,int *conexion_con_memoria);
+void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel,int conexion_con_memoria);
 void consola(void *argumentos);
+void enviar_inciar_proceso_memoria(t_log *logger,char *path,int size,int prioridad,int conexion_con_memoria);
 
 #endif /* KERNEL_H_ */

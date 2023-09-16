@@ -126,12 +126,13 @@ void terminar_kernel(t_log *logger, t_argumentos_kernel *argumentos_kernel, t_co
 	}
 }
 
-void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel,int *conexion_con_memoria)
+void crear_hilo_consola(t_log *logger, t_config_kernel *configuracion_kernel,int conexion_con_memoria)
 {
 	t_argumentos_hilo_consola *argumentos_hilo_consola = malloc(sizeof(t_argumentos_hilo_consola));
 
 	argumentos_hilo_consola->logger = logger;
 	argumentos_hilo_consola->configuracion_kernel = configuracion_kernel;
+	argumentos_hilo_consola->conexion_con_memoria = conexion_con_memoria;
 
 	pthread_create(&hilo_consola, NULL, (void *)consola, (void *)argumentos_hilo_consola);
 	pthread_detach(hilo_consola);
@@ -332,11 +333,11 @@ void consola(void *argumentos)
 
 void enviar_inciar_proceso_memoria(t_log *logger,char *path,int size,int prioridad,int conexion_con_memoria){
 	log_debug(logger, "Comenzando la creacion de paquete para enviar iniciar proceso a memoria!");
-	t_paquete *paquete = crear_paquete(logger, INICIAR_PROCESO);
+	t_paquete *paquete = crear_paquete(logger, INICIAR_PROCESO_MEMORIA);
 
-	agregar_string_a_paquete(logger,paquete,path,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO);
-	agregar_int_a_paquete(logger,paquete,size,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO);
-	agregar_int_a_paquete(logger,paquete,prioridad,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO);
+	agregar_string_a_paquete(logger,paquete,path,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
+	agregar_int_a_paquete(logger,paquete,size,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
+	agregar_int_a_paquete(logger,paquete,prioridad,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
 	log_debug(logger, "Exito en la creacion de paquete para enviar iniciar proceso a memoria!");
 
 	enviar_paquete(logger, conexion_con_memoria, paquete,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA);
