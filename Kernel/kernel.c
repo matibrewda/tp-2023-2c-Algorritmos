@@ -175,6 +175,7 @@ void crear_proceso(char *path, int size, int prioridad)
 	// queue_push(colas_planificacion->cola_new, pcb);
 	// sem_post(&semaforo_cantidad_procesos_en_new);
 
+	enviar_inciar_proceso_memoria(logger,path,size,prioridad);
 	ejecutar_proceso_en_cpu(pcb);
 
 	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
@@ -451,4 +452,18 @@ void interrumpir_proceso_en_cpu()
 {
 	t_paquete *paquete_interrumpir_proceso_en_cpu = crear_paquete_interrumpir_ejecucion(logger);
 	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_interrumpir_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+}
+
+void enviar_inciar_proceso_memoria(t_log *logger,char *path,int size,int prioridad)
+{
+	log_debug(logger, "Comenzando la creacion de paquete para enviar iniciar proceso a memoria!");
+	t_paquete *paquete = crear_paquete(logger, INICIAR_PROCESO_MEMORIA);
+
+	agregar_string_a_paquete(logger,paquete,path,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
+	agregar_int_a_paquete(logger,paquete,size,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
+	agregar_int_a_paquete(logger,paquete,prioridad,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
+	log_debug(logger, "Exito en la creacion de paquete para enviar iniciar proceso a memoria!");
+
+	enviar_paquete(logger, conexion_con_memoria, paquete,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA);
+	log_debug(logger, "Exito en el envio de paquete para iniciar proceso a memoria!");
 }

@@ -235,12 +235,6 @@ void agregar_int_a_paquete(t_log *logger, t_paquete *paquete, int entero, const 
 	memcpy((paquete->buffer->stream) + (paquete->buffer->size), &entero, sizeof(int));
 	paquete->buffer->size += sizeof(int);
 
-	stream: apunta a memoria con un tamanio reservado de 8 bytes
-	3
-	'A' 4 "LUCAS" 3.14 ...
-
-	size: 8
-
 	log_trace(logger, "Se agrego el entero %d al paquete de origen %s, destino %s, y codigo de operacion %s.", entero, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
 }
 

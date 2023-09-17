@@ -40,6 +40,7 @@ bool obtener_ocurrio_interrupcion();
 void actualizar_ocurrio_interrupcion(bool nuevo_valor);
 
 t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
+void devolver_contexto_por_ser_interrumpido();
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();

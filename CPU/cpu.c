@@ -83,6 +83,22 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
+	t_paquete* paquete_handshake_memoria = crear_paquete_handshake_memoria(logger);
+	enviar_paquete(logger, conexion_con_memoria, paquete_handshake_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	int resultado_handhake_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	log_info(logger, "Se recibio la operacion %d desde %s", resultado_handhake_memoria, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA);
+
+	void *buffer_de_paquete_con_offset = buffer_de_paquete;
+
+	int *tam_pagina = malloc(sizeof(int));
+
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_de_paquete_con_offset, tam_pagina, HANDSHAKE_CPU_MEMORIA);
+	
+	log_info(logger, "El tamanio de las paginas de memoria es: %d", *tam_pagina);
+
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente NO ejecuta
 	sem_init(&mutex_ocurrio_interrupcion, false, 1);
@@ -500,7 +516,7 @@ void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica)
 	// TO DO
 
 	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
-}
+}// TO DO
 
 void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio)
 {

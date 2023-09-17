@@ -61,5 +61,9 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
 int obtener_nuevo_pid();
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
 void interrumpir_proceso_en_cpu();
+void terminar_kernel();
+void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel,int conexion_con_memoria);
+void consola();
+void enviar_inciar_proceso_memoria(t_log *logger,char *path,int size,int prioridad);
 
 #endif /* KERNEL_H_ */

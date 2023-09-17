@@ -1,5 +1,6 @@
 #include "Headers/utilidades_serializacion.h"
 
+// Kernel _> CPU
 t_paquete *crear_paquete_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
 {
     return crear_paquete_contexto_de_ejecucion(logger, EJECUTAR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, contexto_de_ejecucion);
@@ -18,6 +19,11 @@ t_paquete *crear_paquete_devuelvo_proceso_por_correcta_finalizacion(t_log *logge
 t_paquete *crear_paquete_interrumpir_ejecucion(t_log *logger)
 {
     return crear_paquete_con_opcode_y_sin_contenido(logger, INTERRUMPIR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
+t_paquete *crear_paquete_handshake_memoria(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, HANDSHAKE_CPU_MEMORIA, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 }
 
 t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_contexto_de_ejecucion *contexto_de_ejecucion)
