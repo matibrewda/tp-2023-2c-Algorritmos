@@ -12,6 +12,7 @@ int conexion_con_kernel_interrupt = -1;
 int conexion_con_memoria = -1;
 
 sem_t semaforo_ejecutar_ciclo_de_instruccion;
+sem_t mutex_ocurrio_interrupcion;
 
 // Registros
 uint32_t program_counter = 0;
@@ -84,6 +85,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente NO ejecuta
+	sem_init(&mutex_ocurrio_interrupcion, false, 1);
 
 	// Hilos
 	pthread_create(&hilo_interrupt, NULL, interrupt, NULL);
@@ -108,7 +110,7 @@ void *interrupt()
 		if (codigo_operacion_recibido == INTERRUMPIR_PROCESO)
 		{
 			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
-			ocurrio_interrupcion = true;
+			actualizar_ocurrio_interrupcion(true);
 		}
 		else
 		{
@@ -124,20 +126,20 @@ void *dispatch()
 	{
 		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
-		
+
 		if (codigo_operacion_recibido == EJECUTAR_PROCESO)
 		{
 			log_trace(logger, "Se recibio una orden de %s para ejecutar un proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 			t_contexto_de_ejecucion *contexto_de_ejecucion = leer_paquete_ejecutar_proceso(logger, conexion_con_kernel_dispatch);
-			
-			// Restauro el contexto de ejecucion
-			program_counter = contexto_de_ejecucion -> program_counter;
-			registro_ax = contexto_de_ejecucion -> registro_ax;
-			registro_bx = contexto_de_ejecucion -> registro_bx;
-			registro_cx = contexto_de_ejecucion -> registro_cx;
-			registro_dx = contexto_de_ejecucion -> registro_dx;
 
-			ocurrio_interrupcion = false;
+			// Restauro el contexto de ejecucion
+			program_counter = contexto_de_ejecucion->program_counter;
+			registro_ax = contexto_de_ejecucion->registro_ax;
+			registro_bx = contexto_de_ejecucion->registro_bx;
+			registro_cx = contexto_de_ejecucion->registro_cx;
+			registro_dx = contexto_de_ejecucion->registro_dx;
+
+			actualizar_ocurrio_interrupcion(false);
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -166,15 +168,35 @@ void ciclo_de_ejecucion()
 	}
 }
 
+bool obtener_ocurrio_interrupcion()
+{
+	bool ocurrio_interrupcion_local;
+
+	sem_wait(&mutex_ocurrio_interrupcion);
+	ocurrio_interrupcion_local = ocurrio_interrupcion;
+	sem_post(&mutex_ocurrio_interrupcion);
+
+	return ocurrio_interrupcion_local;
+}
+
+void actualizar_ocurrio_interrupcion(bool nuevo_valor)
+{
+	sem_wait(&mutex_ocurrio_interrupcion);
+	ocurrio_interrupcion = nuevo_valor;
+	sem_post(&mutex_ocurrio_interrupcion);
+}
+
 void check_interrupt()
 {
-	if (!ocurrio_interrupcion)
+	if (!obtener_ocurrio_interrupcion())
 	{
-		sem_post(&semaforo_ejecutar_ciclo_de_instruccion); // Si NO ocurrio una interrupcion, puedo seguir ejecutando
+		// Si NO ocurrio una interrupcion, puedo seguir ejecutando
+		sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
 	}
 	else
 	{
-		// TO DO:
+		// Si ocurrio una interrupcion, el ciclo de ejecucion no puede continuar
+		devolver_contexto_por_ser_interrumpido();
 	}
 }
 
@@ -537,20 +559,21 @@ void terminar_cpu()
 
 void devolver_contexto_por_ser_interrumpido()
 {
-	// t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
-	// contexto_de_ejecucion->pc=pcb_proceso_a_ejecutar->pc;
-	// contexto_de_ejecucion->registro_ax=pcb_proceso_a_ejecutar->registro_ax;
-	// contexto_de_ejecucion->registro_bx=pcb_proceso_a_ejecutar->registro_bx;
-	// contexto_de_ejecucion->registro_cx=pcb_proceso_a_ejecutar->registro_cx;
-	// contexto_de_ejecucion->registro_dx=pcb_proceso_a_ejecutar->registro_dx;
-
-	// t_paquete *paquete_ejecutar_proceso_en_cpu = crear_paquete_ejecutar_proceso(logger, contexto_de_ejecucion);
-	// enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_ejecutar_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-
-	// free(contexto_de_ejecucion);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_devuelvo_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
 }
 
-void interrumpir_proceso_en_cpu()
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 {
-	
+	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+
+	contexto_de_ejecucion->program_counter = program_counter;
+	contexto_de_ejecucion->registro_ax = registro_ax;
+	contexto_de_ejecucion->registro_bx = registro_bx;
+	contexto_de_ejecucion->registro_cx = registro_cx;
+	contexto_de_ejecucion->registro_dx = registro_dx;
+
+	return contexto_de_ejecucion;
 }

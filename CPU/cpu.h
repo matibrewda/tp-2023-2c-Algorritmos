@@ -36,6 +36,11 @@ void *dispatch();
 uint32_t obtener_valor_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
 
+bool obtener_ocurrio_interrupcion();
+void actualizar_ocurrio_interrupcion(bool nuevo_valor);
+
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
+
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();
 t_instruccion *fetch();
