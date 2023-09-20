@@ -31,11 +31,11 @@
 
 
 // Handshake con CPU
-void realizar_handshake_cpu(t_log *logger, t_config_memoria *configuracion_memoria, int conexion_con_cpu);
+void realizar_handshake_cpu();
 //Iniciar proceso
-void iniciar_proceso_memoria(t_log *logger, int conexion_con_kernel);
+void iniciar_proceso_memoria();
 // Terminar
-void terminar_memoria(t_log *logger, t_argumentos_memoria *argumentos_memoria, t_config_memoria *configuracion_memoria, int socket_kernel, int conexion_con_kernel, int socket_cpu, int conexion_con_cpu, int socket_filesystem, int conexion_con_filesystem);
+void terminar_memoria();
 
 
 #endif /* MEMORIA_H_ */
