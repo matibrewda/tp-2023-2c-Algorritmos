@@ -88,50 +88,53 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		realizar_handshake_cpu();
 	}
 
-	int recibir_iniciar_operacion_kernel = esperar_operacion(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,conexion_con_kernel);
+	int recibir_iniciar_operacion_kernel = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
 	log_info(logger, "Se recibio la operacion %d desde %s", recibir_iniciar_operacion_kernel, NOMBRE_MODULO_KERNEL);
-	if (recibir_iniciar_operacion_kernel == INICIAR_PROCESO_MEMORIA) {
+	if (recibir_iniciar_operacion_kernel == INICIAR_PROCESO_MEMORIA)
+	{
 		iniciar_proceso_memoria();
 	}
 
 	// Finalizacion
-	terminar_memoria();;
+	terminar_memoria();
 	return EXIT_SUCCESS;
 }
 
-void realizar_handshake_cpu() {
+void realizar_handshake_cpu()
+{
 	log_debug(logger, "Comenzando la creacion de paquete para enviar handshake al cpu!");
 	t_paquete *paquete = crear_paquete(logger, HANDSHAKE_CPU_MEMORIA);
 
-  	agregar_int_a_paquete(logger, paquete, configuracion_memoria->tam_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, HANDSHAKE_CPU_MEMORIA);
-    log_debug(logger, "Exito en la creacion de paquete para enviar handshake al cpu!");
+	agregar_int_a_paquete(logger, paquete, configuracion_memoria->tam_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, HANDSHAKE_CPU_MEMORIA);
+	log_debug(logger, "Exito en la creacion de paquete para enviar handshake al cpu!");
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 	log_debug(logger, "Exito en el envio de paquete para handshake al cpu!");
 	destruir_paquete(logger, paquete);
 }
 
-void iniciar_proceso_memoria() {
+void iniciar_proceso_memoria()
+{
 	int tamanio_buffer;
 	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &tamanio_buffer, conexion_con_kernel, INICIAR_PROCESO_MEMORIA);
 
 	void *buffer_de_paquete_con_offset = buffer_de_paquete;
 
-	char *path = malloc(sizeof(char)*30); //-->a que deberia ser el malloc? TODO revisar
+	char *path = malloc(sizeof(char) * 30); //-->a que deberia ser el malloc? TODO revisar
 	int *size = malloc(sizeof(int));
 	int *prioridad = malloc(sizeof(int));
 
-	leer_string_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,&buffer_de_paquete_con_offset,&path,INICIAR_PROCESO_MEMORIA);
+	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &path, INICIAR_PROCESO_MEMORIA);
 	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %d", *path);
 
-	leer_int_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,&buffer_de_paquete_con_offset,size,INICIAR_PROCESO_MEMORIA);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, size, INICIAR_PROCESO_MEMORIA);
 	log_info(logger, "El tamanio del proceso a iniciar es: %d", *size);
 
-	leer_int_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,&buffer_de_paquete_con_offset,prioridad,INICIAR_PROCESO_MEMORIA);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, prioridad, INICIAR_PROCESO_MEMORIA);
 	log_info(logger, "La prioridad del proceso a iniciar es: %d", *prioridad);
 }
 
-void terminar_memoria();
+void terminar_memoria()
 {
 	if (logger != NULL)
 	{
