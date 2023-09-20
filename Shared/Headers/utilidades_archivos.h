@@ -10,5 +10,8 @@
 #include "constantes.h"
 
 char *leer_archivo(t_log *logger, char *ruta_archivo);
+FILE* abrir_archivo(t_log* logger, char* ruta_archivo);
+void cerrar_archivo(t_log *logger, FILE *archivo);
+char *leer_linea(t_log *logger, FILE *archivo);
 
 #endif /* UTILIDADES_ARCHIVOS_H_ */
