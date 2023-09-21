@@ -27,7 +27,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/cpu.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 void terminar_cpu();
 void *interrupt();
@@ -36,11 +36,9 @@ void *dispatch();
 uint32_t obtener_valor_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
 
-bool obtener_ocurrio_interrupcion();
-void actualizar_ocurrio_interrupcion(bool nuevo_valor);
-
 t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
 void devolver_contexto_por_ser_interrumpido();
+void devolver_contexto_por_correcta_finalizacion();
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();

@@ -78,21 +78,23 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
+	while(true);
+
 	// Logica principal
-	esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
+	// esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
 
-	int resultado_handshake_cpu = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, conexion_con_cpu);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_handshake_cpu, NOMBRE_MODULO_CPU);
-	if (resultado_handshake_cpu == HANDSHAKE_CPU_MEMORIA)
-	{
-		realizar_handshake_cpu(logger, configuracion_memoria, conexion_con_cpu);
-	}
+	// int resultado_handshake_cpu = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, conexion_con_cpu);
+	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_handshake_cpu, NOMBRE_MODULO_CPU);
+	// if (resultado_handshake_cpu == HANDSHAKE_CPU_MEMORIA)
+	// {
+	// 	realizar_handshake_cpu(logger, configuracion_memoria, conexion_con_cpu);
+	// }
 
-	int recibir_iniciar_operacion_kernel = esperar_operacion(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,conexion_con_kernel);
-	log_info(logger, "Se recibio la operacion %d desde %s", recibir_iniciar_operacion_kernel, NOMBRE_MODULO_KERNEL);
-	if (recibir_iniciar_operacion_kernel == INICIAR_PROCESO_MEMORIA) {
-		iniciar_proceso_memoria(logger, conexion_con_kernel);
-	}
+	// int recibir_iniciar_operacion_kernel = esperar_operacion(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_KERNEL,conexion_con_kernel);
+	// log_info(logger, "Se recibio la operacion %d desde %s", recibir_iniciar_operacion_kernel, NOMBRE_MODULO_KERNEL);
+	// if (recibir_iniciar_operacion_kernel == INICIAR_PROCESO_MEMORIA) {
+	// 	iniciar_proceso_memoria(logger, conexion_con_kernel);
+	// }
 
 	// Finalizacion
 	terminar_memoria(logger, argumentos_memoria, configuracion_memoria, socket_kernel, conexion_con_kernel, socket_cpu, conexion_con_cpu, socket_filesystem, conexion_con_filesystem);
@@ -108,7 +110,6 @@ void realizar_handshake_cpu(t_log *logger, t_config_memoria *configuracion_memor
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 	log_debug(logger, "Exito en el envio de paquete para handshake al cpu!");
-	destruir_paquete(logger, paquete);
 }
 
 void iniciar_proceso_memoria(t_log *logger, int conexion_con_kernel) {

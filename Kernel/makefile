@@ -1,5 +1,5 @@
 COMPILADOR=gcc
-LIBRERIAS= -lcommons -lpthread -lreadline
+LIBRERIAS= -lcommons -lpthread -lreadline -lm
 NOMBRE_MODULO=kernel
 EJECUTABLE=Ejecutable/$(NOMBRE_MODULO).o
 CONFIGURACION="Configuracion/$(NOMBRE_MODULO).config"

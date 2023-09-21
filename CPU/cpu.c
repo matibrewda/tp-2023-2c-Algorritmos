@@ -12,7 +12,6 @@ int conexion_con_kernel_interrupt = -1;
 int conexion_con_memoria = -1;
 
 sem_t semaforo_ejecutar_ciclo_de_instruccion;
-sem_t mutex_ocurrio_interrupcion;
 
 // Registros
 uint32_t program_counter = 0;
@@ -83,25 +82,24 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	t_paquete* paquete_handshake_memoria = crear_paquete_handshake_memoria(logger);
-	enviar_paquete(logger, conexion_con_memoria, paquete_handshake_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-	int resultado_handhake_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_handhake_memoria, NOMBRE_MODULO_MEMORIA);
+	// t_paquete* paquete_handshake_memoria = crear_paquete_handshake_memoria(logger);
+	// enviar_paquete(logger, conexion_con_memoria, paquete_handshake_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	// int resultado_handhake_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_handhake_memoria, NOMBRE_MODULO_MEMORIA);
 
-	int tamanio_buffer;
-	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA);
+	// int tamanio_buffer;
+	// void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA);
 
-	void *buffer_de_paquete_con_offset = buffer_de_paquete;
+	// void *buffer_de_paquete_con_offset = buffer_de_paquete;
 
-	int *tam_pagina = malloc(sizeof(int));
+	// int *tam_pagina = malloc(sizeof(int));
 
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_de_paquete_con_offset, tam_pagina, HANDSHAKE_CPU_MEMORIA);
+	// leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_de_paquete_con_offset, tam_pagina, HANDSHAKE_CPU_MEMORIA);
 	
-	log_info(logger, "El tamanio de las paginas de memoria es: %d", *tam_pagina);
+	// log_info(logger, "El tamanio de las paginas de memoria es: %d", *tam_pagina);
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente NO ejecuta
-	sem_init(&mutex_ocurrio_interrupcion, false, 1);
 
 	// Hilos
 	pthread_create(&hilo_interrupt, NULL, interrupt, NULL);
@@ -126,7 +124,7 @@ void *interrupt()
 		if (codigo_operacion_recibido == INTERRUMPIR_PROCESO)
 		{
 			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
-			actualizar_ocurrio_interrupcion(true);
+			ocurrio_interrupcion = true;
 		}
 		else
 		{
@@ -155,7 +153,7 @@ void *dispatch()
 			registro_cx = contexto_de_ejecucion->registro_cx;
 			registro_dx = contexto_de_ejecucion->registro_dx;
 
-			actualizar_ocurrio_interrupcion(false);
+			ocurrio_interrupcion = false;
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -177,34 +175,31 @@ void ciclo_de_ejecucion()
 	{
 		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); // Espero a que haya algo para ejecutar
 
-		instruccion = fetch();
-		opcode = decode(instruccion->nombre_instruccion);
-		execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
+		// instruccion = fetch();
+		// opcode = decode(instruccion->nombre_instruccion);
+		// execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
+
+		log_info(logger, "Ejecutando PC = %d...", program_counter);
+
+		program_counter++;
+
+		if (program_counter > 5)
+		{
+			ejecutar_instruccion_exit();
+			continue; // asi no vuelve a ejecutar
+		}
+		else
+		{
+			ejecutar_instruccion_sleep(15);
+		}
+
 		check_interrupt();
 	}
 }
 
-bool obtener_ocurrio_interrupcion()
-{
-	bool ocurrio_interrupcion_local;
-
-	sem_wait(&mutex_ocurrio_interrupcion);
-	ocurrio_interrupcion_local = ocurrio_interrupcion;
-	sem_post(&mutex_ocurrio_interrupcion);
-
-	return ocurrio_interrupcion_local;
-}
-
-void actualizar_ocurrio_interrupcion(bool nuevo_valor)
-{
-	sem_wait(&mutex_ocurrio_interrupcion);
-	ocurrio_interrupcion = nuevo_valor;
-	sem_post(&mutex_ocurrio_interrupcion);
-}
-
 void check_interrupt()
 {
-	if (!obtener_ocurrio_interrupcion())
+	if (!ocurrio_interrupcion)
 	{
 		// Si NO ocurrio una interrupcion, puedo seguir ejecutando
 		sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -432,7 +427,7 @@ void ejecutar_instruccion_sleep(int tiempo)
 {
 	log_info(logger, "PID: <PID> - Ejecutando: %s - %d", SLEEP_NOMBRE_INSTRUCCION, tiempo);
 
-	// TO DO
+	sleep(tiempo);
 
 	log_trace(logger, "PID: <PID> - Ejecutada: %s - %d", SLEEP_NOMBRE_INSTRUCCION, tiempo);
 }
@@ -531,7 +526,7 @@ void ejecutar_instruccion_exit()
 {
 	log_info(logger, "PID: <PID> - Ejecutando: %s", EXIT_NOMBRE_INSTRUCCION);
 
-	// TO DO
+	devolver_contexto_por_correcta_finalizacion();
 
 	log_trace(logger, "PID: <PID> - Ejecutada: %s", EXIT_NOMBRE_INSTRUCCION);
 }
@@ -578,6 +573,14 @@ void devolver_contexto_por_ser_interrumpido()
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_devuelvo_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+}
+
+void devolver_contexto_por_correcta_finalizacion()
+{
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_devuelvo_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 }
 

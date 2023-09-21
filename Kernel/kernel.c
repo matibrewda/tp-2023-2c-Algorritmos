@@ -2,19 +2,30 @@
 
 pthread_t hilo_planificador_largo_plazo;
 pthread_t hilo_planificador_corto_plazo;
+pthread_t hilo_dispatcher;
+pthread_t hilo_escucha_cpu;
+
 t_log *logger = NULL;
 t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
-t_colas_planificacion *colas_planificacion = NULL;
+t_queue *cola_new = NULL;
+t_queue *cola_ready = NULL;
 int conexion_con_cpu_dispatch = -1;
 int conexion_con_cpu_interrupt = -1;
 int conexion_con_memoria = -1;
 int conexion_con_filesystem = -1;
 sem_t semaforo_grado_max_multiprogramacion;
-sem_t semaforo_cantidad_procesos_en_new;
+sem_t semaforo_se_creo_un_proceso;
+sem_t semaforo_se_agrego_proceso_en_cola_ready;
+sem_t semaforo_se_agrego_proceso_para_ejecutar;
+sem_t semaforo_cpu;
+pthread_mutex_t mutex_cola_new;
+pthread_mutex_t mutex_cola_ready;
 t_list *pcbs;
+t_pcb *pcb_a_ejecutar = NULL;
 bool planificacion_detenida = false;
 int proximo_pid = 0;
+bool hay_un_proceso_ejecutando = false;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -74,14 +85,14 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Semaforos
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
-	sem_init(&semaforo_cantidad_procesos_en_new, false, 0);
+	sem_init(&semaforo_se_creo_un_proceso, false, 0);
+	sem_init(&semaforo_se_agrego_proceso_en_cola_ready, false, 0);
+	sem_init(&semaforo_se_agrego_proceso_para_ejecutar, false, 0);
+	sem_init(&semaforo_cpu, false, 1); // inicialmente la CPU NO esta ocupada
 
 	// Colas de planificacion
-	colas_planificacion = malloc(sizeof(t_colas_planificacion));
-
-	colas_planificacion->cola_new = queue_create();
-	colas_planificacion->cola_ready = queue_create();
-	colas_planificacion->cola_executing = queue_create();
+	cola_new = queue_create();
+	cola_ready = queue_create();
 
 	// Listas
 	pcbs = list_create();
@@ -89,6 +100,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
 	pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo, NULL);
+	pthread_create(&hilo_dispatcher, NULL, dispatcher, NULL);
+	pthread_create(&hilo_escucha_cpu, NULL, escuchador_cpu, NULL);
 
 	// Hilo principal
 	consola();
@@ -135,22 +148,63 @@ void terminar_kernel()
 
 void *planificador_largo_plazo()
 {
-	log_trace(logger, "Planificador de largo plazo inicializado con exito.");
-
 	while (true)
 	{
-		log_trace(logger, "Planificador de largo plazo: esperando algun proceso en NEW...");
-		sem_wait(&semaforo_cantidad_procesos_en_new);
-		log_trace(logger, "Planificador de largo plazo: esperando grado maximo de multiprogramacion..");
-		sem_wait(&semaforo_grado_max_multiprogramacion);
+		log_trace(logger, "Soy el planificador de largo plazo");
+		sem_wait(&semaforo_se_creo_un_proceso);
 
-		if (!queue_is_empty(colas_planificacion->cola_new))
-		{
-			t_pcb *pcb = queue_pop(colas_planificacion->cola_new);
-			pcb->estado = 'R';
-			queue_push(colas_planificacion->cola_ready, pcb);
-		}
+		pthread_mutex_lock(&mutex_cola_new);
+		t_pcb *pcb = queue_pop(cola_new);
+		pthread_mutex_unlock(&mutex_cola_new);
+
+		pcb->estado = 'R';
+
+		sem_wait(&semaforo_grado_max_multiprogramacion); // ME FALTA EL POST EN ALGUN LADO, OJO !
+
+		pthread_mutex_lock(&mutex_cola_ready);
+		queue_push(cola_ready, pcb);
+		pthread_mutex_unlock(&mutex_cola_ready);
+
+		log_info(logger, "PID: %d - Estado Anterior: 'NEW' - Estado Actual: 'READY'", pcb->pid);
+		loguear_cola_pcbs(cola_ready, "ready");
+
+		sem_post(&semaforo_se_agrego_proceso_en_cola_ready);
 	}
+}
+
+void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola)
+{
+	pthread_mutex_lock(&mutex_cola_ready);
+
+	t_list_iterator *iterador = list_iterator_create(cola->elements);
+
+	char *pids = malloc(sizeof(char));
+	strcpy(pids, "");
+
+	while (list_iterator_has_next(iterador))
+	{
+		t_pcb *pcb = list_iterator_next(iterador);
+		int cantidad_digitos_pid = floor(log10(abs(pcb->pid))) + 1;
+		char pid_string[cantidad_digitos_pid + 1];
+		sprintf(pid_string, "%d,", pcb->pid);
+		int tamanio_anterior = strlen(pids);
+		int tamanio_a_aumentar = strlen(pid_string);
+		pids = realloc(pids, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+		strcpy(pids + (tamanio_anterior) * sizeof(char), pid_string);
+	}
+
+	int tamanio_pids = strlen(pids);
+	if (tamanio_pids > 0)
+	{
+		pids[tamanio_pids - 1] = '\0';
+	}
+
+	list_iterator_destroy(iterador);
+
+	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, pids);
+	free(pids);
+
+	pthread_mutex_unlock(&mutex_cola_ready);
 }
 
 int obtener_nuevo_pid()
@@ -165,24 +219,25 @@ void crear_proceso(char *path, int size, int prioridad)
 
 	pcb->pid = obtener_nuevo_pid();
 	pcb->estado = 'N';
-	pcb->program_counter = 3;
+	pcb->program_counter = 1;
 	pcb->registro_ax = 4;
 	pcb->registro_bx = 5;
 	pcb->registro_cx = 6;
 	pcb->registro_dx = 7;
 
-	// list_add(pcbs, pcb);
-	// queue_push(colas_planificacion->cola_new, pcb);
-	// sem_post(&semaforo_cantidad_procesos_en_new);
+	pthread_mutex_lock(&mutex_cola_new);
+	queue_push(cola_new, pcb);
+	pthread_mutex_unlock(&mutex_cola_new);
 
-	enviar_inciar_proceso_memoria(logger,path,size,prioridad);
-	ejecutar_proceso_en_cpu(pcb);
+	sem_post(&semaforo_se_creo_un_proceso);
 
 	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
 }
 
 void finalizar_proceso(int pid)
 {
+	// aca me tengo que fijar en que estado estaba el proceso antes!
+	log_info(logger, "Finaliza el proceso %d - Motivo: SUCCESS", pid);
 }
 
 void iniciar_planificacion()
@@ -234,12 +289,29 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 
 void *planificador_corto_plazo()
 {
-	log_trace(logger, "Soy el planificador de corto plazo");
-
 	while (true)
 	{
-		esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+		log_trace(logger, "Soy el planificador de corto plazo");
+
+		fifo();
 	}
+}
+
+void fifo()
+{
+	// Espero a que la CPU este libre
+	sem_wait(&semaforo_cpu);
+
+	// Si la CPU esta libre, saco un proceso de la cola de ready y lo mando a ejecutar
+	sem_wait(&semaforo_se_agrego_proceso_en_cola_ready);
+
+	pthread_mutex_lock(&mutex_cola_ready);
+	t_pcb *pcb = queue_pop(cola_ready);
+	pthread_mutex_unlock(&mutex_cola_ready);
+
+	pcb_a_ejecutar = pcb;
+	log_info(logger, "PID: %d - Estado Anterior: 'READY' - Estado Actual: 'EXEC'", pcb->pid);
+	sem_post(&semaforo_se_agrego_proceso_para_ejecutar);
 }
 
 void consola()
@@ -431,15 +503,55 @@ void consola()
 	}
 }
 
+void *dispatcher()
+{
+	while (true)
+	{
+		log_trace(logger, "Soy el dispatcher");
+
+		sem_wait(&semaforo_se_agrego_proceso_para_ejecutar);
+		ejecutar_proceso_en_cpu(pcb_a_ejecutar);
+	}
+}
+
+void *escuchador_cpu()
+{
+	while (true)
+	{
+		log_trace(logger, "Soy el escuchador de CPU");
+
+		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
+		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
+
+		if (codigo_operacion_recibido == DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+		{
+			log_trace(logger, "Se recibio una orden de %s en %s avisando que termino un proceso por correcta finalizacion.", NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+			t_contexto_de_ejecucion *contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+
+			log_info(logger, "PID: %d - Estado Anterior: 'EXEC' - Estado Actual: 'EXIT'", pcb_a_ejecutar->pid);
+
+			finalizar_proceso(pcb_a_ejecutar->pid);
+			sem_post(&semaforo_grado_max_multiprogramacion);
+
+			// Aviso que se desocupo la CPU
+			sem_post(&semaforo_cpu);
+		}
+		else
+		{
+			log_trace(logger, "Se recibio una orden desconocida de %s en %s.", NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+		}
+	}
+}
+
 // No bloquea!
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
-	contexto_de_ejecucion->program_counter=pcb_proceso_a_ejecutar->program_counter;
-	contexto_de_ejecucion->registro_ax=pcb_proceso_a_ejecutar->registro_ax;
-	contexto_de_ejecucion->registro_bx=pcb_proceso_a_ejecutar->registro_bx;
-	contexto_de_ejecucion->registro_cx=pcb_proceso_a_ejecutar->registro_cx;
-	contexto_de_ejecucion->registro_dx=pcb_proceso_a_ejecutar->registro_dx;
+	contexto_de_ejecucion->program_counter = pcb_proceso_a_ejecutar->program_counter;
+	contexto_de_ejecucion->registro_ax = pcb_proceso_a_ejecutar->registro_ax;
+	contexto_de_ejecucion->registro_bx = pcb_proceso_a_ejecutar->registro_bx;
+	contexto_de_ejecucion->registro_cx = pcb_proceso_a_ejecutar->registro_cx;
+	contexto_de_ejecucion->registro_dx = pcb_proceso_a_ejecutar->registro_dx;
 
 	t_paquete *paquete_ejecutar_proceso_en_cpu = crear_paquete_ejecutar_proceso(logger, contexto_de_ejecucion);
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_ejecutar_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
@@ -454,16 +566,16 @@ void interrumpir_proceso_en_cpu()
 	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_interrumpir_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 }
 
-void enviar_inciar_proceso_memoria(t_log *logger,char *path,int size,int prioridad)
+void enviar_inciar_proceso_memoria(t_log *logger, char *path, int size, int prioridad)
 {
 	log_debug(logger, "Comenzando la creacion de paquete para enviar iniciar proceso a memoria!");
 	t_paquete *paquete = crear_paquete(logger, INICIAR_PROCESO_MEMORIA);
 
-	agregar_string_a_paquete(logger,paquete,path,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
-	agregar_int_a_paquete(logger,paquete,size,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
-	agregar_int_a_paquete(logger,paquete,prioridad,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA,INICIAR_PROCESO_MEMORIA);
+	agregar_string_a_paquete(logger, paquete, path, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, INICIAR_PROCESO_MEMORIA);
+	agregar_int_a_paquete(logger, paquete, size, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, INICIAR_PROCESO_MEMORIA);
+	agregar_int_a_paquete(logger, paquete, prioridad, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, INICIAR_PROCESO_MEMORIA);
 	log_debug(logger, "Exito en la creacion de paquete para enviar iniciar proceso a memoria!");
 
-	enviar_paquete(logger, conexion_con_memoria, paquete,NOMBRE_MODULO_KERNEL,NOMBRE_MODULO_MEMORIA);
+	enviar_paquete(logger, conexion_con_memoria, paquete, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
 	log_debug(logger, "Exito en el envio de paquete para iniciar proceso a memoria!");
 }
