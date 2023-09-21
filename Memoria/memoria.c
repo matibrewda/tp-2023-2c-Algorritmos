@@ -134,6 +134,21 @@ void iniciar_proceso_memoria()
 	log_info(logger, "La prioridad del proceso a iniciar es: %d", *prioridad);
 }
 
+void enviar_instruccion_a_cpu(t_instrucciones_archivo_pseudocodigo *instrucciones)
+{
+	char *proxima_instruccion = leer_linea(logger, instrucciones->archivo);
+
+	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", proxima_instruccion);
+	t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger);
+
+	agregar_string_a_paquete(logger, paquete, proxima_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
+	log_debug(logger, "Exito en la creacion de paquete para enviar instruccion %s al cpu!", proxima_instruccion);
+
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", proxima_instruccion);
+	destruir_paquete(logger, paquete);
+}
+
 void terminar_memoria()
 {
 	if (logger != NULL)

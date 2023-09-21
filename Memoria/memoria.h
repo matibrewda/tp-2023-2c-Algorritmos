@@ -16,12 +16,14 @@
 
 #include "Source/Headers/argumentos_memoria.h"
 #include "Source/Headers/configuracion_memoria.h"
+#include "Source/Headers/estructuras_memoria.h"
 
 #include "../Shared/Headers/utilidades_logger.h"
 #include "../Shared/Headers/utilidades_configuracion.h"
 #include "../Shared/Headers/utilidades_conexion.h"
 #include "../Shared/Headers/utilidades_serializacion.h"
 #include "../Shared/Headers/utilidades_deserializacion.h"
+#include "../../Shared/Headers/utilidades_archivos.h"
 #include "../Shared/Headers/enums.h"
 #include "../Shared/Headers/estructuras.h"
 #include "../Shared/Headers/constantes.h"
