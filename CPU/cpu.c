@@ -13,6 +13,8 @@ int conexion_con_memoria = -1;
 
 sem_t semaforo_ejecutar_ciclo_de_instruccion;
 
+int pid_ejecutando = 0;
+
 // Registros
 uint32_t program_counter = 0;
 uint32_t registro_ax = 0;
@@ -147,6 +149,7 @@ void *dispatch()
 			t_contexto_de_ejecucion *contexto_de_ejecucion = leer_paquete_ejecutar_proceso(logger, conexion_con_kernel_dispatch);
 
 			// Restauro el contexto de ejecucion
+			pid_ejecutando = contexto_de_ejecucion->pid;
 			program_counter = contexto_de_ejecucion->program_counter;
 			registro_ax = contexto_de_ejecucion->registro_ax;
 			registro_bx = contexto_de_ejecucion->registro_bx;
@@ -179,7 +182,7 @@ void ciclo_de_ejecucion()
 		// opcode = decode(instruccion->nombre_instruccion);
 		// execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
 
-		log_info(logger, "Ejecutando PC = %d...", program_counter);
+		log_info(logger, "Ejecutando PID = %d PC = %d...", pid_ejecutando, program_counter);
 
 		program_counter++;
 
@@ -386,149 +389,149 @@ void escribir_valor_a_registro(char *nombre_registro, uint32_t valor)
 
 void ejecutar_instruccion_set(char *nombre_registro, uint32_t valor)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %d", SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
 
 	escribir_valor_a_registro(nombre_registro, valor);
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %d", SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
 }
 
 void ejecutar_instruccion_sum(char *nombre_registro_destino, char *nombre_registro_origen)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
 
 	escribir_valor_a_registro(nombre_registro_destino, obtener_valor_registro(nombre_registro_destino) + obtener_valor_registro(nombre_registro_origen));
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
 }
 
 void ejecutar_instruccion_sub(char *nombre_registro_destino, char *nombre_registro_origen)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
 
 	escribir_valor_a_registro(nombre_registro_destino, obtener_valor_registro(nombre_registro_destino) - obtener_valor_registro(nombre_registro_origen));
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
 }
 
 void ejecutar_instruccion_jnz(char *nombre_registro, uint32_t nuevo_program_counter)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %d", JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
 
 	if (obtener_valor_registro(PC_NOMBRE_REGISTRO) == 0)
 	{
 		escribir_valor_a_registro(PC_NOMBRE_REGISTRO, nuevo_program_counter);
 	}
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %d", JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
 }
 
 void ejecutar_instruccion_sleep(int tiempo)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %d", SLEEP_NOMBRE_INSTRUCCION, tiempo);
+	log_info(logger, "PID: %d - Ejecutando: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo);
 
 	sleep(tiempo);
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %d", SLEEP_NOMBRE_INSTRUCCION, tiempo);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo);
 }
 
 void ejecutar_instruccion_wait(char *nombre_recurso)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s", WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s", WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
 }
 
 void ejecutar_instruccion_signal(char *nombre_recurso)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s", SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s", SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
 }
 
 void ejecutar_instruccion_mov_in(char *nombre_registro, char *direccion_logica)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", MOV_OUT_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
 }
 
 void ejecutar_instruccion_mov_out(char *direccion_logica, char *nombre_registro)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 }
 
 void ejecutar_instruccion_fopen(char *nombre_archivo, char *modo_apertura)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
 }
 
 void ejecutar_instruccion_fclose(char *nombre_archivo)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s", FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s", FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
 }
 
 void ejecutar_instruccion_fseek(char *nombre_archivo, char *posicion)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
 }
 
 void ejecutar_instruccion_fread(char *nombre_archivo, char *direccion_logica)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
 }
 
 void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
 }// TO DO
 
 void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio)
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s - %s - %s", FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
 
 	// TO DO
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s - %s - %s", FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
 }
 
 void ejecutar_instruccion_exit()
 {
-	log_info(logger, "PID: <PID> - Ejecutando: %s", EXIT_NOMBRE_INSTRUCCION);
+	log_info(logger, "PID: %d - Ejecutando: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
 
 	devolver_contexto_por_correcta_finalizacion();
 
-	log_trace(logger, "PID: <PID> - Ejecutada: %s", EXIT_NOMBRE_INSTRUCCION);
+	log_trace(logger, "PID: %d - Ejecutada: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
 }
 
 void terminar_cpu()
@@ -588,6 +591,7 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
 
+	contexto_de_ejecucion->pid = pid_ejecutando;
 	contexto_de_ejecucion->program_counter = program_counter;
 	contexto_de_ejecucion->registro_ax = registro_ax;
 	contexto_de_ejecucion->registro_bx = registro_bx;

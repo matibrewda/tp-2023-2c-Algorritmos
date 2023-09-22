@@ -29,6 +29,7 @@ typedef struct
 
 typedef struct
 {
+    int pid;
     int program_counter;
     uint32_t registro_ax;
     uint32_t registro_bx;

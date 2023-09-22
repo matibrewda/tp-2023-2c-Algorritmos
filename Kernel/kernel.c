@@ -1,28 +1,38 @@
 #include "kernel.h"
 
+// Hilos
 pthread_t hilo_planificador_largo_plazo;
 pthread_t hilo_planificador_corto_plazo;
 pthread_t hilo_dispatcher;
 pthread_t hilo_escucha_cpu;
 
-t_log *logger = NULL;
-t_argumentos_kernel *argumentos_kernel = NULL;
-t_config_kernel *configuracion_kernel = NULL;
-t_queue *cola_new = NULL;
-t_queue *cola_ready = NULL;
+// Conexiones
 int conexion_con_cpu_dispatch = -1;
 int conexion_con_cpu_interrupt = -1;
 int conexion_con_memoria = -1;
 int conexion_con_filesystem = -1;
+
+// Semaforos
 sem_t semaforo_grado_max_multiprogramacion;
 sem_t semaforo_se_creo_un_proceso;
 sem_t semaforo_se_agrego_proceso_en_cola_ready;
 sem_t semaforo_se_agrego_proceso_para_ejecutar;
 sem_t semaforo_cpu;
+sem_t semaforo_planificado_largo_plazo;
+sem_t semaforo_planificado_corto_plazo;
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
+
+// Colas de planificacion
+t_queue *cola_new = NULL;
+t_queue *cola_ready = NULL;
+
+t_log *logger = NULL;
+t_argumentos_kernel *argumentos_kernel = NULL;
+t_config_kernel *configuracion_kernel = NULL;
 t_list *pcbs;
 t_pcb *pcb_a_ejecutar = NULL;
+t_pcb *pcb_ejecutando = NULL;
 bool planificacion_detenida = false;
 int proximo_pid = 0;
 bool hay_un_proceso_ejecutando = false;
@@ -150,7 +160,6 @@ void *planificador_largo_plazo()
 {
 	while (true)
 	{
-		log_trace(logger, "Soy el planificador de largo plazo");
 		sem_wait(&semaforo_se_creo_un_proceso);
 
 		pthread_mutex_lock(&mutex_cola_new);
@@ -159,7 +168,7 @@ void *planificador_largo_plazo()
 
 		pcb->estado = 'R';
 
-		sem_wait(&semaforo_grado_max_multiprogramacion); // ME FALTA EL POST EN ALGUN LADO, OJO !
+		sem_wait(&semaforo_grado_max_multiprogramacion);
 
 		pthread_mutex_lock(&mutex_cola_ready);
 		queue_push(cola_ready, pcb);
@@ -253,8 +262,6 @@ void iniciar_planificacion()
 
 void detener_planificacion()
 {
-	interrumpir_proceso_en_cpu();
-
 	if (planificacion_detenida)
 	{
 		printf("ERROR: La planificacion ya se encuentra detenida.\n");
@@ -266,21 +273,36 @@ void detener_planificacion()
 
 void listar_procesos()
 {
-	if (list_is_empty(pcbs))
+	// Listo procesos en NEW
+	pthread_mutex_lock(&mutex_cola_new);
+	t_list_iterator *iterador_new = list_iterator_create(cola_new->elements);
+	while (list_iterator_has_next(iterador_new))
 	{
-		printf("No hay procesos que listar.\n");
-		return;
+		t_pcb *pcb_new = list_iterator_next(iterador_new);
+		printf("Proceso PID: %d - Estado NEW\n", pcb_new->pid);
+	}
+	list_iterator_destroy(iterador_new);
+	pthread_mutex_unlock(&mutex_cola_new);
+
+	// Listo procesos en READY
+	pthread_mutex_lock(&mutex_cola_ready);
+	t_list_iterator *iterador_ready = list_iterator_create(cola_ready->elements);
+	while (list_iterator_has_next(iterador_ready))
+	{
+		t_pcb *pcb_ready = list_iterator_next(iterador_ready);
+		printf("Proceso PID: %d - Estado READY\n", pcb_ready->pid);
+	}
+	list_iterator_destroy(iterador_ready);
+	pthread_mutex_unlock(&mutex_cola_ready);
+
+	// Listo proceso ejecutando (si es que lo hay)
+	if (pcb_ejecutando != NULL)
+	{
+		printf("Proceso PID: %d - Estado EXEC\n", pcb_ejecutando->pid);
 	}
 
-	t_list_iterator *iterador = list_iterator_create(pcbs);
-
-	while (list_iterator_has_next(iterador))
-	{
-		t_pcb *pcb = list_iterator_next(iterador);
-		printf("Proceso PID: %d esta en estado %c\n", pcb->pid, pcb->estado);
-	}
-
-	list_iterator_destroy(iterador);
+	// Listo procesos BLOQUEADOS
+	// TO DO
 }
 
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
@@ -291,8 +313,6 @@ void *planificador_corto_plazo()
 {
 	while (true)
 	{
-		log_trace(logger, "Soy el planificador de corto plazo");
-
 		fifo();
 	}
 }
@@ -511,6 +531,8 @@ void *dispatcher()
 
 		sem_wait(&semaforo_se_agrego_proceso_para_ejecutar);
 		ejecutar_proceso_en_cpu(pcb_a_ejecutar);
+		pcb_ejecutando = pcb_a_ejecutar;
+		pcb_a_ejecutar = NULL;
 	}
 }
 
@@ -518,8 +540,6 @@ void *escuchador_cpu()
 {
 	while (true)
 	{
-		log_trace(logger, "Soy el escuchador de CPU");
-
 		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
 
@@ -528,13 +548,14 @@ void *escuchador_cpu()
 			log_trace(logger, "Se recibio una orden de %s en %s avisando que termino un proceso por correcta finalizacion.", NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 			t_contexto_de_ejecucion *contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 
-			log_info(logger, "PID: %d - Estado Anterior: 'EXEC' - Estado Actual: 'EXIT'", pcb_a_ejecutar->pid);
+			log_info(logger, "PID: %d - Estado Anterior: 'EXEC' - Estado Actual: 'EXIT'", contexto_de_ejecucion->pid);
 
 			finalizar_proceso(pcb_a_ejecutar->pid);
 			sem_post(&semaforo_grado_max_multiprogramacion);
 
 			// Aviso que se desocupo la CPU
 			sem_post(&semaforo_cpu);
+			pcb_ejecutando = NULL;
 		}
 		else
 		{
@@ -547,6 +568,7 @@ void *escuchador_cpu()
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+	contexto_de_ejecucion->pid = pcb_proceso_a_ejecutar->pid;
 	contexto_de_ejecucion->program_counter = pcb_proceso_a_ejecutar->program_counter;
 	contexto_de_ejecucion->registro_ax = pcb_proceso_a_ejecutar->registro_ax;
 	contexto_de_ejecucion->registro_bx = pcb_proceso_a_ejecutar->registro_bx;
