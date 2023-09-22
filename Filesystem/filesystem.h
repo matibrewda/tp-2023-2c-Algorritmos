@@ -31,5 +31,6 @@
 
 // Terminar
 void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_filesystem, t_config_filesystem *configuracion_filesystem, int socket_kernel, int conexion_con_kernel, int conexion_con_memoria);
+void* main_hilo_2();
 
 #endif /* FILESYSTEM_H_ */
