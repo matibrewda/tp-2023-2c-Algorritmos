@@ -15,6 +15,7 @@ typedef struct
 typedef struct
 {
     FILE *archivo;
-} t_instrucciones_archivo_pseudocodigo;
+    int *pid;
+} t_archivo_proceso;
 
 #endif /* ESTRUCTURAS_MEMORIA_H_ */

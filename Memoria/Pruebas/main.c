@@ -13,11 +13,14 @@ int main()
     if (archivo != NULL)
     {
         char *linea;
-        while ((linea = leer_linea(logger, archivo)) != NULL)
+        /*while ((linea = buscar_linea(logger, archivo)) != NULL)
         {
             log_debug(logger, "Línea leída: %s", linea);
             free(linea); // Liberar la memoria asignada a la línea
-        }
+        }*/
+        linea = buscar_linea(logger, archivo, 6);
+        log_debug(logger, "Línea leída: %s", linea);
+        free(linea);
         cerrar_archivo(logger, archivo);
     }
     return 0;

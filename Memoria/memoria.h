@@ -36,7 +36,12 @@
 void realizar_handshake_cpu();
 //Iniciar proceso
 void iniciar_proceso_memoria();
+void enviar_instruccion_a_cpu();
+void finalizar_proceso_en_memoria();
+// Busqueda
+t_archivo_proceso *buscar_archivo_con_pid(int *pid);
 // Terminar
+void destruir_listas();
 void terminar_memoria();
 
 

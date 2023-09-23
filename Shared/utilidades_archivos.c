@@ -45,7 +45,7 @@ void cerrar_archivo(t_log *logger, FILE *archivo)
     log_error(logger, "Error al cerrar el archivo");
 }
 
-char *leer_linea(t_log *logger, FILE *archivo)
+char *buscar_linea(t_log *logger, FILE *archivo, int pc)
 {
     if (archivo == NULL)
     {
@@ -54,10 +54,30 @@ char *leer_linea(t_log *logger, FILE *archivo)
     }
 
     char *linea = NULL;
-    size_t lenght = 0;
+    size_t length = 0;
     ssize_t read;
+    int64_t byte_offset = 0;
 
-    read = getline(&linea, &lenght, archivo);
+    fseek(archivo, 0, SEEK_SET);
+    int linea_actual = 1;
+
+    while ((read = getline(&linea, &length, archivo)) != -1)
+    {
+        if (linea_actual == pc)
+        {
+            break;
+        }
+        byte_offset += read;
+        linea_actual++;
+    }
+
+    if (fseek(archivo, byte_offset, SEEK_SET) != 0)
+    {
+        log_error(logger, "Error al buscar la línea %d en el archivo", pc);
+        return NULL;
+    }
+
+    read = getline(&linea, &length, archivo);
     if (read == -1)
     {
         free(linea);
