@@ -29,3 +29,25 @@ t_contexto_de_ejecucion *leer_paquete_contexto_de_ejecucion(t_log *logger, int c
 
 	return contexto_de_ejecucion;
 }
+
+int leer_info_inicial_de_memoria_para_cpu(t_log *logger, int conexion_con_memoria)
+{
+	op_code codigo_operacion = DEVOLVER_INFO_DE_MEMORIA_INICIAL_PARA_CPU;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	int tamanio_memoria;
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, &tamanio_memoria, codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+	return tamanio_memoria;
+}

@@ -1,8 +1,12 @@
 #include "memoria.h"
 
+// Variables globales
 t_log *logger = NULL;
 t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
+t_list *procesos_iniciados = NULL;
+
+// Conexiones
 int socket_kernel = -1;
 int socket_cpu = -1;
 int socket_filesystem = -1;
@@ -10,7 +14,9 @@ int conexion_con_kernel = -1;
 int conexion_con_cpu = -1;
 int conexion_con_filesystem = -1;
 
-t_list *procesos_iniciados = NULL;
+// Hilos
+pthread_t hilo_atiendo_kernel;
+pthread_t hilo_atiendo_cpu;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -83,38 +89,60 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Listas
 	procesos_iniciados = list_create();
 
+	// Hilos
+	pthread_create(&hilo_atiendo_cpu, NULL, atender_cpu, NULL);
+	pthread_create(&hilo_atiendo_kernel, NULL, atender_kernel, NULL);
+
 	// Logica principal
-	// esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
-
-	int resultado_handshake_cpu = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, conexion_con_cpu);
-	log_info(logger, "Se recibio la operacion %d desde %s", resultado_handshake_cpu, NOMBRE_MODULO_CPU);
-	if (resultado_handshake_cpu == HANDSHAKE_CPU_MEMORIA)
-	{
-		realizar_handshake_cpu();
-	}
-
-	int recibir_iniciar_operacion_kernel = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
-	log_info(logger, "Se recibio la operacion %d desde %s", recibir_iniciar_operacion_kernel, NOMBRE_MODULO_KERNEL);
-	if (recibir_iniciar_operacion_kernel == INICIAR_PROCESO_MEMORIA)
-	{
-		iniciar_proceso_memoria();
-	}
-
+	pthread_join(hilo_atiendo_cpu, NULL);
+    pthread_join(hilo_atiendo_kernel, NULL);
+	
 	// Finalizacion
 	terminar_memoria();
 	return EXIT_SUCCESS;
 }
 
-void realizar_handshake_cpu()
+void *atender_kernel()
 {
-	log_debug(logger, "Comenzando la creacion de paquete para enviar handshake al cpu!");
-	t_paquete *paquete = crear_paquete(logger, HANDSHAKE_CPU_MEMORIA);
+	while (true)
+	{
+		int operacion_recibida_de_kernel = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
+		log_info(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_kernel), NOMBRE_MODULO_KERNEL);
 
-	agregar_int_a_paquete(logger, paquete, configuracion_memoria->tam_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, HANDSHAKE_CPU_MEMORIA);
-	log_debug(logger, "Exito en la creacion de paquete para enviar handshake al cpu!");
+		if (operacion_recibida_de_kernel == INICIAR_PROCESO_MEMORIA)
+		{
+			iniciar_proceso_memoria();
+		}
+		else if (operacion_recibida_de_kernel == FINALIZAR_PROCESO_MEMORIA)
+		{
+			finalizar_proceso_en_memoria();
+		}
+	}
+}
 
+void *atender_cpu()
+{
+	while (true)
+	{
+		int operacion_recibida_de_cpu = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, conexion_con_cpu);
+		log_info(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_cpu), NOMBRE_MODULO_CPU);
+
+		if (operacion_recibida_de_cpu == SOLICITAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
+		{
+			devolver_info_de_memoria_inicial_para_cpu();
+		}
+		else if (operacion_recibida_de_cpu == SOLICITAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
+		{
+			// TO DO: devuelvo linea a CPU
+		}
+	}
+}
+
+void devolver_info_de_memoria_inicial_para_cpu()
+{
+	log_debug(logger, "Comenzando la creacion de paquete para enviar informacion inicial de memoria a la CPU");
+	t_paquete *paquete = crear_paquete_devolver_info_inicial_de_memoria_para_cpu(logger, configuracion_memoria->tam_memoria);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	log_debug(logger, "Exito en el envio de paquete para handshake al cpu!");
 }
 
 void iniciar_proceso_memoria()
@@ -169,50 +197,52 @@ void enviar_instruccion_a_cpu()
 	log_info(logger, "El proceso que se va a ejecutar tiene el pid %d y se pidio la instruccion del pc %d", pid, pc);
 
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
-	if (archivo_proceso == NULL) {
+	if (archivo_proceso == NULL)
+	{
 		return;
 	}
 
 	char *proxima_instruccion = buscar_linea(logger, archivo_proceso->archivo, pc);
 
-	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", proxima_instruccion);
-	t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger);
+	// log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", proxima_instruccion);
+	// t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger);
 
-	agregar_string_a_paquete(logger, paquete, proxima_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
-	log_debug(logger, "Exito en la creacion de paquete para enviar instruccion %s al cpu!", proxima_instruccion);
+	// agregar_string_a_paquete(logger, paquete, proxima_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
+	// log_debug(logger, "Exito en la creacion de paquete para enviar instruccion %s al cpu!", proxima_instruccion);
 
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", proxima_instruccion);
-	destruir_paquete(logger, paquete);
+	// enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+	// log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", proxima_instruccion);
 }
 
-void finalizar_proceso_en_memoria() {
+void finalizar_proceso_en_memoria()
+{
 	int tamanio_buffer;
 	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &tamanio_buffer, conexion_con_kernel, FINALIZAR_PROCESO_MEMORIA);
 
 	void *buffer_de_paquete_con_offset = buffer_de_paquete;
 
-	int *pid = malloc(sizeof(int));
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, pid, FINALIZAR_PROCESO_MEMORIA);
-	log_info(logger, "El PID del proceso a finalizar es: %d", *pid);
+	int pid;
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &pid, FINALIZAR_PROCESO_MEMORIA);
+	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
 	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
-	if (archivo_proceso == NULL) {
+	if (archivo_proceso == NULL)
+	{
 		return;
 	}
 	cerrar_archivo(logger, archivo_proceso->archivo);
-	list_remove_element(procesos_iniciados, archivo_proceso);
+	//list_remove_element(procesos_iniciados, archivo_proceso);
 	free(archivo_proceso);
 }
 
 // TODO revisar find en commons
-t_archivo_proceso *buscar_archivo_con_pid(int *pid)
+t_archivo_proceso *buscar_archivo_con_pid(int pid)
 {
 	if (list_is_empty(procesos_iniciados))
 	{
 		log_error(logger, "No hay archivos de procesos iniciados en la lista");
-		return;
+		return NULL;
 	}
 
 	t_list_iterator *iterador = list_iterator_create(procesos_iniciados);
@@ -220,21 +250,21 @@ t_archivo_proceso *buscar_archivo_con_pid(int *pid)
 	while (list_iterator_has_next(iterador))
 	{
 		t_archivo_proceso *archivo_proceso = list_iterator_next(iterador);
-		if (archivo_proceso->pid == *pid)
+		if (archivo_proceso->pid == pid)
 		{
-			log_debug(logger, "Se encuentra la estructura de pseudocodigo para el pid %d", *pid);
+			log_debug(logger, "Se encuentra la estructura de pseudocodigo para el pid %d", pid);
 			list_iterator_destroy(iterador);
 			return archivo_proceso;
 		}
-		
 	}
 
 	list_iterator_destroy(iterador);
-	log_error(logger, "No se encuentran estructuras de pseudocodigo para el pid %d", *pid);
+	log_error(logger, "No se encuentran estructuras de pseudocodigo para el pid %d", pid);
 	return NULL;
 }
 
-void destruir_listas() {
+void destruir_listas()
+{
 	list_destroy(procesos_iniciados);
 }
 

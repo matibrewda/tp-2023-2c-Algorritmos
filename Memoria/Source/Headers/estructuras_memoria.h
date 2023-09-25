@@ -15,7 +15,7 @@ typedef struct
 typedef struct
 {
     FILE *archivo;
-    int *pid;
+    int pid;
 } t_archivo_proceso;
 
 #endif /* ESTRUCTURAS_MEMORIA_H_ */

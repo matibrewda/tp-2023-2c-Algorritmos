@@ -21,14 +21,29 @@ t_paquete *crear_paquete_interrumpir_ejecucion(t_log *logger)
     return crear_paquete_con_opcode_y_sin_contenido(logger, INTERRUMPIR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_paquete *crear_paquete_handshake_memoria(t_log *logger)
+t_paquete *crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(t_log *logger)
 {
-    return crear_paquete_con_opcode_y_sin_contenido(logger, HANDSHAKE_CPU_MEMORIA, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+    return crear_paquete_con_opcode_y_sin_contenido(logger, SOLICITAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 }
 
 t_paquete *crear_paquete_enviar_instruccion_a_cpu(t_log *logger)
 {
     return crear_paquete_con_opcode_y_sin_contenido(logger, ENVIAR_INSTRUCCION_MEMORIA_A_CPU, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+}
+
+t_paquete *crear_paquete_devolver_info_inicial_de_memoria_para_cpu(t_log *logger, int tamanio_memoria)
+{
+    op_code codigo_operacion = DEVOLVER_INFO_DE_MEMORIA_INICIAL_PARA_CPU;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+    t_paquete *paquete = crear_paquete(logger, DEVOLVER_INFO_DE_MEMORIA_INICIAL_PARA_CPU);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, tamanio_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
+
+    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+    return paquete;
 }
 
 t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_contexto_de_ejecucion *contexto_de_ejecucion)

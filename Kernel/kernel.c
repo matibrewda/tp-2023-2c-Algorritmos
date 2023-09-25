@@ -50,8 +50,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	log_debug(logger, "Inicializando %s", NOMBRE_MODULO_KERNEL);
-
 	argumentos_kernel = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_kernel == NULL)
 	{

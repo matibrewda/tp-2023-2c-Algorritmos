@@ -23,7 +23,8 @@ t_paquete *crear_paquete_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion
 t_paquete *crear_paquete_devuelvo_proceso_por_ser_interrumpido(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
 t_paquete *crear_paquete_devuelvo_proceso_por_correcta_finalizacion(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
 t_paquete *crear_paquete_interrumpir_ejecucion(t_log *logger);
-t_paquete *crear_paquete_handshake_memoria(t_log *logger);
+t_paquete *crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(t_log *logger);
+t_paquete *crear_paquete_devolver_info_inicial_de_memoria_para_cpu(t_log *logger, int tamanio_memoria);
 
 // Comunes
 t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_contexto_de_ejecucion *contexto_de_ejecucion);

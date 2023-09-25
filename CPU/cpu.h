@@ -41,6 +41,7 @@ void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
 
 void destruir_instruccion(t_instruccion* instruccion);
+void solicitar_info_inicial_a_memoria();
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();

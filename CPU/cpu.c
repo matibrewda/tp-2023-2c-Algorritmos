@@ -6,6 +6,7 @@ t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
 bool ocurrio_interrupcion = false;
 int pid_ejecutando = 0;
+int tam_pagina = -1;
 
 // Conexiones
 int socket_kernel_dispatch = -1;
@@ -37,8 +38,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		terminar_cpu();
 		return EXIT_FAILURE;
 	}
-
-	log_debug(logger, "Inicializando %s", NOMBRE_MODULO_CPU);
 
 	argumentos_cpu = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_cpu == NULL)
@@ -89,16 +88,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	// t_paquete* paquete_handshake_memoria = crear_paquete_handshake_memoria(logger);
-	// enviar_paquete(logger, conexion_con_memoria, paquete_handshake_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-	// int resultado_handhake_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
-	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_handhake_memoria, NOMBRE_MODULO_MEMORIA);
-	// int tamanio_buffer;
-	// void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA);
-	// void *buffer_de_paquete_con_offset = buffer_de_paquete;
-	// int *tam_pagina = malloc(sizeof(int));
-	// leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_de_paquete_con_offset, tam_pagina, HANDSHAKE_CPU_MEMORIA);
-	// log_info(logger, "El tamanio de las paginas de memoria es: %d", *tam_pagina);
+	solicitar_info_inicial_a_memoria();
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente la CPU NO ejecuta (IDLE)
@@ -770,4 +760,16 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	contexto_de_ejecucion->registro_dx = registro_dx;
 
 	return contexto_de_ejecucion;
+}
+
+void solicitar_info_inicial_a_memoria()
+{
+	t_paquete* paquete_solicitar_info_de_memoria_inicial_para_cpu = crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(logger);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitar_info_de_memoria_inicial_para_cpu, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	int operacion_recibida_de_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	if (operacion_recibida_de_memoria == DEVOLVER_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
+	{
+		tam_pagina = leer_info_inicial_de_memoria_para_cpu(logger, conexion_con_memoria);
+		return;
+	}
 }
