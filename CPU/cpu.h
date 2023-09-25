@@ -40,29 +40,32 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
 void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
 
+void destruir_instruccion(t_instruccion* instruccion);
+
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();
-t_instruccion *fetch();
-int decode(char* nombre_instruccion);
-void execute(int opcode, char* parametro_1_instruccion, char* parametro_2_instruccion);
-void check_interrupt();
+char *fetch();
+t_instruccion *decode(char *instruccion_string);
+void execute(t_instruccion* instruccion);
 
 // Instrucciones
+char *pedir_instruccion_a_memoria();
+
 void ejecutar_instruccion_set(char *nombre_registro, uint32_t valor);
 void ejecutar_instruccion_sum(char *nombre_registro_destino, char *nombre_registro_origen);
 void ejecutar_instruccion_sub(char *nombre_registro_destino, char *nombre_registro_origen);
 void ejecutar_instruccion_jnz(char *nombre_registro, uint32_t nuevo_program_counter);
 void ejecutar_instruccion_sleep(int tiempo);
-void ejecutar_instruccion_wait(char* nombre_recurso);
-void ejecutar_instruccion_signal(char* nombre_recurso);
-void ejecutar_instruccion_mov_in(char* nombre_registro, char* direccion_logica);
-void ejecutar_instruccion_mov_out(char* direccion_logica, char* nombre_registro);
-void ejecutar_instruccion_fopen(char* nombre_archivo, char* modo_apertura);
-void ejecutar_instruccion_fclose(char* nombre_archivo);
-void ejecutar_instruccion_fseek(char* nombre_archivo, char* posicion);
-void ejecutar_instruccion_fread(char* nombre_archivo, char* direccion_logica);
-void ejecutar_instruccion_fwrite(char* nombre_archivo, char* direccion_logica);
-void ejecutar_instruccion_ftruncate(char* nombre_archivo, char* tamanio);
+void ejecutar_instruccion_wait(char *nombre_recurso);
+void ejecutar_instruccion_signal(char *nombre_recurso);
+void ejecutar_instruccion_mov_in(char *nombre_registro, char *direccion_logica);
+void ejecutar_instruccion_mov_out(char *direccion_logica, char *nombre_registro);
+void ejecutar_instruccion_fopen(char *nombre_archivo, char *modo_apertura);
+void ejecutar_instruccion_fclose(char *nombre_archivo);
+void ejecutar_instruccion_fseek(char *nombre_archivo, char *posicion);
+void ejecutar_instruccion_fread(char *nombre_archivo, char *direccion_logica);
+void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica);
+void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio);
 void ejecutar_instruccion_exit();
 
 #endif /* CPU_H_ */

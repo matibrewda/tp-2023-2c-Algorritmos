@@ -1,19 +1,25 @@
 #include "cpu.h"
 
-pthread_t hilo_interrupt;
-pthread_t hilo_dispatch;
+// Variables globales
 t_log *logger = NULL;
 t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
+bool ocurrio_interrupcion = false;
+int pid_ejecutando = 0;
+
+// Conexiones
 int socket_kernel_dispatch = -1;
 int socket_kernel_interrupt = -1;
 int conexion_con_kernel_dispatch = -1;
 int conexion_con_kernel_interrupt = -1;
 int conexion_con_memoria = -1;
 
-sem_t semaforo_ejecutar_ciclo_de_instruccion;
+// Hilos
+pthread_t hilo_interrupt;
+pthread_t hilo_dispatch;
 
-int pid_ejecutando = 0;
+// Semaforos
+sem_t semaforo_ejecutar_ciclo_de_instruccion;
 
 // Registros
 uint32_t program_counter = 0;
@@ -21,7 +27,6 @@ uint32_t registro_ax = 0;
 uint32_t registro_bx = 0;
 uint32_t registro_cx = 0;
 uint32_t registro_dx = 0;
-bool ocurrio_interrupcion = false;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -88,20 +93,15 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// enviar_paquete(logger, conexion_con_memoria, paquete_handshake_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 	// int resultado_handhake_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	// log_info(logger, "Se recibio la operacion %d desde %s", resultado_handhake_memoria, NOMBRE_MODULO_MEMORIA);
-
 	// int tamanio_buffer;
 	// void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, HANDSHAKE_CPU_MEMORIA);
-
 	// void *buffer_de_paquete_con_offset = buffer_de_paquete;
-
 	// int *tam_pagina = malloc(sizeof(int));
-
 	// leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, &buffer_de_paquete_con_offset, tam_pagina, HANDSHAKE_CPU_MEMORIA);
-	
 	// log_info(logger, "El tamanio de las paginas de memoria es: %d", *tam_pagina);
 
 	// Semaforos
-	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente NO ejecuta
+	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente la CPU NO ejecuta (IDLE)
 
 	// Hilos
 	pthread_create(&hilo_interrupt, NULL, interrupt, NULL);
@@ -171,6 +171,7 @@ void *dispatch()
 // Hilo Ciclo de Ejecucion (Hilo Principal)
 void ciclo_de_ejecucion()
 {
+	char *instruccion_string;
 	t_instruccion *instruccion;
 	int opcode;
 
@@ -178,150 +179,320 @@ void ciclo_de_ejecucion()
 	{
 		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); // Espero a que haya algo para ejecutar
 
-		// instruccion = fetch();
-		// opcode = decode(instruccion->nombre_instruccion);
-		// execute(opcode, instruccion->parametro_1_instruccion, instruccion->parametro_2_instruccion);
+		instruccion_string = fetch();
+		instruccion = decode(instruccion_string);
+		execute(instruccion);
 
-		log_info(logger, "Ejecutando PID = %d PC = %d...", pid_ejecutando, program_counter);
+		program_counter++; // OJO CON EL JNZ
 
-		program_counter++;
-
-		if (program_counter > 5)
+		// Interrupciones
+		if (ocurrio_interrupcion)
 		{
-			ejecutar_instruccion_exit();
-			continue; // asi no vuelve a ejecutar
+			devolver_contexto_por_ser_interrumpido();
 		}
 		else
 		{
-			ejecutar_instruccion_sleep(15);
+			if (instruccion->opcode != EXIT_OPCODE_INSTRUCCION)
+			{
+				// Sigo ejecutando
+				sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
+			}
 		}
 
-		check_interrupt();
+		destruir_instruccion(instruccion);
 	}
 }
 
-void check_interrupt()
+void destruir_instruccion(t_instruccion *instruccion)
 {
-	if (!ocurrio_interrupcion)
+	if (instruccion == NULL)
 	{
-		// Si NO ocurrio una interrupcion, puedo seguir ejecutando
-		sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
+		return;
+	}
+
+	if (instruccion->parametro_1 != NULL)
+	{
+		free(instruccion->parametro_1);
+	}
+
+	if (instruccion->parametro_2 != NULL)
+	{
+		free(instruccion->parametro_2);
+	}
+
+	free(instruccion);
+}
+
+char *fetch()
+{
+	log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
+	return pedir_instruccion_a_memoria();
+}
+
+char *pedir_instruccion_a_memoria()
+{
+	if (program_counter > 5)
+	{
+		char *instruccion_string = (char *)malloc(sizeof(char) * 5);
+		memcpy(instruccion_string, "EXIT", sizeof(char) * 5);
+		return instruccion_string;
+	}
+
+	char *instruccion_string = (char *)malloc(sizeof(char) * 8);
+	memcpy(instruccion_string, "SLEEP 5", sizeof(char) * 8);
+	return instruccion_string;
+}
+
+t_instruccion *decode(char *instruccion_string)
+{
+	char *saveptr = instruccion_string;
+	char *nombre_instruccion = strtok_r(saveptr, " ", &saveptr);
+	t_instruccion *instruccion = malloc(sizeof(t_instruccion));
+	instruccion->parametro_1 = NULL;
+	instruccion->parametro_2 = NULL;
+	bool tengo_que_leer_parametro_1 = false;
+	bool tengo_que_leer_parametro_2 = false;
+
+	if (strcmp(nombre_instruccion, SET_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = SET_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, SUM_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = SUM_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, SUB_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = SUB_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, JNZ_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = JNZ_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, SLEEP_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = SLEEP_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = false;
+	}
+	else if (strcmp(nombre_instruccion, WAIT_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = WAIT_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = false;
+	}
+	else if (strcmp(nombre_instruccion, SIGNAL_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = SIGNAL_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = false;
+	}
+	else if (strcmp(nombre_instruccion, MOV_IN_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = MOV_IN_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, MOV_OUT_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = MOV_OUT_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, FOPEN_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = FOPEN_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = FCLOSE_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = false;
+	}
+	else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = FSEEK_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = FREAD_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = FWRITE_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = FTRUNCATE_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = true;
+		tengo_que_leer_parametro_2 = true;
+	}
+	else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
+	{
+		instruccion->opcode = EXIT_OPCODE_INSTRUCCION;
+		tengo_que_leer_parametro_1 = false;
+		tengo_que_leer_parametro_2 = false;
 	}
 	else
 	{
-		// Si ocurrio una interrupcion, el ciclo de ejecucion no puede continuar
-		devolver_contexto_por_ser_interrumpido();
+		log_error(logger, "Instrucción '%s' a decodificar no reconocida.", nombre_instruccion);
+		free(instruccion_string);
+		destruir_instruccion(instruccion);
+		return NULL;
 	}
+
+	if (tengo_que_leer_parametro_1)
+	{
+		char *parametro_1 = strtok_r(saveptr, " ", &saveptr);
+
+		if (parametro_1 == NULL)
+		{
+			log_error(logger, "Parametro 1 para instrucción '%s' no reconocido.", nombre_instruccion);
+			free(instruccion_string);
+			destruir_instruccion(instruccion);
+			return NULL;
+		}
+
+		instruccion->parametro_1 = malloc(strlen(parametro_1));
+		strcpy(instruccion->parametro_1, parametro_1);
+	}
+
+	if (tengo_que_leer_parametro_2)
+	{
+		char *parametro_2 = strtok_r(saveptr, " ", &saveptr);
+
+		if (parametro_2 == NULL)
+		{
+			log_error(logger, "Parametro 2 para instrucción '%s' no reconocido.", nombre_instruccion);
+			free(instruccion_string);
+			destruir_instruccion(instruccion);
+			return NULL;
+		}
+
+		instruccion->parametro_2 = malloc(strlen(parametro_2));
+		strcpy(instruccion->parametro_2, parametro_2);
+	}
+
+	free(instruccion_string);
+	return instruccion;
 }
 
-t_instruccion *fetch()
+void execute(t_instruccion *instruccion)
 {
-}
-
-int decode(char *nombre_instruccion)
-{
-	if (strcmp(nombre_instruccion, SET_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == SET_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return SET_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_set(instruccion->parametro_1, atoi(instruccion->parametro_2));
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, SUM_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == SUM_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return SUM_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_sum(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, SUB_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == SUB_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return SUB_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_sub(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, JNZ_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == JNZ_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return JNZ_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_jnz(instruccion->parametro_1, atoi(instruccion->parametro_2));
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, SLEEP_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == SLEEP_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return SLEEP_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_sleep(atoi(instruccion->parametro_1));
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, WAIT_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == WAIT_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return WAIT_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_wait(instruccion->parametro_1);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, SIGNAL_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == SIGNAL_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return SIGNAL_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_signal(instruccion->parametro_1);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, MOV_IN_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == MOV_IN_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return MOV_IN_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_mov_in(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, MOV_OUT_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == MOV_OUT_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return MOV_OUT_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_mov_out(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, FOPEN_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == FOPEN_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return FOPEN_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_fopen(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == FCLOSE_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return FCLOSE_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_fclose(instruccion->parametro_1);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == FSEEK_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return FSEEK_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_fseek(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == FREAD_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return FREAD_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_fread(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == FWRITE_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return FWRITE_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_fwrite(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == FTRUNCATE_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return FTRUNCATE_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_ftruncate(instruccion->parametro_1, instruccion->parametro_2);
+		return;
 	}
 
-	if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
+	if (instruccion->opcode == EXIT_OPCODE_INSTRUCCION)
 	{
-		log_trace(logger, "Instrucción '%s' decodificada.", nombre_instruccion);
-		return EXIT_OPCODE_INSTRUCCION;
+		ejecutar_instruccion_exit();
+		return;
 	}
 
-	log_error(logger, "Instrucción '%s' a decodificar no reconocida.", nombre_instruccion);
-	return -1;
-}
-
-void execute(int opcode, char *parametro_1_instruccion, char *parametro_2_instruccion)
-{
+	log_error(logger, "Instrucción a ejecutar no reconocida.");
+	return;
 }
 
 uint32_t obtener_valor_registro(char *nombre_registro)
@@ -514,7 +685,7 @@ void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica)
 	// TO DO
 
 	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
-}// TO DO
+}
 
 void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio)
 {

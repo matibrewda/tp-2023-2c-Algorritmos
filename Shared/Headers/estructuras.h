@@ -22,9 +22,9 @@ typedef struct
 
 typedef struct
 {
-    char* nombre_instruccion;
-	char* parametro_1_instruccion;
-	char* parametro_2_instruccion;
+    int opcode;
+	char* parametro_1;
+	char* parametro_2;
 } t_instruccion;
 
 typedef struct

@@ -1,16 +1,27 @@
 #include "kernel.h"
 
-// Hilos
-pthread_t hilo_planificador_largo_plazo;
-pthread_t hilo_planificador_corto_plazo;
-pthread_t hilo_dispatcher;
-pthread_t hilo_escucha_cpu;
+// Variables globales
+t_log *logger = NULL;
+t_argumentos_kernel *argumentos_kernel = NULL;
+t_config_kernel *configuracion_kernel = NULL;
+t_list *pcbs;
+t_pcb *pcb_a_ejecutar = NULL;
+t_pcb *pcb_ejecutando = NULL;
+bool planificacion_detenida = false;
+int proximo_pid = 0;
+bool hay_un_proceso_ejecutando = false;
 
 // Conexiones
 int conexion_con_cpu_dispatch = -1;
 int conexion_con_cpu_interrupt = -1;
 int conexion_con_memoria = -1;
 int conexion_con_filesystem = -1;
+
+// Hilos
+pthread_t hilo_planificador_largo_plazo;
+pthread_t hilo_planificador_corto_plazo;
+pthread_t hilo_dispatcher;
+pthread_t hilo_escucha_cpu;
 
 // Semaforos
 sem_t semaforo_grado_max_multiprogramacion;
@@ -26,16 +37,6 @@ pthread_mutex_t mutex_cola_ready;
 // Colas de planificacion
 t_queue *cola_new = NULL;
 t_queue *cola_ready = NULL;
-
-t_log *logger = NULL;
-t_argumentos_kernel *argumentos_kernel = NULL;
-t_config_kernel *configuracion_kernel = NULL;
-t_list *pcbs;
-t_pcb *pcb_a_ejecutar = NULL;
-t_pcb *pcb_ejecutando = NULL;
-bool planificacion_detenida = false;
-int proximo_pid = 0;
-bool hay_un_proceso_ejecutando = false;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -550,7 +551,7 @@ void *escuchador_cpu()
 
 			log_info(logger, "PID: %d - Estado Anterior: 'EXEC' - Estado Actual: 'EXIT'", contexto_de_ejecucion->pid);
 
-			finalizar_proceso(pcb_a_ejecutar->pid);
+			finalizar_proceso(contexto_de_ejecucion->pid);
 			sem_post(&semaforo_grado_max_multiprogramacion);
 
 			// Aviso que se desocupo la CPU
