@@ -26,6 +26,11 @@ t_paquete *crear_paquete_handshake_memoria(t_log *logger)
     return crear_paquete_con_opcode_y_sin_contenido(logger, HANDSHAKE_CPU_MEMORIA, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 }
 
+t_paquete *crear_paquete_enviar_instruccion_a_cpu(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, ENVIAR_INSTRUCCION_MEMORIA_A_CPU, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+}
+
 t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_contexto_de_ejecucion *contexto_de_ejecucion)
 {
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
