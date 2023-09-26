@@ -204,14 +204,14 @@ void enviar_instruccion_a_cpu()
 
 	char *proxima_instruccion = buscar_linea(logger, archivo_proceso->archivo, pc);
 
-	// log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", proxima_instruccion);
-	// t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger);
+	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", proxima_instruccion);
+	t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger);
 
-	// agregar_string_a_paquete(logger, paquete, proxima_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
-	// log_debug(logger, "Exito en la creacion de paquete para enviar instruccion %s al cpu!", proxima_instruccion);
+	agregar_string_a_paquete(logger, paquete, proxima_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
+	log_debug(logger, "Exito en la creacion de paquete para enviar instruccion %s al cpu!", proxima_instruccion);
 
-	// enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	// log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", proxima_instruccion);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", proxima_instruccion);
 }
 
 void finalizar_proceso_en_memoria()
@@ -232,7 +232,7 @@ void finalizar_proceso_en_memoria()
 		return;
 	}
 	cerrar_archivo(logger, archivo_proceso->archivo);
-	//list_remove_element(procesos_iniciados, archivo_proceso);
+	list_remove_element(procesos_iniciados, archivo_proceso);
 	free(archivo_proceso);
 }
 
