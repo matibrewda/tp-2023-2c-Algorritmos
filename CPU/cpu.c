@@ -767,6 +767,7 @@ void solicitar_info_inicial_a_memoria()
 	t_paquete* paquete_solicitar_info_de_memoria_inicial_para_cpu = crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(logger);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitar_info_de_memoria_inicial_para_cpu, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 	int operacion_recibida_de_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	
 	if (operacion_recibida_de_memoria == DEVOLVER_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
 	{
 		tam_pagina = leer_info_inicial_de_memoria_para_cpu(logger, conexion_con_memoria);
