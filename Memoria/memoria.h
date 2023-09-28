@@ -32,18 +32,21 @@
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
 // Handshake con CPU
-void devolver_info_de_memoria_inicial_para_cpu();
+void enviar_info_de_memoria_inicial_para_cpu();
 
 //Iniciar proceso
-void iniciar_proceso_memoria();
-void enviar_instruccion_a_cpu();
-void finalizar_proceso_en_memoria();
+void iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
+void enviar_instruccion_a_cpu(int pid, int pc);
+void finalizar_proceso_en_memoria(int pid);
+
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
+
 // Terminar
 void destruir_listas();
 void terminar_memoria();
 
+// Hilos
 void* atender_kernel();
 void* atender_cpu();
 

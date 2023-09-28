@@ -228,14 +228,19 @@ void crear_proceso(char *path, int size, int prioridad)
 	pcb->pid = obtener_nuevo_pid();
 	pcb->estado = 'N';
 	pcb->program_counter = 1;
-	pcb->registro_ax = 4;
-	pcb->registro_bx = 5;
-	pcb->registro_cx = 6;
-	pcb->registro_dx = 7;
+	pcb->registro_ax = 0;
+	pcb->registro_bx = 0;
+	pcb->registro_cx = 0;
+	pcb->registro_dx = 0;
+	pcb->prioridad = prioridad;
+	pcb->path = path;
+	pcb->size = size;
 
 	pthread_mutex_lock(&mutex_cola_new);
 	queue_push(cola_new, pcb);
 	pthread_mutex_unlock(&mutex_cola_new);
+
+	iniciar_estructuras_de_proceso_en_memoria(logger, pcb->path, pcb->size, pcb->prioridad, pcb->pid);
 
 	sem_post(&semaforo_se_creo_un_proceso);
 
@@ -246,6 +251,8 @@ void finalizar_proceso(int pid)
 {
 	// aca me tengo que fijar en que estado estaba el proceso antes!
 	log_info(logger, "Finaliza el proceso %d - Motivo: SUCCESS", pid);
+
+	// TO DO: finalizar estructuras de proceso en memoria
 }
 
 void iniciar_planificacion()
@@ -587,16 +594,18 @@ void interrumpir_proceso_en_cpu()
 	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_interrumpir_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 }
 
-void enviar_inciar_proceso_memoria(t_log *logger, char *path, int size, int prioridad)
+void iniciar_estructuras_de_proceso_en_memoria(t_log *logger, char *path, int size, int prioridad, int pid)
 {
 	log_debug(logger, "Comenzando la creacion de paquete para enviar iniciar proceso a memoria!");
-	t_paquete *paquete = crear_paquete(logger, INICIAR_PROCESO_MEMORIA);
-
-	agregar_string_a_paquete(logger, paquete, path, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, INICIAR_PROCESO_MEMORIA);
-	agregar_int_a_paquete(logger, paquete, size, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, INICIAR_PROCESO_MEMORIA);
-	agregar_int_a_paquete(logger, paquete, prioridad, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, INICIAR_PROCESO_MEMORIA);
-	log_debug(logger, "Exito en la creacion de paquete para enviar iniciar proceso a memoria!");
+	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
+	proceso_memoria->path = path;
+	proceso_memoria->size = size;
+	proceso_memoria->prioridad = prioridad;
+	proceso_memoria->pid = pid;
+	t_paquete *paquete = crear_paquete_iniciar_proceso_en_memoria(logger, proceso_memoria);
 
 	enviar_paquete(logger, conexion_con_memoria, paquete, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
 	log_debug(logger, "Exito en el envio de paquete para iniciar proceso a memoria!");
+
+	free(proceso_memoria);
 }

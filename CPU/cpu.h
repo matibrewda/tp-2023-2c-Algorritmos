@@ -27,7 +27,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/cpu.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 void terminar_cpu();
 void *interrupt();
@@ -41,7 +41,7 @@ void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
 
 void destruir_instruccion(t_instruccion* instruccion);
-void solicitar_info_inicial_a_memoria();
+bool solicitar_info_inicial_a_memoria();
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();

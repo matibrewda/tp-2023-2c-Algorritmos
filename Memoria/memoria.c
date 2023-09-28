@@ -95,8 +95,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Logica principal
 	pthread_join(hilo_atiendo_cpu, NULL);
-    pthread_join(hilo_atiendo_kernel, NULL);
-	
+	pthread_join(hilo_atiendo_kernel, NULL);
+
 	// Finalizacion
 	terminar_memoria();
 	return EXIT_SUCCESS;
@@ -107,15 +107,21 @@ void *atender_kernel()
 	while (true)
 	{
 		int operacion_recibida_de_kernel = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
-		log_info(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_kernel), NOMBRE_MODULO_KERNEL);
+		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_kernel), NOMBRE_MODULO_KERNEL);
 
 		if (operacion_recibida_de_kernel == INICIAR_PROCESO_MEMORIA)
 		{
-			iniciar_proceso_memoria();
+			t_proceso_memoria *proceso_memoria = leer_paquete_iniciar_proceso_en_memoria(logger, conexion_con_kernel);
+			iniciar_proceso_memoria(proceso_memoria->path, proceso_memoria->size, proceso_memoria->prioridad, proceso_memoria->pid);
+			free(proceso_memoria->path);
+			free(proceso_memoria);
 		}
 		else if (operacion_recibida_de_kernel == FINALIZAR_PROCESO_MEMORIA)
 		{
-			finalizar_proceso_en_memoria();
+			t_proceso_memoria *proceso_memoria = leer_paquete_finalizar_proceso_en_memoria(logger, conexion_con_kernel);
+			finalizar_proceso_en_memoria(proceso_memoria->pid);
+			free(proceso_memoria->path);
+			free(proceso_memoria);
 		}
 	}
 }
@@ -125,52 +131,43 @@ void *atender_cpu()
 	while (true)
 	{
 		int operacion_recibida_de_cpu = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, conexion_con_cpu);
-		log_info(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_cpu), NOMBRE_MODULO_CPU);
+		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_cpu), NOMBRE_MODULO_CPU);
 
 		if (operacion_recibida_de_cpu == SOLICITAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
 		{
-			devolver_info_de_memoria_inicial_para_cpu();
+			enviar_info_de_memoria_inicial_para_cpu();
 		}
-		else if (operacion_recibida_de_cpu == SOLICITAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
+		else if (operacion_recibida_de_cpu == SOLICITAR_INSTRUCCION_A_MEMORIA)
 		{
-			// TO DO: devuelvo linea a CPU
+			t_pedido_instruccion *pedido_instruccion = leer_paquete_pedido_instruccion(logger, conexion_con_cpu);
+			enviar_instruccion_a_cpu(pedido_instruccion->pid, pedido_instruccion->pc);
+			free(pedido_instruccion);
 		}
 	}
 }
 
-void devolver_info_de_memoria_inicial_para_cpu()
+void enviar_info_de_memoria_inicial_para_cpu()
 {
 	log_debug(logger, "Comenzando la creacion de paquete para enviar informacion inicial de memoria a la CPU");
-	t_paquete *paquete = crear_paquete_devolver_info_inicial_de_memoria_para_cpu(logger, configuracion_memoria->tam_memoria);
+
+	t_info_memoria* info_memoria = malloc(sizeof(t_info_memoria));
+	info_memoria->tamanio_memoria = configuracion_memoria->tam_memoria;
+	info_memoria->tamanio_pagina = configuracion_memoria->tam_pagina;
+
+	t_paquete *paquete = crear_paquete_enviar_info_inicial_de_memoria_a_cpu(logger, info_memoria);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+	free(info_memoria);
 }
 
-void iniciar_proceso_memoria()
+void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 {
-	int tamanio_buffer;
-	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &tamanio_buffer, conexion_con_kernel, INICIAR_PROCESO_MEMORIA);
-
-	void *buffer_de_paquete_con_offset = buffer_de_paquete;
-
-	char *path;
-	int size;
-	int prioridad;
-	int pid;
-
-	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &path, INICIAR_PROCESO_MEMORIA);
-	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %d", *path);
-
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &size, INICIAR_PROCESO_MEMORIA);
+	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
 	log_info(logger, "El tamanio del proceso a iniciar es: %d", size);
-
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &prioridad, INICIAR_PROCESO_MEMORIA);
 	log_info(logger, "La prioridad del proceso a iniciar es: %d", prioridad);
-
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &pid, INICIAR_PROCESO_MEMORIA);
 	log_info(logger, "El PID del proceso a iniciar es: %d", pid);
 
-	FILE *archivo = abrir_archivo(logger, path);
-	free(path);
+	FILE *archivo = abrir_archivo(logger, strcat(strcat(configuracion_memoria->path_instrucciones, "/"),path));
 
 	t_archivo_proceso *iniciar_proceso = malloc(sizeof(t_archivo_proceso));
 	iniciar_proceso->archivo = archivo;
@@ -181,20 +178,9 @@ void iniciar_proceso_memoria()
 	// todo ver si es necesario avisarle al kernel que el proceso se inicio correctamente
 }
 
-void enviar_instruccion_a_cpu()
+void enviar_instruccion_a_cpu(int pid, int pc)
 {
-	int tamanio_buffer;
-	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &tamanio_buffer, conexion_con_kernel, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
-
-	void *buffer_de_paquete_con_offset = buffer_de_paquete;
-
-	int pid;
-	int pc;
-
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &pid, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &pc, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
-
-	log_info(logger, "El proceso que se va a ejecutar tiene el pid %d y se pidio la instruccion del pc %d", pid, pc);
+	log_info(logger, "El proceso pid=%d pide instruccion en pc=%d", pid, pc);
 
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 	if (archivo_proceso == NULL)
@@ -202,27 +188,20 @@ void enviar_instruccion_a_cpu()
 		return;
 	}
 
-	char *proxima_instruccion = buscar_linea(logger, archivo_proceso->archivo, pc);
+	char *linea_instruccion = buscar_linea(logger, archivo_proceso->archivo, pc);
 
-	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", proxima_instruccion);
-	t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger);
+	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", linea_instruccion);
+	t_paquete *paquete = crear_paquete_enviar_instruccion_a_cpu(logger, linea_instruccion);
 
-	agregar_string_a_paquete(logger, paquete, proxima_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, ENVIAR_INSTRUCCION_MEMORIA_A_CPU);
-	log_debug(logger, "Exito en la creacion de paquete para enviar instruccion %s al cpu!", proxima_instruccion);
+	// Retardo de respuesta!
+	sleep(configuracion_memoria->retardo_respuesta);
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", proxima_instruccion);
+	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);
 }
 
-void finalizar_proceso_en_memoria()
+void finalizar_proceso_en_memoria(int pid)
 {
-	int tamanio_buffer;
-	void *buffer_de_paquete = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &tamanio_buffer, conexion_con_kernel, FINALIZAR_PROCESO_MEMORIA);
-
-	void *buffer_de_paquete_con_offset = buffer_de_paquete;
-
-	int pid;
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_de_paquete_con_offset, &pid, FINALIZAR_PROCESO_MEMORIA);
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
 	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
@@ -232,7 +211,7 @@ void finalizar_proceso_en_memoria()
 		return;
 	}
 	cerrar_archivo(logger, archivo_proceso->archivo);
-	list_remove_element(procesos_iniciados, archivo_proceso);
+	//list_remove_element(procesos_iniciados, archivo_proceso); // NO COMPILA!
 	free(archivo_proceso);
 }
 

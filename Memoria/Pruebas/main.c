@@ -18,8 +18,8 @@ int main()
             log_debug(logger, "Línea leída: %s", linea);
             free(linea); // Liberar la memoria asignada a la línea
         }*/
-        linea = buscar_linea(logger, archivo, 6);
-        log_debug(logger, "Línea leída: %s", linea);
+        linea = buscar_linea(logger, archivo, 7);
+        log_debug(logger, "Línea leída: %s, tamanio: %ld", linea, strlen(linea));
         free(linea);
         cerrar_archivo(logger, archivo);
     }

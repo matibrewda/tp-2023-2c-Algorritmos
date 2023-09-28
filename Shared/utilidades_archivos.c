@@ -32,6 +32,7 @@ FILE *abrir_archivo(t_log *logger, char *ruta_archivo)
         log_error(logger, "Error al leer archivo con la siguiente ruta: %s", ruta_archivo);
         return NULL;
     }
+
     return fp;
 }
 
@@ -84,5 +85,29 @@ char *buscar_linea(t_log *logger, FILE *archivo, int pc)
         free(linea);
         return NULL;
     }
+
+    // le saco el new line del final (si es que lo tiene):
+    if (strlen(linea) > 0 && linea[strlen(linea) - 1] == '\n')
+    {
+        char *linea_sin_newline = malloc(sizeof(char) * strlen(linea));
+        strncpy(linea_sin_newline, linea, strlen(linea) - 1);
+        linea_sin_newline[strlen(linea)-1] = '\0';
+        free(linea);
+        return linea_sin_newline;
+    }
+
     return linea;
+}
+
+bool existe_archivo(t_log *logger, char *ruta_archivo)
+{
+    FILE* archivo = fopen(ruta_archivo, "r");
+
+    if (archivo == NULL)
+    {
+        return false;
+    }
+
+    fclose(archivo);
+    return true;
 }

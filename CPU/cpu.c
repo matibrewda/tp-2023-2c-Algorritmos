@@ -6,7 +6,8 @@ t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
 bool ocurrio_interrupcion = false;
 int pid_ejecutando = 0;
-int tam_pagina = -1;
+int tamanio_pagina = -1;
+int tamanio_memoria = -1;
 
 // Conexiones
 int socket_kernel_dispatch = -1;
@@ -88,7 +89,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	solicitar_info_inicial_a_memoria();
+	if(!solicitar_info_inicial_a_memoria())
+	{
+		terminar_cpu();
+	}
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente la CPU NO ejecuta (IDLE)
@@ -221,16 +225,23 @@ char *fetch()
 
 char *pedir_instruccion_a_memoria()
 {
-	if (program_counter > 5)
+	// Pido instruccion
+	t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
+	pedido_instruccion->pc=program_counter;
+	pedido_instruccion->pid=pid_ejecutando;
+	t_paquete* paquete_solicitar_instruccion_a_memoria = crear_paquete_solicitar_instruccion_a_memoria(logger,pedido_instruccion);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitar_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+	// Recibo instruccion
+	int operacion_recibida_de_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	if (operacion_recibida_de_memoria == ENVIAR_INSTRUCCION_MEMORIA_A_CPU)
 	{
-		char *instruccion_string = (char *)malloc(sizeof(char) * 5);
-		memcpy(instruccion_string, "EXIT", sizeof(char) * 5);
+		char* instruccion_string = leer_instrucion_recibida_desde_memoria(logger, conexion_con_memoria);
 		return instruccion_string;
 	}
 
-	char *instruccion_string = (char *)malloc(sizeof(char) * 8);
-	memcpy(instruccion_string, "SLEEP 5", sizeof(char) * 8);
-	return instruccion_string;
+	log_error(logger, "Error %s no pudo recibir instruccion desde %s.", NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	return NULL;
 }
 
 t_instruccion *decode(char *instruccion_string)
@@ -522,30 +533,32 @@ void escribir_valor_a_registro(char *nombre_registro, uint32_t valor)
 	if (strcmp(nombre_registro, AX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_ax = valor;
-		log_trace(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, BX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_bx = valor;
-		log_trace(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, CX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_cx = valor;
-		log_trace(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, DX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_dx = valor;
-		log_trace(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, PC_NOMBRE_REGISTRO) == 0)
 	{
 		program_counter = valor;
-		log_trace(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
-
-	log_error(logger, "No se asigno el valor %d al registro '%s' porque es un registro no conocido.", valor, nombre_registro);
+	else
+	{
+		log_error(logger, "No se asigno el valor %d al registro '%s' porque es un registro no conocido.", valor, nombre_registro);
+	}
 }
 
 void ejecutar_instruccion_set(char *nombre_registro, uint32_t valor)
@@ -762,15 +775,21 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	return contexto_de_ejecucion;
 }
 
-void solicitar_info_inicial_a_memoria()
+bool solicitar_info_inicial_a_memoria()
 {
 	t_paquete* paquete_solicitar_info_de_memoria_inicial_para_cpu = crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(logger);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitar_info_de_memoria_inicial_para_cpu, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 	int operacion_recibida_de_memoria = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	
-	if (operacion_recibida_de_memoria == DEVOLVER_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
+	if (operacion_recibida_de_memoria == ENVIAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
 	{
-		tam_pagina = leer_info_inicial_de_memoria_para_cpu(logger, conexion_con_memoria);
-		return;
+		t_info_memoria* info_memoria = leer_info_inicial_de_memoria_para_cpu(logger, conexion_con_memoria);
+		tamanio_pagina = info_memoria->tamanio_pagina;
+		tamanio_memoria = info_memoria->tamanio_memoria;
+		free(info_memoria);
+		return true;
 	}
+
+	log_error(logger, "Error %s no pudo recibir informacion inicial de %s necesaria para inicializar.", NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	return false;
 }

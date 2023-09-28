@@ -31,7 +31,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -59,7 +59,7 @@ void interrumpir_proceso_en_cpu();
 void terminar_kernel();
 void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel, int conexion_con_memoria);
 void consola();
-void enviar_inciar_proceso_memoria(t_log *logger, char *path, int size, int prioridad);
+void iniciar_estructuras_de_proceso_en_memoria(t_log *logger, char *path, int size, int prioridad, int pid);
 
 void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola);
 
