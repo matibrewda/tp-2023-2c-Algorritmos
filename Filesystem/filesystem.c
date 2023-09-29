@@ -95,4 +95,16 @@ void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_file
 	{
 		close(conexion_con_memoria);
 	}
+
+
+}
+
+bool crear_archivo (char* path) {
+	log_debug(logger, "Crear archivo: Directorio:%s", path);
+
+	//crear un archivo FCB con tamaño 0 y sin bloque inicial.
+	// Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK.
+
+	log_debug(logger, "Archivo creado: Bool=%d", true);
+	return true;
 }
