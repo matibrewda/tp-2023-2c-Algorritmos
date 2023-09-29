@@ -171,7 +171,6 @@ int iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 
 	FILE *archivo = abrir_archivo(logger, strcat(strcat(configuracion_memoria->path_instrucciones, "/"),path));
 	if (archivo == NULL) {
-		// todo ver si es necesario avisarle al kernel que el proceso se inicio correctamente
 		return 0;
 	}
 
