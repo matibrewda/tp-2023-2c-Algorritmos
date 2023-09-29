@@ -112,9 +112,11 @@ void *atender_kernel()
 		if (operacion_recibida_de_kernel == INICIAR_PROCESO_MEMORIA)
 		{
 			t_proceso_memoria *proceso_memoria = leer_paquete_iniciar_proceso_en_memoria(logger, conexion_con_kernel);
-			iniciar_proceso_memoria(proceso_memoria->path, proceso_memoria->size, proceso_memoria->prioridad, proceso_memoria->pid);
+			int estado_iniciar_proceso = iniciar_proceso_memoria(proceso_memoria->path, proceso_memoria->size, proceso_memoria->prioridad, proceso_memoria->pid);
 			free(proceso_memoria->path);
 			free(proceso_memoria);
+			t_paquete *paquete = crear_paquete_estado_iniciar_proceso(logger, estado_iniciar_proceso);
+			enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 		}
 		else if (operacion_recibida_de_kernel == FINALIZAR_PROCESO_MEMORIA)
 		{
@@ -160,7 +162,7 @@ void enviar_info_de_memoria_inicial_para_cpu()
 	free(info_memoria);
 }
 
-void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
+int iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 {
 	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
 	log_info(logger, "El tamanio del proceso a iniciar es: %d", size);
@@ -168,14 +170,17 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	log_info(logger, "El PID del proceso a iniciar es: %d", pid);
 
 	FILE *archivo = abrir_archivo(logger, strcat(strcat(configuracion_memoria->path_instrucciones, "/"),path));
+	if (archivo == NULL) {
+		// todo ver si es necesario avisarle al kernel que el proceso se inicio correctamente
+		return 0;
+	}
 
 	t_archivo_proceso *iniciar_proceso = malloc(sizeof(t_archivo_proceso));
 	iniciar_proceso->archivo = archivo;
 	iniciar_proceso->pid = pid;
 
 	list_add(procesos_iniciados, iniciar_proceso);
-
-	// todo ver si es necesario avisarle al kernel que el proceso se inicio correctamente
+	return 1;
 }
 
 void enviar_instruccion_a_cpu(int pid, int pc)

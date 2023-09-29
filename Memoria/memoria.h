@@ -35,7 +35,7 @@
 void enviar_info_de_memoria_inicial_para_cpu();
 
 //Iniciar proceso
-void iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
+int iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
 void finalizar_proceso_en_memoria(int pid);
 

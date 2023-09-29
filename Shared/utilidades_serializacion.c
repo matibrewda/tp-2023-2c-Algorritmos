@@ -72,6 +72,20 @@ t_paquete *crear_paquete_enviar_info_inicial_de_memoria_a_cpu(t_log *logger, t_i
     return paquete;
 }
 
+t_paquete *crear_paquete_estado_iniciar_proceso(t_log *logger, int estado_iniciar_proceso_memoria)
+{
+    op_code codigo_operacion = ESTADO_INICIAR_PROCESO_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'ESTADO INICIAR PROCESO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    agregar_int_a_paquete(logger, paquete, estado_iniciar_proceso_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'ESTADO INICIAR PROCESO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
 t_paquete *crear_paquete_iniciar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
 {
     return crear_paquete_proceso_memoria(logger, INICIAR_PROCESO_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, proceso_memoria);

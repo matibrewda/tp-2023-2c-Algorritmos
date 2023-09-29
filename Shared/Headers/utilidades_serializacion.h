@@ -26,6 +26,9 @@ t_paquete *crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(t_log *logge
 t_paquete *crear_paquete_enviar_info_inicial_de_memoria_a_cpu(t_log *logger, t_info_memoria* info_memoria);
 t_paquete *crear_paquete_enviar_instruccion_a_cpu(t_log *logger, char* linea_instruccion);
 
+// Memoria a Kernel
+t_paquete *crear_paquete_estado_iniciar_proceso(t_log *logger, int estado_iniciar_proceso_memoria);
+
 // Kernel a CPU
 t_paquete *crear_paquete_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
 t_paquete *crear_paquete_interrumpir_ejecucion(t_log *logger);
