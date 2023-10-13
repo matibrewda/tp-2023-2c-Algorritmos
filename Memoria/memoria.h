@@ -45,6 +45,10 @@ void finalizar_proceso_en_memoria(int pid);
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
 
+// Comunicacion con Kernel
+void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);
+void enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
+
 // Terminar
 void destruir_listas();
 void terminar_memoria();

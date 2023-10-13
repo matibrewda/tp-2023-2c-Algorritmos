@@ -5,8 +5,7 @@ t_log *logger = NULL;
 t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
 t_list *pcbs;
-t_pcb *pcb_a_ejecutar = NULL;
-t_pcb *pcb_ejecutando = NULL;
+
 bool planificacion_detenida = false;
 int proximo_pid = 0;
 bool hay_un_proceso_ejecutando = false;
@@ -25,18 +24,20 @@ pthread_t hilo_escucha_cpu;
 
 // Semaforos
 sem_t semaforo_grado_max_multiprogramacion;
-sem_t semaforo_se_creo_un_proceso;
-sem_t semaforo_se_agrego_proceso_en_cola_ready;
-sem_t semaforo_se_agrego_proceso_para_ejecutar;
-sem_t semaforo_cpu;
-sem_t semaforo_planificado_largo_plazo;
-sem_t semaforo_planificado_corto_plazo;
+sem_t semaforo_hay_algun_proceso_en_cola_new;
+sem_t semaforo_hay_algun_proceso_en_cola_ready;
+
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
+pthread_mutex_t mutex_conexion_cpu_dispatch;
+pthread_mutex_t mutex_conexion_cpu_interrupt;
+pthread_mutex_t mutex_conexion_memoria;
+pthread_mutex_t mutex_conexion_filesystem;
 
 // Colas de planificacion
 t_queue *cola_new = NULL;
 t_queue *cola_ready = NULL;
+t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -94,10 +95,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Semaforos
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
-	sem_init(&semaforo_se_creo_un_proceso, false, 0);
-	sem_init(&semaforo_se_agrego_proceso_en_cola_ready, false, 0);
-	sem_init(&semaforo_se_agrego_proceso_para_ejecutar, false, 0);
-	sem_init(&semaforo_cpu, false, 1); // inicialmente la CPU NO esta ocupada
+	sem_init(&semaforo_hay_algun_proceso_en_cola_new, false, 0);
+	sem_init(&semaforo_hay_algun_proceso_en_cola_ready, false, 0);
 
 	// Colas de planificacion
 	cola_new = queue_create();
@@ -108,9 +107,19 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
-	pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo, NULL);
-	pthread_create(&hilo_dispatcher, NULL, dispatcher, NULL);
-	pthread_create(&hilo_escucha_cpu, NULL, escuchador_cpu, NULL);
+
+	if (strcmp(configuracion_kernel->algoritmo_planificacion, ALGORITMO_PLANIFICACION_FIFO) == 0)
+	{
+		pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo_fifo, NULL);
+	}
+	else if (strcmp(configuracion_kernel->algoritmo_planificacion, ALGORITMO_PLANIFICACION_ROUND_ROBIN) == 0)
+	{
+		pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo_round_robin, NULL);
+	}
+	else
+	{
+		pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo_prioridades, NULL);
+	}
 
 	// Hilo principal
 	consola();
@@ -155,192 +164,187 @@ void terminar_kernel()
 	// thread destroy?
 }
 
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* PLANIFICADORES *////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+
 void *planificador_largo_plazo()
 {
 	while (true)
 	{
-		sem_wait(&semaforo_se_creo_un_proceso);
-
-		pthread_mutex_lock(&mutex_cola_new);
-		t_pcb *pcb = queue_pop(cola_new);
-		pthread_mutex_unlock(&mutex_cola_new);
-
-		pcb->estado = 'R';
-
+		sem_wait(&semaforo_hay_algun_proceso_en_cola_new);
 		sem_wait(&semaforo_grado_max_multiprogramacion);
 
-		pthread_mutex_lock(&mutex_cola_ready);
-		queue_push(cola_ready, pcb);
-		pthread_mutex_unlock(&mutex_cola_ready);
-
-		log_info(logger, "PID: %d - Estado Anterior: 'NEW' - Estado Actual: 'READY'", pcb->pid);
-		loguear_cola_pcbs(cola_ready, "ready");
-
-		sem_post(&semaforo_se_agrego_proceso_en_cola_ready);
+		t_pcb *pcb = queue_pop_thread_safe(cola_new, &mutex_cola_new);
+		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
 }
 
-void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola)
-{
-	pthread_mutex_lock(&mutex_cola_ready);
-
-	t_list_iterator *iterador = list_iterator_create(cola->elements);
-
-	char *pids = malloc(sizeof(char));
-	strcpy(pids, "");
-
-	while (list_iterator_has_next(iterador))
-	{
-		t_pcb *pcb = list_iterator_next(iterador);
-		int cantidad_digitos_pid = floor(log10(abs(pcb->pid))) + 1;
-		char pid_string[cantidad_digitos_pid + 1];
-		sprintf(pid_string, "%d,", pcb->pid);
-		int tamanio_anterior = strlen(pids);
-		int tamanio_a_aumentar = strlen(pid_string);
-		pids = realloc(pids, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-		strcpy(pids + (tamanio_anterior) * sizeof(char), pid_string);
-	}
-
-	int tamanio_pids = strlen(pids);
-	if (tamanio_pids > 0)
-	{
-		pids[tamanio_pids - 1] = '\0';
-	}
-
-	list_iterator_destroy(iterador);
-
-	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, pids);
-	free(pids);
-
-	pthread_mutex_unlock(&mutex_cola_ready);
-}
-
-int obtener_nuevo_pid()
-{
-	++proximo_pid;
-	return proximo_pid;
-}
-
-void crear_proceso(char *path, int size, int prioridad)
-{
-	t_pcb *pcb = malloc(sizeof(t_pcb));
-
-	pcb->pid = obtener_nuevo_pid();
-	pcb->estado = 'N';
-	pcb->program_counter = 1;
-	pcb->registro_ax = 0;
-	pcb->registro_bx = 0;
-	pcb->registro_cx = 0;
-	pcb->registro_dx = 0;
-	pcb->prioridad = prioridad;
-	pcb->path = path;
-	pcb->size = size;
-
-	pthread_mutex_lock(&mutex_cola_new);
-	queue_push(cola_new, pcb);
-	pthread_mutex_unlock(&mutex_cola_new);
-
-	iniciar_estructuras_de_proceso_en_memoria(logger, pcb->path, pcb->size, pcb->prioridad, pcb->pid);
-
-	sleep(3);
-
-	sem_post(&semaforo_se_creo_un_proceso);
-
-	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
-}
-
-void finalizar_proceso(int pid)
-{
-	// aca me tengo que fijar en que estado estaba el proceso antes!
-	log_info(logger, "Finaliza el proceso %d - Motivo: SUCCESS", pid);
-
-	// TO DO: finalizar estructuras de proceso en memoria
-}
-
-void iniciar_planificacion()
-{
-	if (!planificacion_detenida)
-	{
-		printf("ERROR: La planificacion ya esta iniciada.\n");
-		return;
-	}
-
-	log_info(logger, "INICIO DE PLANIFICACIÓN");
-}
-
-void detener_planificacion()
-{
-	if (planificacion_detenida)
-	{
-		printf("ERROR: La planificacion ya se encuentra detenida.\n");
-		return;
-	}
-
-	log_info(logger, "PAUSA DE PLANIFICACIÓN");
-}
-
-void listar_procesos()
-{
-	// Listo procesos en NEW
-	pthread_mutex_lock(&mutex_cola_new);
-	t_list_iterator *iterador_new = list_iterator_create(cola_new->elements);
-	while (list_iterator_has_next(iterador_new))
-	{
-		t_pcb *pcb_new = list_iterator_next(iterador_new);
-		printf("Proceso PID: %d - Estado NEW\n", pcb_new->pid);
-	}
-	list_iterator_destroy(iterador_new);
-	pthread_mutex_unlock(&mutex_cola_new);
-
-	// Listo procesos en READY
-	pthread_mutex_lock(&mutex_cola_ready);
-	t_list_iterator *iterador_ready = list_iterator_create(cola_ready->elements);
-	while (list_iterator_has_next(iterador_ready))
-	{
-		t_pcb *pcb_ready = list_iterator_next(iterador_ready);
-		printf("Proceso PID: %d - Estado READY\n", pcb_ready->pid);
-	}
-	list_iterator_destroy(iterador_ready);
-	pthread_mutex_unlock(&mutex_cola_ready);
-
-	// Listo proceso ejecutando (si es que lo hay)
-	if (pcb_ejecutando != NULL)
-	{
-		printf("Proceso PID: %d - Estado EXEC\n", pcb_ejecutando->pid);
-	}
-
-	// Listo procesos BLOQUEADOS
-	// TO DO
-}
-
-void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
-{
-}
-
-void *planificador_corto_plazo()
+void *planificador_corto_plazo_fifo()
 {
 	while (true)
 	{
-		fifo();
+		sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
+
+		t_pcb *pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
+		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
+
+		op_code codigo_operacion_recibido;
+		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido);
+		actualizar_pcb(pcb, contexto_de_ejecucion);
+
+		if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+		{
+			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+		}
 	}
 }
 
-void fifo()
+void *planificador_corto_plazo_round_robin()
 {
-	// Espero a que la CPU este libre
-	sem_wait(&semaforo_cpu);
-
-	// Si la CPU esta libre, saco un proceso de la cola de ready y lo mando a ejecutar
-	sem_wait(&semaforo_se_agrego_proceso_en_cola_ready);
-
-	pthread_mutex_lock(&mutex_cola_ready);
-	t_pcb *pcb = queue_pop(cola_ready);
-	pthread_mutex_unlock(&mutex_cola_ready);
-
-	pcb_a_ejecutar = pcb;
-	log_info(logger, "PID: %d - Estado Anterior: 'READY' - Estado Actual: 'EXEC'", pcb->pid);
-	sem_post(&semaforo_se_agrego_proceso_para_ejecutar);
+	while (true)
+	{
+	}
 }
+
+void *planificador_corto_plazo_prioridades()
+{
+	while (true)
+	{
+	}
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* TRANSICIONES *//////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+
+void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
+{
+	if (pcb->estado == CODIGO_ESTADO_PROCESO_DESCONOCIDO)
+	{
+		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_NEW)
+		{
+			transicionar_proceso_a_new(pcb);
+		}
+	}
+	else if (pcb->estado == CODIGO_ESTADO_PROCESO_NEW)
+	{
+		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
+		{
+			transicionar_proceso_de_new_a_ready(pcb);
+		}
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
+		{
+			transicionar_proceso_de_new_a_exit(pcb);
+		}
+	}
+	else if (pcb->estado == CODIGO_ESTADO_PROCESO_READY)
+	{
+		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXECUTING)
+		{
+			transicionar_proceso_de_ready_a_executing(pcb);
+		}
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
+		{
+			transicionar_proceso_de_ready_a_exit(pcb);
+		}
+	}
+	else if (pcb->estado == CODIGO_ESTADO_PROCESO_EXECUTING)
+	{
+		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
+		{
+			transicionar_proceso_de_executing_a_ready(pcb);
+		}
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_BLOCKED)
+		{
+			transicionar_proceso_de_executing_a_bloqueado(pcb);
+		}
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
+		{
+			transicionar_proceso_de_executing_a_exit(pcb);
+		}
+	}
+	else if (pcb->estado == CODIGO_ESTADO_PROCESO_BLOCKED)
+	{
+		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
+		{
+			transicionar_proceso_de_bloqueado_a_ready(pcb);
+		}
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
+		{
+			transicionar_proceso_de_bloqueado_a_exit(pcb);
+		}
+	}
+}
+
+void transicionar_proceso_a_new(t_pcb *pcb)
+{
+	bool estructuras_inicializadas_correctamente = iniciar_estructuras_de_proceso_en_memoria(pcb);
+
+	if (!estructuras_inicializadas_correctamente)
+	{
+		return;
+	}
+
+	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
+	pcb->estado = CODIGO_ESTADO_PROCESO_NEW;
+	queue_push_thread_safe(cola_new, pcb, &mutex_cola_new);
+	sem_post(&semaforo_hay_algun_proceso_en_cola_new);
+}
+
+void transicionar_proceso_de_new_a_ready(t_pcb *pcb)
+{
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
+	loguear_cola_pcbs(cola_ready, "ready");
+	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
+	queue_push_thread_safe(cola_ready, pcb, &mutex_cola_ready);
+	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
+}
+
+void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
+{
+}
+
+void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
+{
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXECUTING));
+	pcb_ejecutando = pcb;
+	pcb->estado = CODIGO_ESTADO_PROCESO_EXECUTING;
+	ejecutar_proceso_en_cpu(pcb);
+}
+
+void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
+{
+}
+
+void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
+{
+}
+
+void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
+{
+}
+
+void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
+{
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	pcb_ejecutando = NULL;
+	pcb->estado = CODIGO_ESTADO_PROCESO_EXIT;
+	destruir_estructuras_de_proceso_en_memoria(pcb);
+	sem_post(&semaforo_grado_max_multiprogramacion);
+}
+
+void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
+{
+}
+
+void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
+{
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* CONSOLA *///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 
 void consola()
 {
@@ -432,7 +436,7 @@ void consola()
 				}
 			}
 
-			crear_proceso(path, size, prioridad);
+			iniciar_proceso(path, size, prioridad);
 		}
 		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0)
 		{
@@ -519,10 +523,6 @@ void consola()
 			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 			listar_procesos();
 		}
-		else if (strcmp(funcion_seleccionada, "EXIT") == 0)
-		{
-			finalizar = true;
-		}
 		else
 		{
 			log_error(logger, "'%s' no coincide con ninguna funcion conocida.", funcion_seleccionada);
@@ -531,49 +531,47 @@ void consola()
 	}
 }
 
-void *dispatcher()
+void iniciar_proceso(char *path, int size, int prioridad)
 {
-	while (true)
-	{
-		log_trace(logger, "Soy el dispatcher");
-
-		sem_wait(&semaforo_se_agrego_proceso_para_ejecutar);
-		ejecutar_proceso_en_cpu(pcb_a_ejecutar);
-		pcb_ejecutando = pcb_a_ejecutar;
-		pcb_a_ejecutar = NULL;
-	}
+	t_pcb *pcb = crear_pcb(path, size, prioridad);
+	transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_NEW);
 }
 
-void *escuchador_cpu()
+void finalizar_proceso(int pid)
 {
-	while (true)
-	{
-		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
-		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
-
-		if (codigo_operacion_recibido == DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
-		{
-			log_trace(logger, "Se recibio una orden de %s en %s avisando que termino un proceso por correcta finalizacion.", NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-			t_contexto_de_ejecucion *contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-
-			log_info(logger, "PID: %d - Estado Anterior: 'EXEC' - Estado Actual: 'EXIT'", contexto_de_ejecucion->pid);
-
-			finalizar_proceso(contexto_de_ejecucion->pid);
-			sem_post(&semaforo_grado_max_multiprogramacion);
-
-			// Aviso que se desocupo la CPU
-			sem_post(&semaforo_cpu);
-			pcb_ejecutando = NULL;
-		}
-		else
-		{
-			log_trace(logger, "Se recibio una orden desconocida de %s en %s.", NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-		}
-	}
+	// buscar proceso en colas y llamar a transicionar a exit
 }
 
-// No bloquea!
-void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
+void iniciar_planificacion()
+{
+	if (!planificacion_detenida)
+	{
+		printf("ERROR: La planificacion ya esta iniciada.\n");
+		return;
+	}
+
+	log_info(logger, "INICIO DE PLANIFICACIÓN");
+}
+
+void detener_planificacion()
+{
+	if (planificacion_detenida)
+	{
+		printf("ERROR: La planificacion ya se encuentra detenida.\n");
+		return;
+	}
+
+	log_info(logger, "PAUSA DE PLANIFICACIÓN");
+}
+
+void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
+{
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* CPU *///////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar)
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
 	contexto_de_ejecucion->pid = pcb_proceso_a_ejecutar->pid;
@@ -583,31 +581,252 @@ void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 	contexto_de_ejecucion->registro_cx = pcb_proceso_a_ejecutar->registro_cx;
 	contexto_de_ejecucion->registro_dx = pcb_proceso_a_ejecutar->registro_dx;
 
-	t_paquete *paquete_ejecutar_proceso_en_cpu = crear_paquete_ejecutar_proceso(logger, contexto_de_ejecucion);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_ejecutar_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	t_paquete *paquete_solicitud_ejecutar_proceso = crear_paquete_solicitud_ejecutar_proceso(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_solicitud_ejecutar_proceso, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 
 	free(contexto_de_ejecucion);
 }
 
-// No bloquea!
-void interrumpir_proceso_en_cpu()
+void enviar_paquete_solicitud_interrumpir_ejecucion()
 {
-	t_paquete *paquete_interrumpir_proceso_en_cpu = crear_paquete_interrumpir_ejecucion(logger);
-	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_interrumpir_proceso_en_cpu, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+	t_paquete *paquete_solicitud_interrumpir_ejecucion = crear_paquete_solicitud_interrumpir_proceso(logger);
+	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_solicitud_interrumpir_ejecucion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 }
 
-void iniciar_estructuras_de_proceso_en_memoria(t_log *logger, char *path, int size, int prioridad, int pid)
+void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido()
 {
-	log_debug(logger, "Comenzando la creacion de paquete para enviar iniciar proceso a memoria!");
-	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
-	proceso_memoria->path = path;
-	proceso_memoria->size = size;
-	proceso_memoria->prioridad = prioridad;
-	proceso_memoria->pid = pid;
-	t_paquete *paquete = crear_paquete_iniciar_proceso_en_memoria(logger, proceso_memoria);
+	t_paquete *paquete_respuesta_devolver_proceso_por_ser_interrumpido = crear_paquete_respuesta_devolver_proceso_por_ser_interrumpido(logger);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
 
-	enviar_paquete(logger, conexion_con_memoria, paquete, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
-	log_debug(logger, "Exito en el envio de paquete para iniciar proceso a memoria!");
+void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion()
+{
+	t_paquete *paquete_respuesta_devolver_proceso_por_correcta_finalizacion = crear_paquete_respuesta_devolver_proceso_por_correcta_finalizacion(logger);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido)
+{
+	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
+
+	*codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
+	t_contexto_de_ejecucion *contexto_de_ejecucion;
+
+	// Recibo de CPU
+	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO || *codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+	{
+		contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, *codigo_operacion_recibido, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+	}
+
+	// Envio OK a CPU
+	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
+	{
+		enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
+	}
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+	{
+		enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
+	}
+
+	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
+
+	return contexto_de_ejecucion;
+}
+
+bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado)
+{
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
+	return codigo_operacion_recibido == codigo_operacion_esperado;
+}
+
+bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado)
+{
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_interrupt);
+	return codigo_operacion_recibido == codigo_operacion_esperado;
+}
+
+void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
+{
+	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
+	enviar_paquete_solicitud_ejecutar_proceso(pcb_proceso_a_ejecutar);
+	recibir_operacion_de_cpu_dispatch(RESPUESTA_EJECUTAR_PROCESO);
+	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
+}
+
+void interrumpir_proceso_en_cpu()
+{
+	pthread_mutex_lock(&mutex_conexion_cpu_interrupt);
+	enviar_paquete_solicitud_interrumpir_ejecucion();
+	recibir_operacion_de_cpu_interrupt(RESPUESTA_INTERRUMPIR_PROCESO);
+	pthread_mutex_unlock(&mutex_conexion_cpu_interrupt);
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* MEMORIA *///////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+void enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb)
+{
+	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
+	proceso_memoria->path = pcb->path;
+	proceso_memoria->size = pcb->size;
+	proceso_memoria->prioridad = pcb->prioridad;
+	proceso_memoria->pid = pcb->pid;
+
+	t_paquete *paquete_solicitud_iniciar_proceso_en_memoria = crear_paquete_solicitud_iniciar_proceso_en_memoria(logger, proceso_memoria);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_iniciar_proceso_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
 
 	free(proceso_memoria);
+}
+
+void enviar_paquete_destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb)
+{
+	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
+	proceso_memoria->path = pcb->path;
+	proceso_memoria->size = pcb->size;
+	proceso_memoria->prioridad = pcb->prioridad;
+	proceso_memoria->pid = pcb->pid;
+
+	t_paquete *paquete_solicitud_finalizar_proceso_en_memoria = crear_paquete_solicitud_finalizar_proceso_en_memoria(logger, proceso_memoria);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_finalizar_proceso_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+
+	free(proceso_memoria);
+}
+
+bool recibir_operacion_de_memoria(op_code codigo_operacion_esperado)
+{
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	return codigo_operacion_recibido == codigo_operacion_esperado;
+}
+
+bool iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb)
+{
+	pthread_mutex_lock(&mutex_conexion_memoria);
+
+	enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(pcb);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	bool resultado_iniciar_proceso_en_memoria = leer_paquete_respuesta_iniciar_proceso_en_memoria(logger, conexion_con_memoria);
+
+	pthread_mutex_unlock(&mutex_conexion_memoria);
+
+	return resultado_iniciar_proceso_en_memoria;
+}
+
+void destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb)
+{
+	pthread_mutex_lock(&mutex_conexion_memoria);
+	enviar_paquete_destruir_estructuras_de_proceso_en_memoria(pcb);
+	recibir_operacion_de_memoria(RESPUESTA_FINALIZAR_PROCESO_MEMORIA);
+	pthread_mutex_unlock(&mutex_conexion_memoria);
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* UTILIDADES *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+
+const char *nombre_estado_proceso(char codigo_estado_proceso)
+{
+	switch (codigo_estado_proceso)
+	{
+	case CODIGO_ESTADO_PROCESO_READY:
+		return NOMBRE_ESTADO_PROCESO_READY;
+	case CODIGO_ESTADO_PROCESO_NEW:
+		return NOMBRE_ESTADO_PROCESO_NEW;
+	case CODIGO_ESTADO_PROCESO_EXECUTING:
+		return NOMBRE_ESTADO_PROCESO_EXECUTING;
+	case CODIGO_ESTADO_PROCESO_BLOCKED:
+		return NOMBRE_ESTADO_PROCESO_BLOCKED;
+	case CODIGO_ESTADO_PROCESO_EXIT:
+		return NOMBRE_ESTADO_PROCESO_EXIT;
+	default:
+		return "?";
+	}
+}
+
+int obtener_nuevo_pid()
+{
+	++proximo_pid;
+	return proximo_pid;
+}
+
+void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola)
+{
+	// TO DO: a funcion thread safe
+	pthread_mutex_lock(&mutex_cola_ready);
+
+	t_list_iterator *iterador = list_iterator_create(cola->elements);
+
+	char *pids = malloc(sizeof(char));
+	strcpy(pids, "");
+
+	while (list_iterator_has_next(iterador))
+	{
+		t_pcb *pcb = list_iterator_next(iterador);
+		int cantidad_digitos_pid = floor(log10(abs(pcb->pid))) + 1;
+		char pid_string[cantidad_digitos_pid + 1];
+		sprintf(pid_string, "%d,", pcb->pid);
+		int tamanio_anterior = strlen(pids);
+		int tamanio_a_aumentar = strlen(pid_string);
+		pids = realloc(pids, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+		strcpy(pids + (tamanio_anterior) * sizeof(char), pid_string);
+	}
+
+	int tamanio_pids = strlen(pids);
+	if (tamanio_pids > 0)
+	{
+		pids[tamanio_pids - 1] = '\0';
+	}
+
+	list_iterator_destroy(iterador);
+
+	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, pids);
+	free(pids);
+
+	pthread_mutex_unlock(&mutex_cola_ready);
+}
+
+void imprimir_proceso_en_consola(t_pcb *pcb)
+{
+	printf("Proceso PID: %d - Estado %s\n", pcb->pid, nombre_estado_proceso(pcb->estado));
+}
+
+void listar_procesos()
+{
+	queue_iterate_thread_safe(cola_new, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_new);
+	queue_iterate_thread_safe(cola_ready, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_ready);
+
+	if (pcb_ejecutando != NULL)
+	{
+		imprimir_proceso_en_consola(pcb_ejecutando);
+	}
+
+	// TO DO: Listo procesos BLOQUEADOS
+}
+
+t_pcb *crear_pcb(char *path, int size, int prioridad)
+{
+	t_pcb *pcb = malloc(sizeof(t_pcb));
+
+	pcb->pid = obtener_nuevo_pid();
+	pcb->estado = CODIGO_ESTADO_PROCESO_DESCONOCIDO;
+	pcb->program_counter = 1;
+	pcb->registro_ax = 0;
+	pcb->registro_bx = 0;
+	pcb->registro_cx = 0;
+	pcb->registro_dx = 0;
+	pcb->prioridad = prioridad;
+	pcb->path = path;
+	pcb->size = size;
+
+	return pcb;
+}
+
+void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion)
+{
+	pcb->program_counter = contexto_de_ejecucion->program_counter;
+	pcb->registro_ax = contexto_de_ejecucion->registro_ax;
+	pcb->registro_bx = contexto_de_ejecucion->registro_bx;
+	pcb->registro_cx = contexto_de_ejecucion->registro_cx;
+	pcb->registro_dx = contexto_de_ejecucion->registro_dx;
 }

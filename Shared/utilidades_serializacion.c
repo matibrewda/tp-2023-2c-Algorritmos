@@ -1,28 +1,69 @@
 #include "Headers/utilidades_serializacion.h"
 
-t_paquete *crear_paquete_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
+// Kernel a CPU
+t_paquete *crear_paquete_solicitud_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
 {
-    return crear_paquete_contexto_de_ejecucion(logger, EJECUTAR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, contexto_de_ejecucion);
+    return crear_paquete_contexto_de_ejecucion(logger, SOLICITUD_EJECUTAR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, contexto_de_ejecucion);
 }
 
-t_paquete *crear_paquete_devuelvo_proceso_por_ser_interrumpido(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
+// Kernel a CPU
+t_paquete *crear_paquete_solicitud_interrumpir_proceso(t_log *logger)
 {
-    return crear_paquete_contexto_de_ejecucion(logger, DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, contexto_de_ejecucion);
+    return crear_paquete_con_opcode_y_sin_contenido(logger, SOLICITUD_INTERRUMPIR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_paquete *crear_paquete_devuelvo_proceso_por_correcta_finalizacion(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
+// Kernel a CPU
+t_paquete *crear_paquete_respuesta_devolver_proceso_por_ser_interrumpido(t_log *logger)
 {
-    return crear_paquete_contexto_de_ejecucion(logger, DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, contexto_de_ejecucion);
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_paquete *crear_paquete_interrumpir_ejecucion(t_log *logger)
+// Kernel a CPU
+t_paquete *crear_paquete_respuesta_devolver_proceso_por_correcta_finalizacion(t_log *logger)
 {
-    return crear_paquete_con_opcode_y_sin_contenido(logger, INTERRUMPIR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_paquete *crear_paquete_solicitar_instruccion_a_memoria(t_log *logger, t_pedido_instruccion* pedido_instruccion)
+// Kernel a Memoria
+t_paquete *crear_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
 {
-    op_code codigo_operacion = SOLICITAR_INSTRUCCION_A_MEMORIA;
+    return crear_paquete_proceso_memoria(logger, SOLICITUD_INICIAR_PROCESO_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, proceso_memoria);
+}
+
+// Kernel a Memoria
+t_paquete *crear_paquete_solicitud_finalizar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
+{
+    return crear_paquete_proceso_memoria(logger, SOLICITUD_FINALIZAR_PROCESO_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, proceso_memoria);
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_respuesta_ejecutar_proceso(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_EJECUTAR_PROCESO, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_respuesta_interrumpir_proceso(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_INTERRUMPIR_PROCESO, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
+{
+    return crear_paquete_contexto_de_ejecucion(logger, SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, contexto_de_ejecucion);
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
+{
+    return crear_paquete_contexto_de_ejecucion(logger, SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, contexto_de_ejecucion);
+}
+
+// CPU a Memoria
+t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_pedido_instruccion *pedido_instruccion)
+{
+    op_code codigo_operacion = SOLICITUD_PEDIR_INSTRUCCION_A_MEMORIA;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
@@ -36,14 +77,38 @@ t_paquete *crear_paquete_solicitar_instruccion_a_memoria(t_log *logger, t_pedido
     return paquete;
 }
 
-t_paquete *crear_paquete_solicitar_info_de_memoria_inicial_para_cpu(t_log *logger)
+// CPU a Memoria
+t_paquete *crear_paquete_solicitud_pedir_info_de_memoria_inicial_para_cpu(t_log *logger)
 {
-    return crear_paquete_con_opcode_y_sin_contenido(logger, SOLICITAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+    return crear_paquete_con_opcode_y_sin_contenido(logger, SOLICITUD_PEDIR_INFO_DE_MEMORIA_INICIAL_PARA_CPU, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 }
 
-t_paquete *crear_paquete_enviar_instruccion_a_cpu(t_log *logger, char* linea_instruccion)
+// Memoria a Kernel
+t_paquete *crear_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, bool resultado_iniciar_proceso)
 {
-    op_code codigo_operacion = ENVIAR_INSTRUCCION_MEMORIA_A_CPU;
+    op_code codigo_operacion = RESPUESTA_INICIAR_PROCESO_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, resultado_iniciar_proceso, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
+// Memoria a Kernel
+t_paquete *crear_paquete_respuesta_finalizar_proceso_en_memoria(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_FINALIZAR_PROCESO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+}
+
+// Memoria a CPU
+t_paquete *crear_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, char *linea_instruccion)
+{
+    op_code codigo_operacion = RESPUESTA_PEDIR_INSTRUCCION_A_MEMORIA;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
@@ -56,9 +121,10 @@ t_paquete *crear_paquete_enviar_instruccion_a_cpu(t_log *logger, char* linea_ins
     return paquete;
 }
 
-t_paquete *crear_paquete_enviar_info_inicial_de_memoria_a_cpu(t_log *logger, t_info_memoria* info_memoria)
+// Memoria a CPU
+t_paquete *crear_paquete_respuesta_pedir_info_de_memoria_inicial_para_cpu(t_log *logger, t_info_memoria *info_memoria)
 {
-    op_code codigo_operacion = ENVIAR_INFO_DE_MEMORIA_INICIAL_PARA_CPU;
+    op_code codigo_operacion = RESPUESTA_PEDIR_INFO_DE_MEMORIA_INICIAL_PARA_CPU;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'INFO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
@@ -72,16 +138,7 @@ t_paquete *crear_paquete_enviar_info_inicial_de_memoria_a_cpu(t_log *logger, t_i
     return paquete;
 }
 
-t_paquete *crear_paquete_iniciar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
-{
-    return crear_paquete_proceso_memoria(logger, INICIAR_PROCESO_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, proceso_memoria);
-}
-
-t_paquete *crear_paquete_finalizar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
-{
-    return crear_paquete_proceso_memoria(logger, INICIAR_PROCESO_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, proceso_memoria);
-}
-
+// Comunes
 t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_proceso_memoria *proceso_memoria)
 {
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'PROCESO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
@@ -99,6 +156,7 @@ t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion
     return paquete;
 }
 
+// Comunes
 t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_contexto_de_ejecucion *contexto_de_ejecucion)
 {
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
@@ -118,6 +176,7 @@ t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_ope
     return paquete;
 }
 
+// Comunes
 t_paquete *crear_paquete_con_opcode_y_sin_contenido(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino)
 {
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'VACIO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
