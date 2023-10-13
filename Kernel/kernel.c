@@ -242,6 +242,8 @@ void crear_proceso(char *path, int size, int prioridad)
 
 	iniciar_estructuras_de_proceso_en_memoria(logger, pcb->path, pcb->size, pcb->prioridad, pcb->pid);
 
+	sleep(3);
+
 	sem_post(&semaforo_se_creo_un_proceso);
 
 	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);

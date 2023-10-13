@@ -167,13 +167,24 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	log_info(logger, "La prioridad del proceso a iniciar es: %d", prioridad);
 	log_info(logger, "El PID del proceso a iniciar es: %d", pid);
 
-	FILE *archivo = abrir_archivo(logger, strcat(strcat(configuracion_memoria->path_instrucciones, "/"),path));
+	char* ruta_archivo_completa = NULL;
+	int error_archivo = asprintf(&ruta_archivo_completa, "%s/%s", configuracion_memoria->path_instrucciones, path);
+
+	if (error_archivo == -1)
+	{
+		log_error(logger, "Error al calcular ruta completa para archivo de pseudocodigo (para PID: %d)", pid);
+		return;
+	}
+
+	FILE *archivo = abrir_archivo(logger, ruta_archivo_completa);
 
 	t_archivo_proceso *iniciar_proceso = malloc(sizeof(t_archivo_proceso));
 	iniciar_proceso->archivo = archivo;
 	iniciar_proceso->pid = pid;
 
+	log_trace(logger, "Intento agregar proceso PID: %d a la lista", pid);
 	list_add(procesos_iniciados, iniciar_proceso);
+	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
 	// todo ver si es necesario avisarle al kernel que el proceso se inicio correctamente
 }

@@ -1,6 +1,9 @@
 #ifndef MEMORIA_H_
 #define MEMORIA_H_
 
+// Para incluir la funcion asprintf()
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
