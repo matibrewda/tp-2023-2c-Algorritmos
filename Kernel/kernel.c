@@ -4,11 +4,9 @@
 t_log *logger = NULL;
 t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
-t_list *pcbs;
-
-bool planificacion_detenida = false;
 int proximo_pid = 0;
-bool hay_un_proceso_ejecutando = false;
+bool planificacion_detenida = false;
+char *aux_pids_cola;
 
 // Conexiones
 int conexion_con_cpu_dispatch = -1;
@@ -101,9 +99,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Colas de planificacion
 	cola_new = queue_create();
 	cola_ready = queue_create();
-
-	// Listas
-	pcbs = list_create();
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
@@ -283,6 +278,7 @@ void transicionar_proceso_a_new(t_pcb *pcb)
 
 	if (!estructuras_inicializadas_correctamente)
 	{
+		log_error(logger, "Ocurrio un error al inicializar las estructuras en memoria del proceso %d", pcb->pid);
 		return;
 	}
 
@@ -295,9 +291,9 @@ void transicionar_proceso_a_new(t_pcb *pcb)
 void transicionar_proceso_de_new_a_ready(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
-	loguear_cola_pcbs(cola_ready, "ready");
 	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
 	queue_push_thread_safe(cola_ready, pcb, &mutex_cola_ready);
+	loguear_cola(cola_ready, "ready", &mutex_cola_ready);
 	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
 }
 
@@ -345,7 +341,6 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* CONSOLA *///////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-
 void consola()
 {
 	bool finalizar = false;
@@ -750,40 +745,32 @@ int obtener_nuevo_pid()
 	return proximo_pid;
 }
 
-void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola)
+void agregar_pid_a_aux_pids_cola(t_pcb *pcb)
 {
-	// TO DO: a funcion thread safe
-	pthread_mutex_lock(&mutex_cola_ready);
+	int cantidad_digitos_pid = floor(log10(abs(pcb->pid))) + 1;
+	char pid_string[cantidad_digitos_pid + 1];
+	sprintf(pid_string, "%d,", pcb->pid);
+	int tamanio_anterior = strlen(aux_pids_cola);
+	int tamanio_a_aumentar = strlen(pid_string);
+	aux_pids_cola = realloc(aux_pids_cola, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+	strcpy(aux_pids_cola + (tamanio_anterior) * sizeof(char), pid_string);
+}
 
-	t_list_iterator *iterador = list_iterator_create(cola->elements);
+void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola)
+{
+	aux_pids_cola = malloc(sizeof(char));
+	strcpy(aux_pids_cola, "");
 
-	char *pids = malloc(sizeof(char));
-	strcpy(pids, "");
+	queue_iterate_thread_safe(cola, (void (*)(void *)) & agregar_pid_a_aux_pids_cola, mutex_cola);
 
-	while (list_iterator_has_next(iterador))
-	{
-		t_pcb *pcb = list_iterator_next(iterador);
-		int cantidad_digitos_pid = floor(log10(abs(pcb->pid))) + 1;
-		char pid_string[cantidad_digitos_pid + 1];
-		sprintf(pid_string, "%d,", pcb->pid);
-		int tamanio_anterior = strlen(pids);
-		int tamanio_a_aumentar = strlen(pid_string);
-		pids = realloc(pids, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-		strcpy(pids + (tamanio_anterior) * sizeof(char), pid_string);
-	}
-
-	int tamanio_pids = strlen(pids);
+	int tamanio_pids = strlen(aux_pids_cola);
 	if (tamanio_pids > 0)
 	{
-		pids[tamanio_pids - 1] = '\0';
+		aux_pids_cola[tamanio_pids - 1] = '\0';
 	}
 
-	list_iterator_destroy(iterador);
-
-	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, pids);
-	free(pids);
-
-	pthread_mutex_unlock(&mutex_cola_ready);
+	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, aux_pids_cola);
+	free(aux_pids_cola);
 }
 
 void imprimir_proceso_en_consola(t_pcb *pcb)

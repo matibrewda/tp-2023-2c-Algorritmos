@@ -32,7 +32,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -93,7 +93,8 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
 // Utilidades
 const char *nombre_estado_proceso(char codigo_estado_proceso);
 int obtener_nuevo_pid();
-void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola);
+void agregar_pid_a_aux_pids_cola(t_pcb *pcb);
+void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola);
 void imprimir_proceso_en_consola(t_pcb *pcb);
 void listar_procesos();
 t_pcb *crear_pcb(char *path, int size, int prioridad);
