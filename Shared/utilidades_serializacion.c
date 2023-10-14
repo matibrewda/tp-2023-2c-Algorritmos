@@ -72,7 +72,7 @@ t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_
     agregar_int_a_paquete(logger, paquete, pedido_instruccion->pid, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, pedido_instruccion->pc, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
     return paquete;
 }
@@ -94,7 +94,7 @@ t_paquete *crear_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, boo
     // RESPETAR EL ORDEN -> SERIALIZACION!
     agregar_int_a_paquete(logger, paquete, resultado_iniciar_proceso, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 
     return paquete;
 }
@@ -116,7 +116,7 @@ t_paquete *crear_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, ch
     // RESPETAR EL ORDEN -> SERIALIZACION!
     agregar_string_a_paquete(logger, paquete, linea_instruccion, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 
     return paquete;
 }
@@ -133,7 +133,7 @@ t_paquete *crear_paquete_respuesta_pedir_info_de_memoria_inicial_para_cpu(t_log 
     agregar_int_a_paquete(logger, paquete, info_memoria->tamanio_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, info_memoria->tamanio_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s y contenido 'INFO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'INFO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 
     return paquete;
 }
@@ -151,7 +151,7 @@ t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion
     agregar_int_a_paquete(logger, paquete, proceso_memoria->prioridad, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, proceso_memoria->pid, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s y contenido 'PROCESO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'PROCESO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 
     return paquete;
 }
@@ -171,7 +171,7 @@ t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_ope
     agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_cx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
     agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_dx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 
     return paquete;
 }
@@ -183,7 +183,7 @@ t_paquete *crear_paquete_con_opcode_y_sin_contenido(t_log *logger, op_code codig
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
-    log_debug(logger, "Extio en la creacion del paquete de codigo de operacion %s y contenido 'VACIO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'VACIO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 
     return paquete;
 }

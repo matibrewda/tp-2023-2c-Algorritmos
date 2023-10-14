@@ -233,6 +233,7 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 
 void finalizar_proceso_en_memoria(int pid)
 {
+	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
 	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura

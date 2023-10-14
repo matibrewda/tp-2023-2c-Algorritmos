@@ -22,9 +22,8 @@ pthread_t hilo_dispatch;
 
 // Semaforos
 sem_t semaforo_ejecutar_ciclo_de_instruccion;
-pthread_mutex_t mutex_conexion_kernel_dispatch;
-pthread_mutex_t mutex_conexion_kernel_interrupt;
-pthread_mutex_t mutex_conexion_memoria;
+sem_t semaforo_espero_ejecutar_proceso;
+sem_t semaforo_devuelvo_proceso;
 
 // Registros
 uint32_t program_counter = 0;
@@ -96,6 +95,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente la CPU NO ejecuta (IDLE)
+	sem_init(&semaforo_devuelvo_proceso, false, 0);
+	sem_init(&semaforo_espero_ejecutar_proceso, false, 1);
 
 	// Hilos
 	pthread_create(&hilo_interrupt, NULL, interrupt, NULL);
@@ -173,6 +174,8 @@ void *dispatch()
 {
 	while (true)
 	{
+		sem_wait(&semaforo_espero_ejecutar_proceso);
+
 		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
 
@@ -200,6 +203,8 @@ void *dispatch()
 		{
 			log_trace(logger, "Se recibio una orden desconocida de %s en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 		}
+
+		sem_post(&semaforo_devuelvo_proceso);
 	}
 }
 
@@ -239,18 +244,18 @@ bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado)
 
 void devolver_contexto_por_ser_interrumpido()
 {
-	pthread_mutex_lock(&mutex_conexion_kernel_dispatch);
+	sem_wait(&semaforo_devuelvo_proceso);
 	enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
 	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO);
-	pthread_mutex_unlock(&mutex_conexion_kernel_dispatch);
+	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_correcta_finalizacion()
 {
-	pthread_mutex_lock(&mutex_conexion_kernel_dispatch);
+	sem_wait(&semaforo_devuelvo_proceso);
 	enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
 	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION);
-	pthread_mutex_unlock(&mutex_conexion_kernel_dispatch);
+	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -273,8 +278,6 @@ void enviar_paquete_solicitud_pedir_instruccion_a_memoria()
 
 void solicitar_info_inicial_a_memoria()
 {
-	pthread_mutex_lock(&mutex_conexion_memoria);
-
 	enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
 
 	// Recibir
@@ -283,21 +286,15 @@ void solicitar_info_inicial_a_memoria()
 	tamanio_pagina = info_memoria->tamanio_pagina;
 	tamanio_memoria = info_memoria->tamanio_memoria;
 	free(info_memoria);
-
-	pthread_mutex_unlock(&mutex_conexion_memoria);
 }
 
 char *pedir_instruccion_a_memoria()
 {
-	pthread_mutex_lock(&mutex_conexion_memoria);
-
 	enviar_paquete_solicitud_pedir_instruccion_a_memoria();
 
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	char *instruccion_string = leer_paquete_respuesta_pedir_instruccion_a_memoria(logger, conexion_con_memoria);
-
-	pthread_mutex_unlock(&mutex_conexion_memoria);
 
 	return instruccion_string;
 }

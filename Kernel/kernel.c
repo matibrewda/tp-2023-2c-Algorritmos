@@ -25,6 +25,7 @@ sem_t semaforo_grado_max_multiprogramacion;
 sem_t semaforo_hay_algun_proceso_en_cola_new;
 sem_t semaforo_hay_algun_proceso_en_cola_ready;
 
+// REVISAR LOS MUTEX! (pensar en hilos)
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_conexion_cpu_dispatch;
