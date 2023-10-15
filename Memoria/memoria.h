@@ -44,6 +44,7 @@ void finalizar_proceso_en_memoria(int pid);
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
+void cerrar_archivo_con_pid(int pid);
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);

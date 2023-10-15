@@ -19,6 +19,7 @@
         "cpu.h": "c",
         "argumentos_memoria.h": "c",
         "list.h": "c",
-        "utilidades_semaforos.h": "c"
+        "utilidades_semaforos.h": "c",
+        "queue.h": "c"
     }
 }

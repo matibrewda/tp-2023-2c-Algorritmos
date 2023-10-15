@@ -150,7 +150,7 @@ void enviar_info_de_memoria_inicial_para_cpu()
 {
 	log_debug(logger, "Comenzando la creacion de paquete para enviar informacion inicial de memoria a la CPU");
 
-	t_info_memoria* info_memoria = malloc(sizeof(t_info_memoria));
+	t_info_memoria *info_memoria = malloc(sizeof(t_info_memoria));
 	info_memoria->tamanio_memoria = configuracion_memoria->tam_memoria;
 	info_memoria->tamanio_pagina = configuracion_memoria->tam_pagina;
 
@@ -167,7 +167,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	log_info(logger, "La prioridad del proceso a iniciar es: %d", prioridad);
 	log_info(logger, "El PID del proceso a iniciar es: %d", pid);
 
-	char* ruta_archivo_completa = NULL;
+	char *ruta_archivo_completa = NULL;
 	int error_archivo = asprintf(&ruta_archivo_completa, "%s/%s", configuracion_memoria->path_instrucciones, path);
 
 	if (error_archivo == -1)
@@ -214,6 +214,7 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 	log_info(logger, "El proceso pid=%d pide instruccion en pc=%d", pid, pc);
 
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
+
 	if (archivo_proceso == NULL)
 	{
 		return;
@@ -236,44 +237,42 @@ void finalizar_proceso_en_memoria(int pid)
 	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
-	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
-	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
-	if (archivo_proceso == NULL)
-	{
-		return;
-	}
-	cerrar_archivo(logger, archivo_proceso->archivo);
-	//list_remove_element(procesos_iniciados, archivo_proceso); // NO COMPILA!
-	free(archivo_proceso);
+	cerrar_archivo_con_pid(pid);
 
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 }
 
-// TODO revisar find en commons
 t_archivo_proceso *buscar_archivo_con_pid(int pid)
 {
-	if (list_is_empty(procesos_iniciados))
+	bool _filtro_archivo_proceso_por_id(t_archivo_proceso * archivo_proceso)
 	{
-		log_error(logger, "No hay archivos de procesos iniciados en la lista");
-		return NULL;
+		return archivo_proceso->pid == pid;
+	};
+
+	t_archivo_proceso* resultado = list_find(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id);
+
+	if (resultado == NULL)
+	{
+		log_warning(logger, "No se encontro archivo proceso con PID %d", pid);
 	}
 
-	t_list_iterator *iterador = list_iterator_create(procesos_iniciados);
+	return resultado;
+}
 
-	while (list_iterator_has_next(iterador))
+void cerrar_archivo_con_pid(int pid)
+{
+	bool _filtro_archivo_proceso_por_id(t_archivo_proceso *archivo_proceso)
 	{
-		t_archivo_proceso *archivo_proceso = list_iterator_next(iterador);
-		if (archivo_proceso->pid == pid)
-		{
-			log_debug(logger, "Se encuentra la estructura de pseudocodigo para el pid %d", pid);
-			list_iterator_destroy(iterador);
-			return archivo_proceso;
-		}
+		return archivo_proceso->pid == pid;
+	};
+
+	void _finalizar_archivo_proceso(t_archivo_proceso *archivo_proceso)
+	{
+		cerrar_archivo(logger, archivo_proceso->archivo);
+		free(archivo_proceso);
 	}
 
-	list_iterator_destroy(iterador);
-	log_error(logger, "No se encuentran estructuras de pseudocodigo para el pid %d", pid);
-	return NULL;
+	list_remove_and_destroy_by_condition(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso);
 }
 
 void destruir_listas()
