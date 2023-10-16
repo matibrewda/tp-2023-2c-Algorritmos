@@ -10,6 +10,8 @@ typedef struct
     char estado;
     char* path;
     int size;
+    bool quantum_finalizado;
+    int id_hilo_quantum;
 
     // Registros del CPU
     int program_counter;

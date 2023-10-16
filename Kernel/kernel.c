@@ -7,6 +7,9 @@ t_config_kernel *configuracion_kernel = NULL;
 int proximo_pid = 0;
 bool planificacion_detenida = true;
 char *aux_pids_cola;
+bool planifico_con_round_robin = false;
+bool planifico_con_prioridades = false;
+int id_hilo_quantum = 0;
 
 // Conexiones
 int conexion_con_cpu_dispatch = -1;
@@ -30,6 +33,7 @@ pthread_mutex_t mutex_conexion_cpu_dispatch;
 pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
 pthread_mutex_t mutex_conexion_filesystem;
+pthread_mutex_t mutex_id_hilo_quantum;
 
 // Colas de planificacion
 t_queue *cola_new = NULL;
@@ -103,19 +107,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
+	pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo, NULL);
 
-	if (strcmp(configuracion_kernel->algoritmo_planificacion, ALGORITMO_PLANIFICACION_FIFO) == 0)
-	{
-		pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo_fifo, NULL);
-	}
-	else if (strcmp(configuracion_kernel->algoritmo_planificacion, ALGORITMO_PLANIFICACION_ROUND_ROBIN) == 0)
-	{
-		pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo_round_robin, NULL);
-	}
-	else
-	{
-		pthread_create(&hilo_planificador_corto_plazo, NULL, planificador_corto_plazo_prioridades, NULL);
-	}
+	planifico_con_round_robin = strcmp(configuracion_kernel->algoritmo_planificacion, ALGORITMO_PLANIFICACION_ROUND_ROBIN) == 0;
+	planifico_con_prioridades = strcmp(configuracion_kernel->algoritmo_planificacion, ALGORITMO_PLANIFICACION_PRIORIDADES) == 0;
 
 	// Hilo principal
 	consola();
@@ -168,14 +163,16 @@ void *planificador_largo_plazo()
 {
 	while (true)
 	{
-		log_info(logger, "Soy el planificador de largo plazo");
-
 		sem_wait(&semaforo_hay_algun_proceso_en_cola_new);
 		sem_wait(&semaforo_grado_max_multiprogramacion);
 		sem_wait(&semaforo_planificador_largo_plazo);
 
 		t_pcb *pcb = queue_pop_thread_safe(cola_new, &mutex_cola_new);
-		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+
+		if (pcb != NULL)
+		{
+			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+		}
 
 		if (!planificacion_detenida)
 		{
@@ -184,26 +181,34 @@ void *planificador_largo_plazo()
 	}
 }
 
-void *planificador_corto_plazo_fifo()
+void *planificador_corto_plazo()
 {
 	while (true)
 	{
-		log_info(logger, "Soy el planificador de corto plazo");
-
 		sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
-
 		t_pcb *pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
-		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
 
-		op_code codigo_operacion_recibido;
-		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido);
-		actualizar_pcb(pcb, contexto_de_ejecucion);
-
-		sem_wait(&semaforo_planificador_corto_plazo);
-
-		if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+		if (pcb != NULL)
 		{
-			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
+			op_code codigo_operacion_recibido;
+			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido);
+			actualizar_pcb(pcb, contexto_de_ejecucion);
+
+			sem_wait(&semaforo_planificador_corto_plazo);
+
+			if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+			{
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
+			{
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+			}
+		}
+		else
+		{
+			sem_wait(&semaforo_planificador_corto_plazo);
 		}
 
 		if (!planificacion_detenida)
@@ -213,17 +218,22 @@ void *planificador_corto_plazo_fifo()
 	}
 }
 
-void *planificador_corto_plazo_round_robin()
+void *contador_quantum(void *id_hilo_quantum)
 {
-	while (true)
-	{
-	}
-}
+	int pid_proceso_a_interrumpir = pcb_ejecutando->pid;
+	int id_hilo = *((int *)id_hilo_quantum);
+	log_info(logger, "Soy el hilo contador quantum de ID %d", id_hilo);
 
-void *planificador_corto_plazo_prioridades()
-{
-	while (true)
+	sleep(configuracion_kernel->quantum);
+
+	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid_proceso_a_interrumpir && pcb_ejecutando->id_hilo_quantum == id_hilo)
 	{
+		pcb_ejecutando->quantum_finalizado = true;
+		if (!queue_is_empty_thread_safe(cola_ready, &mutex_cola_ready))
+		{
+			interrumpir_proceso_en_cpu();
+			log_info(logger, "PID: %d - Desalojado por fin de Quantum", pid_proceso_a_interrumpir);
+		}
 	}
 }
 
@@ -310,9 +320,7 @@ void transicionar_proceso_de_new_a_ready(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
 	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
-	queue_push_thread_safe(cola_ready, pcb, &mutex_cola_ready);
-	loguear_cola(cola_ready, "ready", &mutex_cola_ready);
-	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
+	push_cola_ready(pcb);
 }
 
 void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
@@ -327,6 +335,19 @@ void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 	pcb_ejecutando = pcb;
 	pcb->estado = CODIGO_ESTADO_PROCESO_EXECUTING;
 	ejecutar_proceso_en_cpu(pcb);
+
+	if (planifico_con_round_robin)
+	{
+		pthread_mutex_lock(&mutex_id_hilo_quantum);
+		id_hilo_quantum++;
+		pcb->id_hilo_quantum = id_hilo_quantum;
+		pcb->quantum_finalizado = false;
+		pthread_t hilo_contador_quantum;
+		int *id_hilo_quantum_arg = malloc(sizeof(int));
+		*id_hilo_quantum_arg = id_hilo_quantum;
+		pthread_create(&hilo_contador_quantum, NULL, contador_quantum, (void *)id_hilo_quantum_arg);
+		pthread_mutex_unlock(&mutex_id_hilo_quantum);
+	}
 }
 
 void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
@@ -338,6 +359,10 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 
 void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 {
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
+	pcb_ejecutando = NULL;
+	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
+	push_cola_ready(pcb);
 }
 
 void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
@@ -557,8 +582,8 @@ void iniciar_proceso(char *path, int size, int prioridad)
 
 void finalizar_proceso(int pid)
 {
-	t_pcb * pcb = buscar_pcb_con_pid(pid);
-	
+	t_pcb *pcb = buscar_pcb_con_pid(pid);
+
 	if (pcb != NULL)
 	{
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
@@ -833,6 +858,8 @@ t_pcb *crear_pcb(char *path, int size, int prioridad)
 	pcb->prioridad = prioridad;
 	pcb->path = path;
 	pcb->size = size;
+	pcb->quantum_finalizado = false;
+	pcb->id_hilo_quantum = -1;
 
 	return pcb;
 }
@@ -897,4 +924,35 @@ void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 	}
 
 	list_remove_and_destroy_by_condition_thread_safe(cola->elements, (void *)_filtro_proceso_por_id, (void *)_finalizar_pcb, mutex);
+}
+
+void push_cola_ready(t_pcb *pcb)
+{
+	queue_push_thread_safe(cola_ready, pcb, &mutex_cola_ready);
+
+	if (planifico_con_prioridades)
+	{
+		bool _comparador_prioridades(t_pcb* pcb1, t_pcb* pcb2)
+		{
+			return pcb1->prioridad < pcb2->prioridad;
+		}
+
+		list_sort_thread_safe(cola_ready->elements, (void *)_comparador_prioridades, &mutex_cola_ready);
+	}
+
+	loguear_cola(cola_ready, "ready", &mutex_cola_ready);
+
+	if (planifico_con_round_robin && pcb_ejecutando != NULL && pcb_ejecutando->quantum_finalizado)
+	{
+		interrumpir_proceso_en_cpu();
+		log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_ejecutando->pid);
+	}
+
+	if (planifico_con_prioridades && pcb_ejecutando != NULL && pcb->prioridad < pcb_ejecutando->prioridad)
+	{
+		interrumpir_proceso_en_cpu();
+		log_info(logger, "PID: %d - Desalojado por proceso con mayor prioridad", pcb_ejecutando->pid);
+	}
+
+	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
 }

@@ -46,10 +46,8 @@ void terminar_kernel();
 
 // Planificadores
 void *planificador_largo_plazo();
-
-void *planificador_corto_plazo_fifo();
-void *planificador_corto_plazo_round_robin();
-void *planificador_corto_plazo_prioridades();
+void *planificador_corto_plazo();
+void *contador_quantum(void *id_hilo_quantum);
 
 // Transicion de estado de procesos
 void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso);
@@ -98,9 +96,10 @@ void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex
 void imprimir_proceso_en_consola(t_pcb *pcb);
 void listar_procesos();
 t_pcb *crear_pcb(char *path, int size, int prioridad);
-void actualizar_pcb(t_pcb* pcb, t_contexto_de_ejecucion* contexto_de_ejecucion);
+void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion);
 t_pcb *buscar_pcb_con_pid(int pid);
-t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue* cola, pthread_mutex_t* mutex);
+t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
+void push_cola_ready(t_pcb* pcb);
 
 #endif /* KERNEL_H_ */

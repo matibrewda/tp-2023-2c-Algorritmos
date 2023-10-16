@@ -1,11 +1,30 @@
 #include "Headers/utilidades_thread_safe.h"
 
+bool queue_is_empty_thread_safe(t_queue *cola, pthread_mutex_t *mutex)
+{
+    bool resultado;
+
+    pthread_mutex_lock(mutex);
+    resultado = queue_is_empty(cola);
+    pthread_mutex_unlock(mutex);
+
+    return resultado;
+}
+
 void *queue_pop_thread_safe(t_queue *cola, pthread_mutex_t *mutex)
 {
     void *elemento;
 
     pthread_mutex_lock(mutex);
-    elemento = queue_pop(cola);
+    if (queue_is_empty(cola))
+    {
+        elemento = NULL;
+    }
+    else
+    {
+        elemento = queue_pop(cola);
+    }
+    
     pthread_mutex_unlock(mutex);
 
     return elemento;
@@ -45,5 +64,12 @@ void list_remove_and_destroy_by_condition_thread_safe(t_list *lista, bool(*filtr
 {
     pthread_mutex_lock(mutex);
 	list_remove_and_destroy_by_condition(lista, filtro, destructor);
+	pthread_mutex_unlock(mutex);
+}
+
+void list_sort_thread_safe(t_list *lista, bool (*comparador)(void *, void *), pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	list_sort(lista, comparador);
 	pthread_mutex_unlock(mutex);
 }
