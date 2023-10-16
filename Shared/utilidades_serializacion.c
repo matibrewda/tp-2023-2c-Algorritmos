@@ -7,9 +7,19 @@ t_paquete *crear_paquete_solicitud_ejecutar_proceso(t_log *logger, t_contexto_de
 }
 
 // Kernel a CPU
-t_paquete *crear_paquete_solicitud_interrumpir_proceso(t_log *logger)
+t_paquete *crear_paquete_solicitud_interrumpir_proceso(t_log *logger, int motivo_interrupcion)
 {
-    return crear_paquete_con_opcode_y_sin_contenido(logger, SOLICITUD_INTERRUMPIR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+    op_code codigo_operacion = SOLICITUD_INTERRUMPIR_PROCESO;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, motivo_interrupcion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+
+    return paquete;
 }
 
 // Kernel a CPU
@@ -170,6 +180,7 @@ t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_ope
     agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_bx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
     agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_cx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
     agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_dx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->motivo_interrupcion, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 

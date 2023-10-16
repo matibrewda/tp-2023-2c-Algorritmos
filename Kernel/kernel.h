@@ -64,14 +64,14 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb);
 
 // Comunicacion con CPU
 void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar);
-void enviar_paquete_solicitud_interrumpir_ejecucion();
+void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion);
 void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
 void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
 t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido);
 bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado);
 bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado);
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
-void interrumpir_proceso_en_cpu();
+void interrumpir_proceso_en_cpu(int motivo_interrupcion);
 
 // Comunicacion con Memoria
 void enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb);

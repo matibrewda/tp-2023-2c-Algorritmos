@@ -23,6 +23,7 @@ bool leer_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, int conexi
 
 // CPU recibe de Kernel
 t_contexto_de_ejecucion *leer_paquete_solicitud_ejecutar_proceso(t_log *logger, int conexion_con_kernel_dispatch);
+int leer_paquete_solicitud_interrumpir_proceso(t_log *logger, int conexion_con_kernel_interrupt);
 
 // Memoria recibe de Kernel
 t_proceso_memoria *leer_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, int conexion_con_kernel);

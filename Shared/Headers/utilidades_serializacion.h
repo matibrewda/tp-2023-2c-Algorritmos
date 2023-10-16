@@ -20,7 +20,7 @@
 
 // Kernel a CPU
 t_paquete *crear_paquete_solicitud_ejecutar_proceso(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion);
-t_paquete *crear_paquete_solicitud_interrumpir_proceso(t_log *logger);
+t_paquete *crear_paquete_solicitud_interrumpir_proceso(t_log *logger, int motivo_interrupcion);
 t_paquete *crear_paquete_respuesta_devolver_proceso_por_ser_interrumpido(t_log *logger);
 t_paquete *crear_paquete_respuesta_devolver_proceso_por_correcta_finalizacion(t_log *logger);
 

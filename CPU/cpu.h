@@ -73,7 +73,7 @@ void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio);
 void ejecutar_instruccion_exit();
 
 // Utilidades
-t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion(int motivo_interrupcion);
 void destruir_instruccion(t_instruccion *instruccion);
 uint32_t obtener_valor_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);

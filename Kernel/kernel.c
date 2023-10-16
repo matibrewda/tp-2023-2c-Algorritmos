@@ -27,6 +27,7 @@ sem_t semaforo_hay_algun_proceso_en_cola_new;
 sem_t semaforo_hay_algun_proceso_en_cola_ready;
 sem_t semaforo_planificador_corto_plazo;
 sem_t semaforo_planificador_largo_plazo;
+
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_conexion_cpu_dispatch;
@@ -203,7 +204,14 @@ void *planificador_corto_plazo()
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
 			{
-				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+				if (contexto_de_ejecucion->motivo_interrupcion == INTERRUPCION_POR_DESALOJO)
+				{
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+				}
+				else if (contexto_de_ejecucion->motivo_interrupcion == INTERRUPCION_POR_KILL)
+				{
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+				}
 			}
 		}
 		else
@@ -231,7 +239,7 @@ void *contador_quantum(void *id_hilo_quantum)
 		pcb_ejecutando->quantum_finalizado = true;
 		if (!queue_is_empty_thread_safe(cola_ready, &mutex_cola_ready))
 		{
-			interrumpir_proceso_en_cpu();
+			interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
 			log_info(logger, "PID: %d - Desalojado por fin de Quantum", pid_proceso_a_interrumpir);
 		}
 	}
@@ -381,10 +389,12 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 
 void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
 {
+	// TO DO
 }
 
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
+	// TO DO
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -587,7 +597,14 @@ void finalizar_proceso(int pid)
 
 	if (pcb != NULL)
 	{
-		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+		if (pcb->estado == CODIGO_ESTADO_PROCESO_EXECUTING)
+		{
+			interrumpir_proceso_en_cpu(INTERRUPCION_POR_KILL);
+		}
+		else
+		{
+			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+		}
 	}
 }
 
@@ -636,9 +653,9 @@ void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar)
 	free(contexto_de_ejecucion);
 }
 
-void enviar_paquete_solicitud_interrumpir_ejecucion()
+void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion)
 {
-	t_paquete *paquete_solicitud_interrumpir_ejecucion = crear_paquete_solicitud_interrumpir_proceso(logger);
+	t_paquete *paquete_solicitud_interrumpir_ejecucion = crear_paquete_solicitud_interrumpir_proceso(logger, motivo_interrupcion);
 	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_solicitud_interrumpir_ejecucion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 }
 
@@ -702,10 +719,10 @@ void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
 }
 
-void interrumpir_proceso_en_cpu()
+void interrumpir_proceso_en_cpu(int motivo_interrupcion)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_interrupt);
-	enviar_paquete_solicitud_interrumpir_ejecucion();
+	enviar_paquete_solicitud_interrumpir_ejecucion(motivo_interrupcion);
 	recibir_operacion_de_cpu_interrupt(RESPUESTA_INTERRUMPIR_PROCESO);
 	pthread_mutex_unlock(&mutex_conexion_cpu_interrupt);
 }
@@ -933,7 +950,7 @@ void push_cola_ready(t_pcb *pcb)
 
 	if (planifico_con_prioridades)
 	{
-		bool _comparador_prioridades(t_pcb* pcb1, t_pcb* pcb2)
+		bool _comparador_prioridades(t_pcb * pcb1, t_pcb * pcb2)
 		{
 			return pcb1->prioridad < pcb2->prioridad;
 		}
@@ -945,13 +962,13 @@ void push_cola_ready(t_pcb *pcb)
 
 	if (planifico_con_round_robin && pcb_ejecutando != NULL && pcb_ejecutando->quantum_finalizado)
 	{
-		interrumpir_proceso_en_cpu();
+		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
 		log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_ejecutando->pid);
 	}
 
 	if (planifico_con_prioridades && pcb_ejecutando != NULL && pcb->prioridad < pcb_ejecutando->prioridad)
 	{
-		interrumpir_proceso_en_cpu();
+		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
 		log_info(logger, "PID: %d - Desalojado por proceso con mayor prioridad", pcb_ejecutando->pid);
 	}
 

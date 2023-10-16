@@ -5,6 +5,7 @@ t_log *logger = NULL;
 t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
 bool ocurrio_interrupcion = false;
+int motivo_interrupcion = -1;
 int pid_ejecutando = 0;
 int tamanio_pagina = -1;
 int tamanio_memoria = -1;
@@ -160,6 +161,7 @@ void *interrupt()
 		if (codigo_operacion_recibido == SOLICITUD_INTERRUMPIR_PROCESO)
 		{
 			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+			motivo_interrupcion = leer_paquete_solicitud_interrumpir_proceso(logger, conexion_con_kernel_interrupt);
 			ocurrio_interrupcion = true;
 			enviar_paquete_respuesta_interrumpir_ejecucion();
 		}
@@ -192,6 +194,7 @@ void *dispatch()
 			registro_cx = contexto_de_ejecucion->registro_cx;
 			registro_dx = contexto_de_ejecucion->registro_dx;
 
+			motivo_interrupcion = -1;
 			ocurrio_interrupcion = false;
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
@@ -222,7 +225,7 @@ void enviar_paquete_respuesta_interrumpir_ejecucion()
 
 void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido()
 {
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion(motivo_interrupcion);
 	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
@@ -230,7 +233,7 @@ void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido()
 
 void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion()
 {
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion(motivo_interrupcion);
 	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
@@ -317,7 +320,10 @@ void ciclo_de_ejecucion()
 		instruccion = decode(instruccion_string);
 		execute(instruccion);
 
-		program_counter++; // OJO CON EL JNZ
+		if (instruccion->opcode != JNZ_OPCODE_INSTRUCCION)
+		{
+			program_counter++;
+		}
 
 		// Interrupciones
 		if (ocurrio_interrupcion)
@@ -630,7 +636,7 @@ void ejecutar_instruccion_jnz(char *nombre_registro, uint32_t nuevo_program_coun
 {
 	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
 
-	if (obtener_valor_registro(PC_NOMBRE_REGISTRO) == 0)
+	if (obtener_valor_registro(nombre_registro) == 0)
 	{
 		escribir_valor_a_registro(PC_NOMBRE_REGISTRO, nuevo_program_counter);
 	}
@@ -749,7 +755,7 @@ void ejecutar_instruccion_exit()
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* UTILIDADES *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion(int motivo_interrupcion)
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
 
@@ -759,6 +765,7 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	contexto_de_ejecucion->registro_bx = registro_bx;
 	contexto_de_ejecucion->registro_cx = registro_cx;
 	contexto_de_ejecucion->registro_dx = registro_dx;
+	contexto_de_ejecucion->motivo_interrupcion = motivo_interrupcion;
 
 	return contexto_de_ejecucion;
 }

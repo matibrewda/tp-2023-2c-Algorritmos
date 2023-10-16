@@ -28,6 +28,28 @@ t_contexto_de_ejecucion *leer_paquete_solicitud_ejecutar_proceso(t_log *logger, 
 	return leer_paquete_contexto_de_ejecucion(logger, conexion_con_kernel_dispatch, SOLICITUD_EJECUTAR_PROCESO, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
+// CPU recibe de Kernel
+int leer_paquete_solicitud_interrumpir_proceso(t_log *logger, int conexion_con_kernel_interrupt)
+{
+	op_code codigo_operacion = SOLICITUD_INTERRUMPIR_PROCESO;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT, &tamanio_buffer, conexion_con_kernel_interrupt, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	int motivo_interrupcion;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT, &buffer_con_offset, &(motivo_interrupcion), codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+
+	return motivo_interrupcion;
+}
+
 // Memoria recibe de Kernel
 t_proceso_memoria *leer_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, int conexion_con_kernel)
 {
@@ -150,6 +172,7 @@ t_contexto_de_ejecucion *leer_paquete_contexto_de_ejecucion(t_log *logger, int c
 	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_bx), codigo_operacion);
 	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_cx), codigo_operacion);
 	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_dx), codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->motivo_interrupcion), codigo_operacion);
 
 	free(buffer);
 
