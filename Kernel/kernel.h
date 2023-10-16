@@ -32,7 +32,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -99,5 +99,8 @@ void imprimir_proceso_en_consola(t_pcb *pcb);
 void listar_procesos();
 t_pcb *crear_pcb(char *path, int size, int prioridad);
 void actualizar_pcb(t_pcb* pcb, t_contexto_de_ejecucion* contexto_de_ejecucion);
+t_pcb *buscar_pcb_con_pid(int pid);
+t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue* cola, pthread_mutex_t* mutex);
+void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 
 #endif /* KERNEL_H_ */
