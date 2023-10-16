@@ -367,6 +367,7 @@ void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 
 void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 {
+	// TO DO
 }
 
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
