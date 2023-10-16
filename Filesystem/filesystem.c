@@ -1,14 +1,19 @@
 #include "filesystem.h"
+#include "commons/config.h" 
+#include "fcb.h" 
+#include "fat.h" 
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	t_log *logger = NULL;
 	t_argumentos_filesystem *argumentos_filesystem = NULL;
 	t_config_filesystem *configuracion_filesystem = NULL;
+
 	int socket_kernel = -1;
 	int conexion_con_kernel = -1;
 	int conexion_con_memoria = -1;
 
+	
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_FILESYSTEM, LOG_LEVEL);
 	if (logger == NULL)
@@ -27,11 +32,30 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	configuracion_filesystem = leer_configuracion(logger, argumentos_filesystem->ruta_archivo_configuracion);
+
 	if (configuracion_filesystem == NULL)
 	{
 		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
+
+	// INICIAR SU FCB 
+
+	FCB* fcb = crear_fcb("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/Notas1erParcialK9999.fcb");
+	if (fcb!=NULL){
+		log_info(logger,"Pude cargar el siguiente archivo fcb");
+	 log_info(logger, "Nombre archivo: %s - Tamaño Archivo: %d - Inicio de bloque: %d", fcb->nombre_archivo, fcb->tamanio_archivo, fcb->bloque_inicial);
+	 } else {
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+		return EXIT_FAILURE;}
+
+	// INICIAR SU FAT 
+
+	int fat_checker = iniciarFAT(logger,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fat/fat.bin",configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+	if (fat_checker == 0){
+		log_debug(logger,"FS FAT: Pude iniciar mi FAT.");
+	} else log_debug(logger,"FS FAT: No pude iniciar mi FAT.");
+
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
@@ -54,6 +78,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
+	
+
+
 	// Logica principal
 	int resultado_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
 	log_info(logger, "Se recibio la operacion %d desde %s", resultado_kernel, NOMBRE_MODULO_KERNEL);
@@ -64,6 +91,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	enviar_operacion_sin_paquete(logger, conexion_con_memoria, MENSAJE_DE_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 	int resultado_memoria = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	log_info(logger, "Se recibio la operacion %d desde %s", resultado_memoria, NOMBRE_MODULO_MEMORIA);
+
+
 
 	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
@@ -99,12 +128,120 @@ void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_file
 
 }
 
-bool crear_archivo (char* path) {
-	log_debug(logger, "Crear archivo: Directorio:%s", path);
+int crear_archivo (char* path) {
 
 	//crear un archivo FCB con tamaño 0 y sin bloque inicial.
 	// Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK.
 
-	log_debug(logger, "Archivo creado: Bool=%d", true);
-	return true;
+	return EXIT_SUCCESS;
+}
+
+// PETICIONES KERNEL
+
+void abrirArchivo(char* ruta_archivo){
+/* Abrir archivo:
+La operación de abrir archivo consistirá en verificar que exista el 
+FCB correspondiente al archivo. 
+
+En caso de que exista deberá devolver el tamaño del archivo.
+En caso de que no exista, deberá informar que el archivo no existe. */
+
+// Abrir FCB con nombre ruta_archivo
+// Si no existe DEVOLVER ARCHIVO NO EXISTE
+// Si existe DEVOLVER TAMAÑO DEL ARCHIVO
+}
+
+int crearArchivo(){
+/* Crear Archivo
+En la operación crear archivo, se deberá crear un archivo FCB con tamaño 0 y sin bloque inicial.
+Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK. */
+
+return EXIT_SUCCESS;
+}
+
+void truncarArchivo(char* ruta_archivo){
+/* 	Truncar Archivo:
+Al momento de truncar un archivo, pueden ocurrir 2 situaciones: 
+1) Ampliar el tamaño del archivo: Al momento de ampliar el tamaño del archivo deberá 
+actualizar el tamaño del archivo en el FCB y se le deberán asignar tantos 
+bloques como sea necesario para poder direccionar el nuevo tamaño.
+
+2) Reducir el tamaño del archivo: Se deberá asignar el nuevo tamaño del archivo en el FCB y 
+se deberán marcar como libres todos los bloques que ya no sean necesarios para direccionar 
+el tamaño del archivo (descartando desde el final del archivo hacia el principio).
+Siempre se van a poder truncar archivos para ampliarlos, no se realizará la prueba de llenar el FS.
+ */
+}
+
+void leerArchivo(char* ruta_archivo){
+
+}
+
+void escribirArchivo(char* ruta_archivo){
+
+}
+
+//Peticiones MEMORIA:
+
+int inicarProceso(){
+return EXIT_SUCCESS;
+}
+
+int finalizarProceso(){
+return EXIT_SUCCESS;
+}
+
+// PETICIONES KERNEL
+
+void abrirArchivo(char* ruta_archivo){
+/* Abrir archivo:
+La operación de abrir archivo consistirá en verificar que exista el 
+FCB correspondiente al archivo. 
+
+En caso de que exista deberá devolver el tamaño del archivo.
+En caso de que no exista, deberá informar que el archivo no existe. */
+
+// Abrir FCB con nombre ruta_archivo
+// Si no existe DEVOLVER ARCHIVO NO EXISTE
+// Si existe DEVOLVER TAMAÑO DEL ARCHIVO
+}
+
+int crearArchivo(){
+/* Crear Archivo
+En la operación crear archivo, se deberá crear un archivo FCB con tamaño 0 y sin bloque inicial.
+Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK. */
+
+return EXIT_SUCCESS;
+}
+
+void truncarArchivo(char* ruta_archivo){
+/* 	Truncar Archivo:
+Al momento de truncar un archivo, pueden ocurrir 2 situaciones: 
+1) Ampliar el tamaño del archivo: Al momento de ampliar el tamaño del archivo deberá 
+actualizar el tamaño del archivo en el FCB y se le deberán asignar tantos 
+bloques como sea necesario para poder direccionar el nuevo tamaño.
+
+2) Reducir el tamaño del archivo: Se deberá asignar el nuevo tamaño del archivo en el FCB y 
+se deberán marcar como libres todos los bloques que ya no sean necesarios para direccionar 
+el tamaño del archivo (descartando desde el final del archivo hacia el principio).
+Siempre se van a poder truncar archivos para ampliarlos, no se realizará la prueba de llenar el FS.
+ */
+}
+
+void leerArchivo(char* ruta_archivo){
+
+}
+
+void escribirArchivo(char* ruta_archivo){
+
+}
+
+//Peticiones MEMORIA:
+
+int inicarProceso(){
+return EXIT_SUCCESS;
+}
+
+int finalizarProceso(){
+return EXIT_SUCCESS;
 }

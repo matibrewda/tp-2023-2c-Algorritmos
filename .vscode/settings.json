@@ -7,6 +7,7 @@
         "utilidades_conexion.h": "c",
         "semaphore.h": "c",
         "utilidades_logger.h": "c",
-        "config.h": "c"
+        "config.h": "c",
+        "argumentos_filesystem.h": "c"
     }
 }
