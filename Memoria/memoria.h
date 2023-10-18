@@ -38,9 +38,9 @@ void enviar_info_de_memoria_inicial_para_cpu();
 //Iniciar proceso
 int iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
-void pedir_bloques_a_fylesystem(int cantidad_de_bloques);
+t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques);
 void finalizar_proceso_en_memoria(int pid);
-void pedir_liberacion_de_bloques_a_filesystem(int bloques);
+void pedir_liberacion_de_bloques_a_filesystem();
 
 //Notificacion filesystem
 void notificar_lectura_a_filesystem();

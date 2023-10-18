@@ -34,7 +34,7 @@ t_pedido_instruccion *leer_paquete_pedido_instruccion(t_log *logger, int conexio
 
 //Memoria recibe de FileSystem
 t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem);
-t_pedido_escribir_archivo *leer_paquete_escribir_leer_archivo(t_log *logger, int conexion_con_filsystem);
+t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, int conexion_con_filsystem);
 
 
 // Comunes

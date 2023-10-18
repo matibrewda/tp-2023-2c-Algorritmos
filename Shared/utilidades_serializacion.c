@@ -142,3 +142,42 @@ t_paquete *crear_paquete_con_opcode_y_sin_contenido(t_log *logger, op_code codig
 
     return paquete;
 }
+
+t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_de_bloques)
+{
+    op_code codigo_operacion = PEDIR_BLOQUES_A_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, cantidad_de_bloques, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list * posiciones_swap)
+{
+    op_code codigo_operacion = LIBERAR_BLOQUES_EN_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    t_list_iterator *iterador = list_iterator_create(posiciones_swap);
+
+	while (list_iterator_has_next(iterador))
+	{
+		int *posicion_en_swap = list_iterator_next(iterador);
+		// RESPETAR EL ORDEN -> SERIALIZACION!
+        log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", *posicion_en_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+        agregar_int_a_paquete(logger, paquete, *posicion_en_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+	}
+
+	list_iterator_destroy(iterador);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}

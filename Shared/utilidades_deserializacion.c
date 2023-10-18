@@ -148,7 +148,7 @@ t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conex
 	return pedido_leer_archivo;
 }
 
-t_pedido_escribir_archivo *leer_paquete_escribir_leer_archivo(t_log *logger, int conexion_con_filsystem)
+t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, int conexion_con_filsystem)
 {
 	op_code codigo_operacion = ESCRIBIR_ARCHIVO_MEMORIA;
 	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO ESCRIBIR ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);

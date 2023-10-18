@@ -204,7 +204,8 @@ int iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 
 	list_add(procesos_iniciados, iniciar_proceso);
 
-	//pedir_bloques_a_fylesystem(cantidad_de_bloques);//todo
+	int cantidad_de_bloques_mock = 1; // TODO MOCK
+	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques_mock); // TODO pasar cantidad de bloques correspondiente
 	return 1;
 }
 
@@ -243,7 +244,7 @@ void finalizar_proceso_en_memoria(int pid)
 	cerrar_archivo(logger, archivo_proceso->archivo);
 	//list_remove_element(procesos_iniciados, archivo_proceso); // NO COMPILA!
 
-	//pedir_liberacion_de_bloques_a_filesystem(bloques);//todo
+	pedir_liberacion_de_bloques_a_filesystem();//todo pasar lista de bloques
 	free(archivo_proceso);
 }
 
@@ -289,14 +290,21 @@ void notificar_escritura_a_filesystem()
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
-void pedir_bloques_a_fylesystem(int cantidad_de_bloques)
+t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 {
-	//todo
+	t_list *posiciones_swap = list_create();
+	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	// TODO bloquear hilo esperando el paquete de respuesta?
+	return posiciones_swap;
 }
 
-void pedir_liberacion_de_bloques_a_filesystem(int bloques)
+void pedir_liberacion_de_bloques_a_filesystem()
 {
-	//todo
+	t_list *posiciones_swap = list_create(); // TODO MOCK
+	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, posiciones_swap);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	// TODO esperar respuesta de liberacion de bloques?
 }
 
 
