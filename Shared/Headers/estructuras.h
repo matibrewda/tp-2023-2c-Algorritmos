@@ -59,4 +59,15 @@ typedef struct
 	int pc;
 } t_pedido_instruccion;
 
+typedef struct
+{
+	char *informacion;
+} t_pedido_leer_archivo;
+
+typedef struct
+{
+	int direccion_fisica;
+} t_pedido_escribir_archivo;
+
+
 #endif /* ESTRUCTURAS_H_ */

@@ -17,6 +17,7 @@ int conexion_con_filesystem = -1;
 // Hilos
 pthread_t hilo_atiendo_kernel;
 pthread_t hilo_atiendo_cpu;
+pthread_t hilo_atiendo_filesystem;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -92,6 +93,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Hilos
 	pthread_create(&hilo_atiendo_cpu, NULL, atender_cpu, NULL);
 	pthread_create(&hilo_atiendo_kernel, NULL, atender_kernel, NULL);
+	pthread_create(&hilo_atiendo_filesystem, NULL, atender_filesystem, NULL);
 
 	// Logica principal
 	pthread_join(hilo_atiendo_cpu, NULL);
@@ -148,6 +150,28 @@ void *atender_cpu()
 	}
 }
 
+void *atender_filesystem()
+{
+	while (true)
+	{
+		int operacion_recibida_de_filesystem = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_filesystem), NOMBRE_MODULO_FILESYSTEM);
+
+		if (operacion_recibida_de_filesystem == LEER_ARCHIVO_MEMORIA)
+		{
+			t_pedido_leer_archivo *pedido_leer_archivo = leer_paquete_pedido_leer_archivo(logger,conexion_con_filesystem);
+			notificar_lectura_a_filesystem();//devuelve un paquete con el mismo opcode y sin info por ahora
+			free(pedido_leer_archivo);
+		}
+		else if (operacion_recibida_de_filesystem == ESCRIBIR_ARCHIVO_MEMORIA)
+		{
+			t_pedido_escribir_archivo *pedido_escribir_archivo = leer_paquete_pedido_escribir_archivo(logger,conexion_con_filesystem);
+			notificar_escritura_a_filesystem();//devuelve un paquete con el mismo opcode y sin info por ahora
+			free(pedido_escribir_archivo);
+		}
+	}
+}
+
 void enviar_info_de_memoria_inicial_para_cpu()
 {
 	log_debug(logger, "Comenzando la creacion de paquete para enviar informacion inicial de memoria a la CPU");
@@ -179,6 +203,8 @@ int iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	iniciar_proceso->pid = pid;
 
 	list_add(procesos_iniciados, iniciar_proceso);
+
+	//pedir_bloques_a_fylesystem(cantidad_de_bloques);//todo
 	return 1;
 }
 
@@ -216,6 +242,8 @@ void finalizar_proceso_en_memoria(int pid)
 	}
 	cerrar_archivo(logger, archivo_proceso->archivo);
 	//list_remove_element(procesos_iniciados, archivo_proceso); // NO COMPILA!
+
+	//pedir_liberacion_de_bloques_a_filesystem(bloques);//todo
 	free(archivo_proceso);
 }
 
@@ -245,6 +273,32 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid)
 	log_error(logger, "No se encuentran estructuras de pseudocodigo para el pid %d", pid);
 	return NULL;
 }
+
+
+void notificar_lectura_a_filesystem() 
+{
+	log_debug(logger,"Notificando a File System de lectura exitosa en memoria");
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger,LEER_ARCHIVO_MEMORIA,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_FILESYSTEM);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+}
+
+void notificar_escritura_a_filesystem() 
+{
+	log_debug(logger,"Notificando a File System de lectura exitosa en memoria");
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger,ESCRIBIR_ARCHIVO_MEMORIA,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_FILESYSTEM);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+}
+
+void pedir_bloques_a_fylesystem(int cantidad_de_bloques)
+{
+	//todo
+}
+
+void pedir_liberacion_de_bloques_a_filesystem(int bloques)
+{
+	//todo
+}
+
 
 void destruir_listas()
 {

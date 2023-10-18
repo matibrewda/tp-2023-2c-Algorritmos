@@ -34,10 +34,17 @@
 // Handshake con CPU
 void enviar_info_de_memoria_inicial_para_cpu();
 
+
 //Iniciar proceso
 int iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
+void pedir_bloques_a_fylesystem(int cantidad_de_bloques);
 void finalizar_proceso_en_memoria(int pid);
+void pedir_liberacion_de_bloques_a_filesystem(int bloques);
+
+//Notificacion filesystem
+void notificar_lectura_a_filesystem();
+void notificar_escritura_a_filesystem();
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
@@ -49,5 +56,6 @@ void terminar_memoria();
 // Hilos
 void* atender_kernel();
 void* atender_cpu();
+void* atender_filesystem();
 
 #endif /* MEMORIA_H_ */

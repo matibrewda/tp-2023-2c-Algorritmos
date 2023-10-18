@@ -127,3 +127,43 @@ t_info_memoria* leer_info_inicial_de_memoria_para_cpu(t_log *logger, int conexio
 
 	return info_memoria;
 }
+
+t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem)
+{
+	op_code codigo_operacion = LEER_ARCHIVO_MEMORIA;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO LEER ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &tamanio_buffer, conexion_con_filsystem, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_pedido_leer_archivo *pedido_leer_archivo = malloc(sizeof(t_pedido_leer_archivo));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_string_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_FILESYSTEM,&buffer_con_offset, &(pedido_leer_archivo->informacion), codigo_operacion);
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO LEER ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	return pedido_leer_archivo;
+}
+
+t_pedido_escribir_archivo *leer_paquete_escribir_leer_archivo(t_log *logger, int conexion_con_filsystem)
+{
+	op_code codigo_operacion = ESCRIBIR_ARCHIVO_MEMORIA;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO ESCRIBIR ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &tamanio_buffer, conexion_con_filsystem, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_pedido_escribir_archivo *pedido_escribir_archivo = malloc(sizeof(t_pedido_escribir_archivo));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_FILESYSTEM,&buffer_con_offset, &(pedido_escribir_archivo->direccion_fisica), codigo_operacion);
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO ESCRIBIR ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	return pedido_escribir_archivo;
+}
