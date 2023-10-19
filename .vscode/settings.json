@@ -17,6 +17,9 @@
         "utilidades_serializacion.h": "c",
         "utilidades_deserializacion.h": "c",
         "cpu.h": "c",
-        "argumentos_memoria.h": "c"
+        "argumentos_memoria.h": "c",
+        "list.h": "c",
+        "utilidades_semaforos.h": "c",
+        "queue.h": "c"
     }
 }

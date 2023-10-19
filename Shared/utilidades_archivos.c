@@ -1,6 +1,4 @@
 #include "Headers/utilidades_archivos.h"
-#include <stdio.h>
-#include <stdlib.h>
 
 char *leer_archivo(t_log *logger, char *ruta_archivo)
 {

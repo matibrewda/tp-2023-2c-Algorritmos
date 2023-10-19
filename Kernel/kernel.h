@@ -26,6 +26,7 @@
 #include "../Shared/Headers/utilidades_conexion.h"
 #include "../Shared/Headers/utilidades_serializacion.h"
 #include "../Shared/Headers/utilidades_deserializacion.h"
+#include "../Shared/Headers/utilidades_thread_safe.h"
 #include "../Shared/Headers/enums.h"
 #include "../Shared/Headers/estructuras.h"
 #include "../Shared/Headers/constantes.h"
@@ -42,27 +43,63 @@
 #define PROCESO_ESTADO "PROCESO_ESTADO"
 
 void terminar_kernel();
-void consola();
+
+// Planificadores
 void *planificador_largo_plazo();
 void *planificador_corto_plazo();
-void *dispatcher();
-void *escuchador_cpu();
-void crear_proceso(char *path, int size, int prioridad);
+void *contador_quantum(void *id_hilo_quantum);
+
+// Transicion de estado de procesos
+void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso);
+void transicionar_proceso_a_new(t_pcb *pcb);
+void transicionar_proceso_de_new_a_ready(t_pcb *pcb);
+void transicionar_proceso_de_new_a_exit(t_pcb *pcb);
+void transicionar_proceso_de_ready_a_executing(t_pcb *pcb);
+void transicionar_proceso_de_ready_a_exit(t_pcb *pcb);
+void transicionar_proceso_de_executing_a_exit(t_pcb *pcb);
+void transicionar_proceso_de_executing_a_ready(t_pcb *pcb);
+void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb);
+void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb);
+void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb);
+
+// Comunicacion con CPU
+void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar);
+void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion);
+void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
+void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido);
+bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado);
+bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado);
+void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
+void interrumpir_proceso_en_cpu(int motivo_interrupcion);
+
+// Comunicacion con Memoria
+void enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb);
+void enviar_paquete_destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb);
+bool recibir_operacion_de_memoria(op_code codigo_operacion_esperado);
+bool iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb);
+void destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb);
+
+// Consola
+void consola();
+void iniciar_proceso(char *path, int size, int prioridad);
 void finalizar_proceso(int pid);
 void iniciar_planificacion();
 void detener_planificacion();
-void listar_procesos();
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
+
+// Utilidades
+const char *nombre_estado_proceso(char codigo_estado_proceso);
 int obtener_nuevo_pid();
-void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
-void interrumpir_proceso_en_cpu();
-void terminar_kernel();
-void crear_hilo_consola(t_log *logger, t_config_kernel *config_kernel, int conexion_con_memoria);
-void consola();
-void iniciar_estructuras_de_proceso_en_memoria(t_log *logger, char *path, int size, int prioridad, int pid);
-
-void loguear_cola_pcbs(t_queue *cola, const char *nombre_cola);
-
-void fifo();
+void agregar_pid_a_aux_pids_cola(t_pcb *pcb);
+void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola);
+void imprimir_proceso_en_consola(t_pcb *pcb);
+void listar_procesos();
+t_pcb *crear_pcb(char *path, int size, int prioridad);
+void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion);
+t_pcb *buscar_pcb_con_pid(int pid);
+t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
+void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
+void push_cola_ready(t_pcb* pcb);
 
 #endif /* KERNEL_H_ */

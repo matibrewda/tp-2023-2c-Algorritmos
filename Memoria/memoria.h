@@ -1,6 +1,9 @@
 #ifndef MEMORIA_H_
 #define MEMORIA_H_
 
+// Para incluir la funcion asprintf()
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +39,7 @@ void enviar_info_de_memoria_inicial_para_cpu();
 
 
 //Iniciar proceso
-int iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
+void iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
 t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques);
 void finalizar_proceso_en_memoria(int pid);
@@ -48,6 +51,11 @@ void notificar_escritura_a_filesystem();
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
+void cerrar_archivo_con_pid(int pid);
+
+// Comunicacion con Kernel
+void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);
+void enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 
 // Terminar
 void destruir_listas();

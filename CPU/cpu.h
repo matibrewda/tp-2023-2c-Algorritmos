@@ -30,28 +30,31 @@
 #define LOG_LEVEL LOG_LEVEL_INFO
 
 void terminar_cpu();
+
+// Comunicacion con Kernel
 void *interrupt();
 void *dispatch();
-
-uint32_t obtener_valor_registro(char *nombre_registro);
-void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
-
-t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
+void enviar_paquete_respuesta_ejecutar_proceso();
+void enviar_paquete_respuesta_interrumpir_ejecucion();
+void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
+void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
+bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado);
 void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
 
-void destruir_instruccion(t_instruccion* instruccion);
-bool solicitar_info_inicial_a_memoria();
+// Comunicacion con Memoria
+void enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
+void enviar_paquete_solicitud_pedir_instruccion_a_memoria();
+void solicitar_info_inicial_a_memoria();
+char *pedir_instruccion_a_memoria();
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();
 char *fetch();
 t_instruccion *decode(char *instruccion_string);
-void execute(t_instruccion* instruccion);
+void execute(t_instruccion *instruccion);
 
 // Instrucciones
-char *pedir_instruccion_a_memoria();
-
 void ejecutar_instruccion_set(char *nombre_registro, uint32_t valor);
 void ejecutar_instruccion_sum(char *nombre_registro_destino, char *nombre_registro_origen);
 void ejecutar_instruccion_sub(char *nombre_registro_destino, char *nombre_registro_origen);
@@ -68,5 +71,11 @@ void ejecutar_instruccion_fread(char *nombre_archivo, char *direccion_logica);
 void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica);
 void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio);
 void ejecutar_instruccion_exit();
+
+// Utilidades
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion(int motivo_interrupcion);
+void destruir_instruccion(t_instruccion *instruccion);
+uint32_t obtener_valor_registro(char *nombre_registro);
+void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
 
 #endif /* CPU_H_ */
