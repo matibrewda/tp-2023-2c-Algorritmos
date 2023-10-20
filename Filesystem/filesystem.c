@@ -4,15 +4,22 @@
 #include "fat.h" 
 #include "swap.h" 
 
+pthread_t hilo_memoria;
+pthread_t hilo_kernel;
+
+
+t_log *logger = NULL;
+t_argumentos_filesystem *argumentos_filesystem = NULL;
+t_config_filesystem *configuracion_filesystem = NULL;
+
+int socket_kernel = -1;
+int conexion_con_kernel = -1;
+int conexion_con_memoria = -1;
+
+
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
-	t_log *logger = NULL;
-	t_argumentos_filesystem *argumentos_filesystem = NULL;
-	t_config_filesystem *configuracion_filesystem = NULL;
-
-	int socket_kernel = -1;
-	int conexion_con_kernel = -1;
-	int conexion_con_memoria = -1;
+	
 
 	
 	// Inicializacion
@@ -85,8 +92,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
-
 	
+	pthread_create(&hilo_kernel,NULL,(void *)comunicacion_kernel,NULL);
+	pthread_create(&hilo_memoria,NULL,(void *)comunicacion_memoria,NULL);
 
 
 	// Logica principal
@@ -136,6 +144,29 @@ void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_file
 
 }
 
+void *comunicacion_memoria(){
+	while (true){
+		int operacion_recibida_memoria = esperar_operacion(logger,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_MEMORIA,conexion_con_memoria);
+		log_debug(logger,"se recibió la operacion %s de %s", nombre_opcode(operacion_recibida_memoria),NOMBRE_MODULO_MEMORIA);
+		enviar_operacion_sin_paquete(logger,conexion_con_memoria,operacion_recibida_memoria,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_MEMORIA);
+		log_debug(logger,"le devuelvo la operacion recibida: %s a %s",operacion_recibida_memoria,NOMBRE_MODULO_MEMORIA);
+		
+		
+	}
+}
+
+void *comunicacion_kernel(){
+	while (true){
+		int operacion_recibida_kernel = esperar_operacion(logger,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_KERNEL,conexion_con_kernel);
+		log_debug(logger,"se recibio la operacion %s de %s",nombre_opcode(operacion_recibida_kernel),NOMBRE_MODULO_KERNEL);
+		t_paquete *paquete_para_cpu = crear_paquete(logger, operacion_recibida_kernel);
+		log_debug(logger,"creo un paquete con el codigo de operacion recibido: %s , y se lo devuelvo a",operacion_recibida_kernel, NOMBRE_MODULO_KERNEL);
+		enviar_paquete(logger,conexion_con_kernel,paquete_para_cpu,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_KERNEL);
+
+
+		
+	}
+}
 /* int crear_archivo (char* path) {
 
 	//crear un archivo FCB con tamaño 0 y sin bloque inicial.
