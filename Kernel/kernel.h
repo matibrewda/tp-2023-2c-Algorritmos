@@ -32,7 +32,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -101,5 +101,8 @@ t_pcb *buscar_pcb_con_pid(int pid);
 t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void push_cola_ready(t_pcb* pcb);
+void crear_recursos();
+t_recurso* crear_recurso(char* nombre, int instancias);
+bool recurso_existe(char* nombre);
 
 #endif /* KERNEL_H_ */

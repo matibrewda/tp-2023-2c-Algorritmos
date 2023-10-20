@@ -62,4 +62,11 @@ typedef struct
 	int pc;
 } t_pedido_instruccion;
 
+typedef struct
+{
+	char* nombre;
+	int instancias_iniciales;
+    int instancias_disponibles;
+} t_recurso;
+
 #endif /* ESTRUCTURAS_H_ */

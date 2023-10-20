@@ -11,6 +11,9 @@ bool planifico_con_round_robin = false;
 bool planifico_con_prioridades = false;
 int id_hilo_quantum = 0;
 
+// Recursos
+t_list *recursos;
+
 // Conexiones
 int conexion_con_cpu_dispatch = -1;
 int conexion_con_cpu_interrupt = -1;
@@ -94,6 +97,13 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		terminar_kernel();
 		return EXIT_FAILURE;
 	}
+
+	// Recursos
+	crear_recursos();
+
+	log_debug(logger, "Existe el recurso RA? %d", recurso_existe("RA"));
+	log_debug(logger, "Existe el recurso RW? %d", recurso_existe("RW"));
+
 
 	// Semaforos
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
@@ -973,4 +983,39 @@ void push_cola_ready(t_pcb *pcb)
 	}
 
 	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
+}
+
+void crear_recursos()
+{
+	recursos = list_create();
+
+	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	{
+		list_add(recursos, crear_recurso(configuracion_kernel->recursos[i], configuracion_kernel->instancias_recursos[i]));
+	}
+}
+
+t_recurso *crear_recurso(char *nombre, int instancias)
+{
+	t_recurso *recurso = malloc(sizeof(t_recurso));
+
+	recurso->nombre = malloc(strlen(nombre));
+	strcpy(recurso->nombre, nombre);
+
+	recurso->instancias_iniciales = instancias;
+	recurso->instancias_disponibles = instancias;
+
+	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
+
+	return recurso;
+}
+
+bool recurso_existe(char* nombre)
+{
+	bool _filtro_nombre_recurso(t_recurso * recurso)
+	{
+		return strcmp(recurso->nombre, nombre) == 0;
+	}
+
+	return list_any_satisfy(recursos, (void*) _filtro_nombre_recurso);
 }
