@@ -64,6 +64,16 @@ typedef struct
 
 typedef struct
 {
+	char *informacion;
+} t_pedido_leer_archivo;
+
+typedef struct
+{
+	int direccion_fisica;
+} t_pedido_escribir_archivo;
+
+typedef struct
+{
 	char* nombre;
 	int instancias_iniciales;
     int instancias_disponibles;

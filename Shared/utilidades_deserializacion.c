@@ -130,6 +130,48 @@ t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *
 	return pedido_instruccion;
 }
 
+// Memoria recibe de Filesystem
+t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem)
+{
+	op_code codigo_operacion = SOLICITUD_LEER_ARCHIVO_MEMORIA;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO LEER ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filsystem, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_pedido_leer_archivo *pedido_leer_archivo = malloc(sizeof(t_pedido_leer_archivo));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_string_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM,&buffer_con_offset, &(pedido_leer_archivo->informacion), codigo_operacion);
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO LEER ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	return pedido_leer_archivo;
+}
+
+// Memoria recibe de Filesystem
+t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, int conexion_con_filsystem)
+{
+	op_code codigo_operacion = SOLICITUD_ESCRIBIR_ARCHIVO_MEMORIA;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO ESCRIBIR ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &tamanio_buffer, conexion_con_filsystem, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_pedido_escribir_archivo *pedido_escribir_archivo = malloc(sizeof(t_pedido_escribir_archivo));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_FILESYSTEM,&buffer_con_offset, &(pedido_escribir_archivo->direccion_fisica), codigo_operacion);
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO ESCRIBIR ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	return pedido_escribir_archivo;
+}
+
 // Comunes
 t_proceso_memoria *leer_paquete_proceso_memoria(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino)
 {
@@ -177,6 +219,4 @@ t_contexto_de_ejecucion *leer_paquete_contexto_de_ejecucion(t_log *logger, int c
 	free(buffer);
 
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
-
-	return contexto_de_ejecucion;
 }

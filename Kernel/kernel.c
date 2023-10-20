@@ -101,9 +101,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Recursos
 	crear_recursos();
 
-	log_debug(logger, "Existe el recurso RA? %d", recurso_existe("RA"));
-	log_debug(logger, "Existe el recurso RW? %d", recurso_existe("RW"));
-
 
 	// Semaforos
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);

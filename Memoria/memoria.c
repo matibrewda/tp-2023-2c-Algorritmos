@@ -17,6 +17,7 @@ int conexion_con_filesystem = -1;
 // Hilos
 pthread_t hilo_atiendo_kernel;
 pthread_t hilo_atiendo_cpu;
+pthread_t hilo_atiendo_filesystem;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -92,6 +93,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Hilos
 	pthread_create(&hilo_atiendo_cpu, NULL, atender_cpu, NULL);
 	pthread_create(&hilo_atiendo_kernel, NULL, atender_kernel, NULL);
+	pthread_create(&hilo_atiendo_filesystem, NULL, atender_filesystem, NULL);
 
 	// Logica principal
 	pthread_join(hilo_atiendo_cpu, NULL);
@@ -146,6 +148,28 @@ void *atender_cpu()
 	}
 }
 
+void *atender_filesystem()
+{
+	while (true)
+	{
+		int operacion_recibida_de_filesystem = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_filesystem), NOMBRE_MODULO_FILESYSTEM);
+
+		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_ARCHIVO_MEMORIA)
+		{
+			t_pedido_leer_archivo *pedido_leer_archivo = leer_paquete_pedido_leer_archivo(logger,conexion_con_filesystem);
+			notificar_lectura_a_filesystem();
+			free(pedido_leer_archivo);
+		}
+		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_ARCHIVO_MEMORIA)
+		{
+			t_pedido_escribir_archivo *pedido_escribir_archivo = leer_paquete_pedido_escribir_archivo(logger,conexion_con_filesystem);
+			notificar_escritura_a_filesystem();
+			free(pedido_escribir_archivo);
+		}
+	}
+}
+
 void enviar_info_de_memoria_inicial_para_cpu()
 {
 	log_debug(logger, "Comenzando la creacion de paquete para enviar informacion inicial de memoria a la CPU");
@@ -194,6 +218,8 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	list_add(procesos_iniciados, iniciar_proceso);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
+	int cantidad_de_bloques_mock = 1; // TODO MOCK
+	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques_mock); // TODO pasar cantidad de bloques correspondiente
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 }
 
@@ -237,9 +263,17 @@ void finalizar_proceso_en_memoria(int pid)
 	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
+	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
+	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
+	if (archivo_proceso == NULL)
+	{
+		return;
+	}
 	cerrar_archivo_con_pid(pid);
 
+	pedir_liberacion_de_bloques_a_filesystem();//todo pasar lista de bloques
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
+	free(archivo_proceso);
 }
 
 t_archivo_proceso *buscar_archivo_con_pid(int pid)
@@ -274,6 +308,39 @@ void cerrar_archivo_con_pid(int pid)
 
 	list_remove_and_destroy_by_condition(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso);
 }
+
+
+void notificar_lectura_a_filesystem() 
+{
+	log_debug(logger,"Notificando a File System de lectura exitosa en memoria");
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LEER_ARCHIVO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+}
+
+void notificar_escritura_a_filesystem() 
+{
+	log_debug(logger,"Notificando a File System de lectura exitosa en memoria");
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_ARCHIVO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+}
+
+t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
+{
+	t_list *posiciones_swap = list_create();
+	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	// TODO bloquear hilo esperando el paquete de respuesta?
+	return posiciones_swap;
+}
+
+void pedir_liberacion_de_bloques_a_filesystem()
+{
+	t_list *posiciones_swap = list_create(); // TODO MOCK
+	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, posiciones_swap);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	// TODO esperar respuesta de liberacion de bloques?
+}
+
 
 void destruir_listas()
 {
