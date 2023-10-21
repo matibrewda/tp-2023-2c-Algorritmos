@@ -21,6 +21,7 @@
         "list.h": "c",
         "utilidades_semaforos.h": "c",
         "queue.h": "c",
-        "configuracion_filesystem.h": "c"
+        "configuracion_filesystem.h": "c",
+        "argumentos_filesystem.h": "c"
     }
 }

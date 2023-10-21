@@ -1,0 +1,29 @@
+[DEBUG] 23:01:05:418 MiCliente/(30910:30910): Inicializando Cliente
+[DEBUG] 23:01:05:418 MiCliente/(30910:30910): Comenzando la lectura de argumentos
+[TRACE] 23:01:05:418 MiCliente/(30910:30910): La cantidad de argumentos recibida es la esperada: 1
+[TRACE] 23:01:05:418 MiCliente/(30910:30910): Se leyo el argumento ruta archivo de configuracion con valor Configuracion/cliente.config
+[DEBUG] 23:01:05:418 MiCliente/(30910:30910): Exito en la lectura de argumentos
+[DEBUG] 23:01:05:418 MiCliente/(30910:30910): Comenzando la lectura de archivo de configuracion
+[TRACE] 23:01:05:418 MiCliente/(30910:30910): Se leyo desde archivo de configuracion la clave IP_SERVIDOR con valor 127.0.0.1 
+[TRACE] 23:01:05:418 MiCliente/(30910:30910): Se leyo desde archivo de configuracion la clave PUERTO_SERVIDOR con valor 4444 
+[DEBUG] 23:01:05:418 MiCliente/(30910:30910): Exito en la lectura de archivo de configuracion
+[DEBUG] 23:01:05:418 MiCliente/(30910:30910): Intentando conectar MiCliente con MiServidor ...
+[INFO] 23:01:05:429 MiCliente/(30910:30910): Se realizo una conexion entre el cliente MiCliente y el servidor MiServidor.
+[DEBUG] 23:01:05:429 MiCliente/(30910:30910): Comenzando la creacion de paquete para enviar al servidor!
+[TRACE] 23:01:05:429 MiCliente/(30910:30910): Se creara un paquete (inicialmente vacio) con el codigo de operacion 0
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se creo un paquete (inicialmente vacio) con el codigo de operacion 0
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se agregara el entero 1 al paquete de origen MiCliente, destino MiServidor, y codigo de operacion 0.
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se agrego el entero 1 al paquete de origen MiCliente, destino MiServidor, y codigo de operacion 0.
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se agregara el entero 2 al paquete de origen MiCliente, destino MiServidor, y codigo de operacion 0.
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se agrego el entero 2 al paquete de origen MiCliente, destino MiServidor, y codigo de operacion 0.
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se agregara el entero 3 al paquete de origen MiCliente, destino MiServidor, y codigo de operacion 0.
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Se agrego el entero 3 al paquete de origen MiCliente, destino MiServidor, y codigo de operacion 0.
+[DEBUG] 23:01:05:430 MiCliente/(30910:30910): Exito en la creacion de paquete para enviar al servidor!
+[INFO] 23:01:05:430 MiCliente/(30910:30910): Enviando señal para hacer quack a MiServidor
+[TRACE] 23:01:05:430 MiCliente/(30910:30910): Comenzando el envio de paquete desde MiCliente a MiServidor.
+[TRACE] 23:01:05:432 MiCliente/(30910:30910): Paquete enviado con exito desde MiCliente a MiServidor.
+[INFO] 23:01:05:432 MiCliente/(30910:30910): Exito en el envio de señal para hacer quack a MiServidor
+[TRACE] 23:01:05:432 MiCliente/(30910:30910): MiCliente esta esperando un codigo de operacion proveniente de MiServidor.
+[TRACE] 23:01:05:432 MiCliente/(30910:30910): MiCliente recibio un codigo de operacion proveniente de MiServidor y es 1.
+[INFO] 23:01:05:432 MiCliente/(30910:30910): Se recibio la operacion 1 desde MiServidor
+[DEBUG] 23:01:05:432 MiCliente/(30910:30910): Finalizando Cliente

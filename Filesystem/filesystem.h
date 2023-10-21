@@ -29,7 +29,10 @@
 #define RUTA_ARCHIVO_DE_LOGS "Logs/filesystem.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
+
+bool crear_archivo(char* path);
 // Terminar
 void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_filesystem, t_config_filesystem *configuracion_filesystem, int socket_kernel, int conexion_con_kernel, int conexion_con_memoria);
+
 
 #endif /* FILESYSTEM_H_ */
