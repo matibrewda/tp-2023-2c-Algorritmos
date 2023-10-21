@@ -81,4 +81,10 @@ typedef struct
     t_queue* pids_bloqueados;
 } t_recurso;
 
+typedef struct
+{
+	int pid;
+    int tiempo_sleep;
+} t_bloqueo_sleep;
+
 #endif /* ESTRUCTURAS_H_ */

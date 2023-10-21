@@ -62,6 +62,10 @@ void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb);
 void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb);
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb);
 
+// Bloqueos
+void crear_hilo_sleep(int pid, int tiempo_sleep);
+void* bloqueo_sleep();
+
 // Comunicacion con CPU
 void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar);
 void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion);

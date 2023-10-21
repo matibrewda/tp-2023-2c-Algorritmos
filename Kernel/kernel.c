@@ -33,6 +33,7 @@ sem_t semaforo_planificador_largo_plazo;
 
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
+pthread_mutex_t mutex_cola_bloqueados_sleep;
 pthread_mutex_t mutex_conexion_cpu_dispatch;
 pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
@@ -42,6 +43,7 @@ pthread_mutex_t mutex_id_hilo_quantum;
 // Colas de planificacion
 t_queue *cola_new = NULL;
 t_queue *cola_ready = NULL;
+t_queue *cola_bloqueados_sleep = NULL;
 t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
@@ -112,6 +114,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Colas de planificacion
 	cola_new = queue_create();
 	cola_ready = queue_create();
+	cola_bloqueados_sleep = queue_create();
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
@@ -226,7 +229,9 @@ void *planificador_corto_plazo()
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
 			{
-				log_info(logger, "ME LLEGO UN SLEEP DE %d", tiempo_sleep);
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+				queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
+				crear_hilo_sleep(pcb->pid, tiempo_sleep);
 			}
 		}
 		else
@@ -390,7 +395,9 @@ void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 
 void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 {
-	// TO DO
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_BLOCKED));
+	pcb_ejecutando = NULL;
+	pcb->estado = CODIGO_ESTADO_PROCESO_BLOCKED;
 }
 
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
@@ -410,6 +417,25 @@ void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
 	// TO DO
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* BLOQUEOS *//////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+void crear_hilo_sleep(int pid, int tiempo_sleep)
+{
+	pthread_t hilo_bloqueo_sleep;
+	t_bloqueo_sleep* bloqueo_sleep_parametros = malloc(sizeof(t_bloqueo_sleep));
+	bloqueo_sleep_parametros->pid = pid;
+	bloqueo_sleep_parametros->tiempo_sleep = tiempo_sleep;
+	pthread_create(&hilo_bloqueo_sleep, NULL, bloqueo_sleep, (void *) bloqueo_sleep_parametros);
+}
+
+void* bloqueo_sleep(void* argumentos)
+{
+	t_bloqueo_sleep* bloqueo_sleep = (t_bloqueo_sleep*) argumentos;
+
+
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
