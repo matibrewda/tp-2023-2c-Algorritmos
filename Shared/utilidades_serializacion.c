@@ -34,6 +34,12 @@ t_paquete *crear_paquete_respuesta_devolver_proceso_por_correcta_finalizacion(t_
     return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
+// Kernel a CPU
+t_paquete *crear_paquete_respuesta_devolver_proceso_por_sleep(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
 // Kernel a Memoria
 t_paquete *crear_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
 {
@@ -59,15 +65,43 @@ t_paquete *crear_paquete_respuesta_interrumpir_proceso(t_log *logger)
 }
 
 // CPU a Kernel
-t_paquete *crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int motivo_interrupcion)
 {
-    return crear_paquete_contexto_de_ejecucion(logger, SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, contexto_de_ejecucion);
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + MOTIVO INTERRUPCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_int_a_paquete(logger, paquete, motivo_interrupcion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + MOTIVO INTERRUPCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
 }
 
 // CPU a Kernel
 t_paquete *crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion)
 {
     return crear_paquete_contexto_de_ejecucion(logger, SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, contexto_de_ejecucion);
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_sleep(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int tiempo_sleep)
+{
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + TIEMPO SLEEP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_int_a_paquete(logger, paquete, tiempo_sleep, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + TIEMPO SLEEP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
 }
 
 // CPU a Memoria
@@ -174,13 +208,7 @@ t_paquete *crear_paquete_contexto_de_ejecucion(t_log *logger, op_code codigo_ope
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
-    agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->pid, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
-    agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->program_counter, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
-    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_ax, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
-    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_bx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
-    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_cx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
-    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_dx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
-    agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->motivo_interrupcion, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, nombre_proceso_origen, nombre_proceso_destino);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 
@@ -236,4 +264,15 @@ t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list * p
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     return paquete;
+}
+
+void agregar_contexto_de_ejecucion_a_paquete(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_paquete* paquete, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino)
+{
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->pid, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->program_counter, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_ax, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_bx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_cx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+    agregar_int32_a_paquete(logger, paquete, contexto_de_ejecucion->registro_dx, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
 }

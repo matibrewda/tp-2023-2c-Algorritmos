@@ -62,12 +62,17 @@ void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb);
 void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb);
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb);
 
+// Bloqueos
+void crear_hilo_sleep(int pid, int tiempo_sleep);
+void* bloqueo_sleep();
+
 // Comunicacion con CPU
 void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar);
 void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion);
 void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
 void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido);
+void enviar_paquete_respuesta_devolver_proceso_por_sleep();
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int* tiempo_sleep, int* motivo_interrupcion);
 bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado);
 bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado);
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);

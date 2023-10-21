@@ -33,6 +33,7 @@ sem_t semaforo_planificador_largo_plazo;
 
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
+pthread_mutex_t mutex_cola_bloqueados_sleep;
 pthread_mutex_t mutex_conexion_cpu_dispatch;
 pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
@@ -42,6 +43,7 @@ pthread_mutex_t mutex_id_hilo_quantum;
 // Colas de planificacion
 t_queue *cola_new = NULL;
 t_queue *cola_ready = NULL;
+t_queue *cola_bloqueados_sleep = NULL;
 t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
@@ -112,6 +114,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Colas de planificacion
 	cola_new = queue_create();
 	cola_ready = queue_create();
+	cola_bloqueados_sleep = queue_create();
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
@@ -199,8 +202,12 @@ void *planificador_corto_plazo()
 		if (pcb != NULL)
 		{
 			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
+
 			op_code codigo_operacion_recibido;
-			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido);
+			int tiempo_sleep = -1;
+			int motivo_interrupcion = -1;
+
+			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion);
 			actualizar_pcb(pcb, contexto_de_ejecucion);
 
 			sem_wait(&semaforo_planificador_corto_plazo);
@@ -211,14 +218,20 @@ void *planificador_corto_plazo()
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
 			{
-				if (contexto_de_ejecucion->motivo_interrupcion == INTERRUPCION_POR_DESALOJO)
+				if (motivo_interrupcion == INTERRUPCION_POR_DESALOJO)
 				{
 					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 				}
-				else if (contexto_de_ejecucion->motivo_interrupcion == INTERRUPCION_POR_KILL)
+				else if (motivo_interrupcion == INTERRUPCION_POR_KILL)
 				{
 					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 				}
+			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
+			{
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+				queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
+				crear_hilo_sleep(pcb->pid, tiempo_sleep);
 			}
 		}
 		else
@@ -382,7 +395,9 @@ void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 
 void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 {
-	// TO DO
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_BLOCKED));
+	pcb_ejecutando = NULL;
+	pcb->estado = CODIGO_ESTADO_PROCESO_BLOCKED;
 }
 
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
@@ -402,6 +417,25 @@ void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
 	// TO DO
+}
+
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* BLOQUEOS *//////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+void crear_hilo_sleep(int pid, int tiempo_sleep)
+{
+	pthread_t hilo_bloqueo_sleep;
+	t_bloqueo_sleep* bloqueo_sleep_parametros = malloc(sizeof(t_bloqueo_sleep));
+	bloqueo_sleep_parametros->pid = pid;
+	bloqueo_sleep_parametros->tiempo_sleep = tiempo_sleep;
+	pthread_create(&hilo_bloqueo_sleep, NULL, bloqueo_sleep, (void *) bloqueo_sleep_parametros);
+}
+
+void* bloqueo_sleep(void* argumentos)
+{
+	t_bloqueo_sleep* bloqueo_sleep = (t_bloqueo_sleep*) argumentos;
+
+
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -678,27 +712,33 @@ void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion()
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido)
+void enviar_paquete_respuesta_devolver_proceso_por_sleep()
+{
+	t_paquete *paquete_respuesta_devolver_proceso_por_sleep = crear_paquete_respuesta_devolver_proceso_por_sleep(logger);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int* tiempo_sleep, int* motivo_interrupcion)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
 	*codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
 	t_contexto_de_ejecucion *contexto_de_ejecucion;
 
-	// Recibo de CPU
-	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO || *codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 	{
 		contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, *codigo_operacion_recibido, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+		enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
 	}
-
-	// Envio OK a CPU
-	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
 	{
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, conexion_con_cpu_dispatch, motivo_interrupcion);
 		enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
 	}
-	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
 	{
-		enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_sleep(logger, conexion_con_cpu_dispatch, tiempo_sleep);
+		enviar_paquete_respuesta_devolver_proceso_por_sleep();
 	}
 
 	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
@@ -1001,6 +1041,7 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 
 	recurso->instancias_iniciales = instancias;
 	recurso->instancias_disponibles = instancias;
+	recurso->pids_bloqueados = queue_create();
 
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 
