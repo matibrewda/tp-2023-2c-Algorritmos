@@ -148,9 +148,9 @@ void *comunicacion_memoria(){
 	while (true){
 		int operacion_recibida_memoria = esperar_operacion(logger,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_MEMORIA,conexion_con_memoria);
 		log_debug(logger,"se recibió la operacion %s de %s", nombre_opcode(operacion_recibida_memoria),NOMBRE_MODULO_MEMORIA);
-		enviar_operacion_sin_paquete(logger,conexion_con_memoria,operacion_recibida_memoria,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_MEMORIA);
+		/*enviar_operacion_sin_paquete(logger,conexion_con_memoria,operacion_recibida_memoria,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_MEMORIA);
 		log_debug(logger,"le devuelvo la operacion recibida: %s a %s",operacion_recibida_memoria,NOMBRE_MODULO_MEMORIA);
-		
+		*/
 		
 	}
 }
@@ -158,11 +158,11 @@ void *comunicacion_memoria(){
 void *comunicacion_kernel(){
 	while (true){
 		int operacion_recibida_kernel = esperar_operacion(logger,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_KERNEL,conexion_con_kernel);
-		log_debug(logger,"se recibio la operacion %s de %s",nombre_opcode(operacion_recibida_kernel),NOMBRE_MODULO_KERNEL);
+		log_debug(logger,"se recibio la operacion %s de %s",nombre_opcode(operacion_recibida_kernel),NOMBRE_MODULO_KERNEL);/*
 		t_paquete *paquete_para_cpu = crear_paquete(logger, operacion_recibida_kernel);
 		log_debug(logger,"creo un paquete con el codigo de operacion recibido: %s , y se lo devuelvo a",operacion_recibida_kernel, NOMBRE_MODULO_KERNEL);
 		enviar_paquete(logger,conexion_con_kernel,paquete_para_cpu,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_KERNEL);
-
+*/
 
 		
 	}
