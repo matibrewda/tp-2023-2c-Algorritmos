@@ -432,7 +432,7 @@ void* bloqueo_sleep(void* argumentos)
 {
 	t_bloqueo_sleep* bloqueo_sleep = (t_bloqueo_sleep*) argumentos;
 
-
+	log_info(logger, "ME LLEGO UN SLEEP DE %d PARA PID %d", bloqueo_sleep->tiempo_sleep, bloqueo_sleep->pid); // funca bien! (Y)
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
