@@ -328,7 +328,7 @@ t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 {
 	t_list *posiciones_swap = list_create();
 	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	// TODO bloquear hilo esperando el paquete de respuesta?
 	return posiciones_swap;
 }
@@ -337,10 +337,9 @@ void pedir_liberacion_de_bloques_a_filesystem()
 {
 	t_list *posiciones_swap = list_create(); // TODO MOCK
 	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, posiciones_swap);
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	// TODO esperar respuesta de liberacion de bloques?
 }
-
 
 void destruir_listas()
 {
