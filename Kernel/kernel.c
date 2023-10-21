@@ -49,6 +49,7 @@ t_pcb *pcb_ejecutando = NULL;
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	setbuf(stdout, NULL); // Why? Era algo de consola esto.
+	atexit(terminar_kernel);
 
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_KERNEL, LOG_LEVEL);
@@ -135,12 +136,8 @@ void terminar_kernel()
 {
 	if (logger != NULL)
 	{
-		log_debug(logger, "Finalizando %s", NOMBRE_MODULO_KERNEL);
+		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_KERNEL);
 	}
-
-	destruir_logger(logger);
-	destruir_argumentos(argumentos_kernel);
-	destruir_configuracion(configuracion_kernel);
 
 	if (conexion_con_cpu_dispatch != -1)
 	{
@@ -904,7 +901,7 @@ void listar_procesos()
 		imprimir_proceso_en_consola(pcb_ejecutando);
 	}
 
-	// TO DO: Listo procesos BLOQUEADOS
+	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_sleep);
 }
 
 t_pcb *crear_pcb(char *path, int size, int prioridad)

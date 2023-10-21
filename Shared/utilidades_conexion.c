@@ -310,7 +310,7 @@ op_code esperar_operacion(t_log *logger, const char *nombre_proceso_que_espera, 
 	}
 
 	log_error(logger, "%s no pudo recibir un codigo de operacion proveniente de %s.", nombre_proceso_que_espera, nombre_proceso_que_manda);
-	exit(EXIT_FAILURE);
+	exit(EXIT_SUCCESS);
 	return -1;
 }
 

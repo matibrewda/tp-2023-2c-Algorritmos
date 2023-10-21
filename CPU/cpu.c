@@ -37,6 +37,8 @@ uint32_t registro_dx = 0;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
+	atexit(terminar_cpu);
+
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_CPU, LOG_LEVEL);
 	if (logger == NULL)
@@ -117,12 +119,8 @@ void terminar_cpu()
 {
 	if (logger != NULL)
 	{
-		log_debug(logger, "Finalizando %s", NOMBRE_MODULO_CPU);
+		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_CPU);
 	}
-
-	destruir_logger(logger);
-	destruir_argumentos(argumentos_cpu);
-	destruir_configuracion(configuracion_cpu);
 
 	if (socket_kernel_dispatch != -1)
 	{

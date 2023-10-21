@@ -21,6 +21,8 @@ pthread_t hilo_atiendo_filesystem;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
+	atexit(terminar_memoria);
+
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_MEMORIA, LOG_LEVEL);
 	if (logger == NULL)
@@ -350,14 +352,8 @@ void terminar_memoria()
 {
 	if (logger != NULL)
 	{
-		log_debug(logger, "Finalizando %s", NOMBRE_MODULO_MEMORIA);
+		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_MEMORIA);
 	}
-
-	destruir_logger(logger);
-	destruir_argumentos(argumentos_memoria);
-	destruir_configuracion(configuracion_memoria);
-	destruir_listas();
-	// todo revisar si es necesario aca finalizar los procesos iniciados
 
 	if (socket_kernel != -1)
 	{
