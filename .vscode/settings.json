@@ -20,6 +20,9 @@
         "argumentos_memoria.h": "c",
         "list.h": "c",
         "utilidades_semaforos.h": "c",
-        "queue.h": "c"
+        "queue.h": "c",
+        "configuracion_filesystem.h": "c",
+        "argumentos_filesystem.h": "c",
+        "utilidades_configuracion.h": "c"
     }
 }

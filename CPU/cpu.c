@@ -5,7 +5,8 @@ t_log *logger = NULL;
 t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
 bool ocurrio_interrupcion = false;
-int motivo_interrupcion = -1;
+bool se_ejecuto_instruccion_bloqueante = false;
+bool se_leyo_instruccion_exit = false;
 int pid_ejecutando = 0;
 int tamanio_pagina = -1;
 int tamanio_memoria = -1;
@@ -16,6 +17,7 @@ int socket_kernel_interrupt = -1;
 int conexion_con_kernel_dispatch = -1;
 int conexion_con_kernel_interrupt = -1;
 int conexion_con_memoria = -1;
+int motivo_interrupcion = -1;
 
 // Hilos
 pthread_t hilo_interrupt;
@@ -194,8 +196,9 @@ void *dispatch()
 			registro_cx = contexto_de_ejecucion->registro_cx;
 			registro_dx = contexto_de_ejecucion->registro_dx;
 
-			motivo_interrupcion = -1;
 			ocurrio_interrupcion = false;
+			se_ejecuto_instruccion_bloqueante = false;
+			se_leyo_instruccion_exit = false;
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -225,17 +228,25 @@ void enviar_paquete_respuesta_interrumpir_ejecucion()
 
 void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido()
 {
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion(motivo_interrupcion);
-	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion, motivo_interrupcion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 }
 
 void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion()
 {
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion(motivo_interrupcion);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+}
+
+void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep)
+{
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion(motivo_interrupcion, segundos_sleep);
+	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 }
 
@@ -258,6 +269,14 @@ void devolver_contexto_por_correcta_finalizacion()
 	sem_wait(&semaforo_devuelvo_proceso);
 	enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
 	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION);
+	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
+void devolver_contexto_por_sleep(int segundos_sleep)
+{
+	sem_wait(&semaforo_devuelvo_proceso);
+	enviar_paquete_solicitud_devolver_proceso_por_sleep(segundos_sleep);
+	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP);
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
@@ -314,7 +333,8 @@ void ciclo_de_ejecucion()
 
 	while (true)
 	{
-		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); // Espero a que haya algo para ejecutar
+		// Espero a que haya algo para ejecutar
+		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); 
 
 		instruccion_string = fetch();
 		instruccion = decode(instruccion_string);
@@ -325,18 +345,15 @@ void ciclo_de_ejecucion()
 			program_counter++;
 		}
 
-		// Interrupciones
 		if (ocurrio_interrupcion)
 		{
 			devolver_contexto_por_ser_interrumpido();
 		}
-		else
+
+		if (!se_ejecuto_instruccion_bloqueante && !ocurrio_interrupcion && !se_leyo_instruccion_exit)
 		{
-			if (instruccion->opcode != EXIT_OPCODE_INSTRUCCION)
-			{
-				// Sigo ejecutando
-				sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
-			}
+			// Sigo ejecutando
+			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
 		}
 
 		destruir_instruccion(instruccion);
@@ -648,7 +665,9 @@ void ejecutar_instruccion_sleep(int tiempo)
 {
 	log_info(logger, "PID: %d - Ejecutando: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo);
 
-	sleep(tiempo);
+	se_ejecuto_instruccion_bloqueante = true;
+	program_counter++;
+	devolver_contexto_por_sleep(tiempo);
 
 	log_trace(logger, "PID: %d - Ejecutada: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo);
 }
@@ -747,6 +766,7 @@ void ejecutar_instruccion_exit()
 {
 	log_info(logger, "PID: %d - Ejecutando: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
 
+	se_leyo_instruccion_exit = true;
 	devolver_contexto_por_correcta_finalizacion();
 
 	log_trace(logger, "PID: %d - Ejecutada: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
@@ -755,7 +775,7 @@ void ejecutar_instruccion_exit()
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* UTILIDADES *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion(int motivo_interrupcion)
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
 
@@ -765,7 +785,6 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion(int motivo_interrupc
 	contexto_de_ejecucion->registro_bx = registro_bx;
 	contexto_de_ejecucion->registro_cx = registro_cx;
 	contexto_de_ejecucion->registro_dx = registro_dx;
-	contexto_de_ejecucion->motivo_interrupcion = motivo_interrupcion;
 
 	return contexto_de_ejecucion;
 }

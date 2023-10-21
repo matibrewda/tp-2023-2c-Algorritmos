@@ -38,9 +38,11 @@ void enviar_paquete_respuesta_ejecutar_proceso();
 void enviar_paquete_respuesta_interrumpir_ejecucion();
 void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
 void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
+void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep);
 bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado);
 void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
+void devolver_contexto_por_sleep(int segundos_sleep);
 
 // Comunicacion con Memoria
 void enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
@@ -73,7 +75,7 @@ void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio);
 void ejecutar_instruccion_exit();
 
 // Utilidades
-t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion(int motivo_interrupcion);
+t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
 void destruir_instruccion(t_instruccion *instruccion);
 uint32_t obtener_valor_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
