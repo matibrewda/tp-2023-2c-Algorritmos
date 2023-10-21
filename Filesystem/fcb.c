@@ -12,8 +12,8 @@ FCB *crear_fcb(char *ruta_archivo)
         char *nombre_archivo = config_get_string_value(config, "NOMBRE_ARCHIVO");
         uint32_t tamanio_archivo = config_get_int_value(config, "TAMANIO_ARCHIVO");
         uint32_t bloque_inicial = config_get_int_value(config, "BLOQUE_INICIAL");
-        config_destroy(config);
         FCB *fcb = iniciar_fcb(nombre_archivo, tamanio_archivo, bloque_inicial);
+        config_destroy(config);
         return fcb;
     }
     else

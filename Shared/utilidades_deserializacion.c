@@ -37,6 +37,8 @@ t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_ser_interru
 	free(buffer);
 
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+
+	return contexto_de_ejecucion;
 }
 
 // Kernel recibe de CPU
@@ -54,6 +56,8 @@ t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_sleep(t_log
 	free(buffer);
 
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + TIEMPO SLEEP' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+
+	return contexto_de_ejecucion;
 }
 
 // CPU recibe de Kernel

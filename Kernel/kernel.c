@@ -161,9 +161,6 @@ void terminar_kernel()
 	{
 		close(conexion_con_filesystem);
 	}
-
-	// sem_destroys
-	// thread destroy?
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -250,7 +247,7 @@ void *contador_quantum(void *id_hilo_quantum)
 {
 	int pid_proceso_a_interrumpir = pcb_ejecutando->pid;
 	int id_hilo = *((int *)id_hilo_quantum);
-	log_info(logger, "Soy el hilo contador quantum de ID %d", id_hilo);
+	log_debug(logger, "Soy el hilo contador quantum de ID %d", id_hilo);
 
 	sleep(configuracion_kernel->quantum);
 
@@ -673,6 +670,7 @@ void detener_planificacion()
 
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 {
+	// TO DO
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
