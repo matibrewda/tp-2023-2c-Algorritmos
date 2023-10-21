@@ -86,14 +86,14 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	conexion_con_memoria = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+	conexion_con_memoria = crear_socket_cliente(logger, configuracion_kernel->ip_memoria, configuracion_kernel->puerto_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
 	if (conexion_con_memoria == -1)
 	{
 		terminar_kernel();
 		return EXIT_FAILURE;
 	}
 
-	conexion_con_filesystem = crear_socket_cliente(logger, configuracion_kernel->ip_cpu, configuracion_kernel->puerto_filesystem, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+	conexion_con_filesystem = crear_socket_cliente(logger, configuracion_kernel->ip_filesystem, configuracion_kernel->puerto_filesystem, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
 	if (conexion_con_filesystem == -1)
 	{
 		terminar_kernel();
