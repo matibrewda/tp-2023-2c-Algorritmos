@@ -5,7 +5,7 @@ t_log *logger = NULL;
 t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
 int proximo_pid = 0;
-bool planificacion_detenida = true;
+bool planificacion_detenida = false;
 char *aux_pids_cola;
 bool planifico_con_round_robin = false;
 bool planifico_con_prioridades = false;
@@ -108,8 +108,17 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
 	sem_init(&semaforo_hay_algun_proceso_en_cola_new, false, 0);
 	sem_init(&semaforo_hay_algun_proceso_en_cola_ready, false, 0);
-	sem_init(&semaforo_planificador_corto_plazo, false, 0);
-	sem_init(&semaforo_planificador_largo_plazo, false, 0);
+
+	if (planificacion_detenida)
+	{
+		sem_init(&semaforo_planificador_corto_plazo, false, 0);
+		sem_init(&semaforo_planificador_largo_plazo, false, 0);
+	}
+	else
+	{
+		sem_init(&semaforo_planificador_corto_plazo, false, 1);
+		sem_init(&semaforo_planificador_largo_plazo, false, 1);
+	}
 
 	// Colas de planificacion
 	cola_new = queue_create();
@@ -980,7 +989,7 @@ t_pcb *buscar_pcb_con_pid(int pid)
 		return pcb_ejecutando;
 	}
 
-		log_warning(logger, "No se encontro proceso con PID %d", pid);
+	log_warning(logger, "No se encontro proceso con PID %d", pid);
 
 	return NULL;
 }
