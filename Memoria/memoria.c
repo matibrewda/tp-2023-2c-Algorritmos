@@ -254,7 +254,7 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 	t_paquete *paquete = crear_paquete_respuesta_pedir_instruccion_a_memoria(logger, linea_instruccion);
 
 	// Retardo de respuesta!
-	sleep(configuracion_memoria->retardo_respuesta);
+	usleep((configuracion_memoria->retardo_respuesta)*1000);
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);
@@ -352,6 +352,7 @@ void terminar_memoria()
 {
 	if (logger != NULL)
 	{
+		log_warning(logger, "Algo salio mal!");
 		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_MEMORIA);
 	}
 

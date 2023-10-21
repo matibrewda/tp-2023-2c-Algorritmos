@@ -119,6 +119,7 @@ void terminar_cpu()
 {
 	if (logger != NULL)
 	{
+		log_warning(logger, "Algo salio mal!");
 		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_CPU);
 	}
 

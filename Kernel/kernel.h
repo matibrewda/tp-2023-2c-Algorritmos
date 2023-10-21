@@ -16,6 +16,7 @@
 #include <commons/collections/queue.h>
 
 #include <readline/readline.h>
+#include <readline/history.h>
 
 #include "Source/Headers/argumentos_kernel.h"
 #include "Source/Headers/configuracion_kernel.h"
@@ -32,7 +33,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -63,7 +64,7 @@ void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb);
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb);
 
 // Bloqueos
-void crear_hilo_sleep(int pid, int tiempo_sleep);
+void crear_hilo_sleep(t_pcb* pcb, int tiempo_sleep);
 void* bloqueo_sleep();
 
 // Comunicacion con CPU
@@ -104,7 +105,7 @@ t_pcb *crear_pcb(char *path, int size, int prioridad);
 void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion);
 t_pcb *buscar_pcb_con_pid(int pid);
 t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
-void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
+void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex, bool destruir_pcb);
 void push_cola_ready(t_pcb* pcb);
 void crear_recursos();
 t_recurso* crear_recurso(char* nombre, int instancias);

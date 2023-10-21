@@ -83,7 +83,7 @@ typedef struct
 
 typedef struct
 {
-	int pid;
+	t_pcb* pcb;
     int tiempo_sleep;
 } t_bloqueo_sleep;
 

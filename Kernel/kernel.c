@@ -104,7 +104,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Recursos
 	crear_recursos();
 
-
 	// Semaforos
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
 	sem_init(&semaforo_hay_algun_proceso_en_cola_new, false, 0);
@@ -136,6 +135,7 @@ void terminar_kernel()
 {
 	if (logger != NULL)
 	{
+		log_warning(logger, "Algo salio mal!");
 		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_KERNEL);
 	}
 
@@ -225,7 +225,7 @@ void *planificador_corto_plazo()
 			{
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
-				crear_hilo_sleep(pcb->pid, tiempo_sleep);
+				crear_hilo_sleep(pcb, tiempo_sleep);
 			}
 		}
 		else
@@ -244,9 +244,8 @@ void *contador_quantum(void *id_hilo_quantum)
 {
 	int pid_proceso_a_interrumpir = pcb_ejecutando->pid;
 	int id_hilo = *((int *)id_hilo_quantum);
-	log_debug(logger, "Soy el hilo contador quantum de ID %d", id_hilo);
 
-	sleep(configuracion_kernel->quantum);
+	usleep((configuracion_kernel->quantum) * 1000);
 
 	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid_proceso_a_interrumpir && pcb_ejecutando->id_hilo_quantum == id_hilo)
 	{
@@ -348,7 +347,8 @@ void transicionar_proceso_de_new_a_ready(t_pcb *pcb)
 void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
-	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new);
+	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new, true);
 }
 
 void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
@@ -375,7 +375,8 @@ void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
-	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready);
+	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready, true);
 	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
@@ -397,6 +398,7 @@ void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
 	pcb_ejecutando = NULL;
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
@@ -405,31 +407,47 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 
 void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
 {
-	// TO DO
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
+	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
+	push_cola_ready(pcb);
 }
 
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
-	// TO DO
+	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep, true);
+	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* BLOQUEOS *//////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-void crear_hilo_sleep(int pid, int tiempo_sleep)
+void crear_hilo_sleep(t_pcb *pcb, int tiempo_sleep)
 {
+	log_info(logger, "PID: %d - Bloqueado por: SLEEP", pcb->pid);
 	pthread_t hilo_bloqueo_sleep;
-	t_bloqueo_sleep* bloqueo_sleep_parametros = malloc(sizeof(t_bloqueo_sleep));
-	bloqueo_sleep_parametros->pid = pid;
+	t_bloqueo_sleep *bloqueo_sleep_parametros = malloc(sizeof(t_bloqueo_sleep));
+	bloqueo_sleep_parametros->pcb = pcb;
 	bloqueo_sleep_parametros->tiempo_sleep = tiempo_sleep;
-	pthread_create(&hilo_bloqueo_sleep, NULL, bloqueo_sleep, (void *) bloqueo_sleep_parametros);
+	pthread_create(&hilo_bloqueo_sleep, NULL, bloqueo_sleep, (void *)bloqueo_sleep_parametros);
 }
 
-void* bloqueo_sleep(void* argumentos)
+void *bloqueo_sleep(void *argumentos)
 {
-	t_bloqueo_sleep* bloqueo_sleep = (t_bloqueo_sleep*) argumentos;
+	t_bloqueo_sleep *bloqueo_sleep = (t_bloqueo_sleep *)argumentos;
 
-	log_info(logger, "ME LLEGO UN SLEEP DE %d PARA PID %d", bloqueo_sleep->tiempo_sleep, bloqueo_sleep->pid); // funca bien! (Y)
+	int pid_proceso_bloqueado = bloqueo_sleep->pcb->pid;
+
+	usleep((bloqueo_sleep->tiempo_sleep) * 1000);
+
+	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+
+	if (pcb != NULL)
+	{
+		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep, false);
+		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -449,6 +467,8 @@ void consola()
 		} while (valor_ingresado_por_teclado == NULL);
 
 		log_trace(logger, "Valor ingresado por consola: %s", valor_ingresado_por_teclado);
+
+		add_history(valor_ingresado_por_teclado);
 
 		char *saveptr = valor_ingresado_por_teclado;
 		char *funcion_seleccionada = strtok_r(saveptr, " ", &saveptr);
@@ -713,7 +733,7 @@ void enviar_paquete_respuesta_devolver_proceso_por_sleep()
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int* tiempo_sleep, int* motivo_interrupcion)
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
@@ -949,12 +969,18 @@ t_pcb *buscar_pcb_con_pid(int pid)
 		return pcb;
 	}
 
+	pcb = buscar_pcb_con_pid_en_cola(pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+	if (pcb != NULL)
+	{
+		return pcb;
+	}
+
 	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid)
 	{
 		return pcb_ejecutando;
 	}
 
-	log_warning(logger, "No se encontro proceso con PID %d", pid);
+		log_warning(logger, "No se encontro proceso con PID %d", pid);
 
 	return NULL;
 }
@@ -970,7 +996,7 @@ t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex
 	return pcb;
 }
 
-void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
+void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex, bool destruir_pcb)
 {
 	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
@@ -979,8 +1005,11 @@ void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 
 	void _finalizar_pcb(t_pcb * pcb)
 	{
-		destruir_estructuras_de_proceso_en_memoria(pcb);
-		free(pcb);
+		if (destruir_pcb)
+		{
+			destruir_estructuras_de_proceso_en_memoria(pcb);
+			free(pcb);
+		}
 	}
 
 	list_remove_and_destroy_by_condition_thread_safe(cola->elements, (void *)_filtro_proceso_por_id, (void *)_finalizar_pcb, mutex);
@@ -1043,12 +1072,12 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 	return recurso;
 }
 
-bool recurso_existe(char* nombre)
+bool recurso_existe(char *nombre)
 {
 	bool _filtro_nombre_recurso(t_recurso * recurso)
 	{
 		return strcmp(recurso->nombre, nombre) == 0;
 	}
 
-	return list_any_satisfy(recursos, (void*) _filtro_nombre_recurso);
+	return list_any_satisfy(recursos, (void *)_filtro_nombre_recurso);
 }
