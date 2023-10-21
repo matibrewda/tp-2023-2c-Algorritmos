@@ -265,13 +265,13 @@ void agregar_string_a_paquete(t_log *logger, t_paquete *paquete, char *string, c
 	log_trace(logger, "Se agregara el string (%s) al paquete de origen %s, destino %s, y codigo de operacion %s.", string, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
 
 	int string_length = strlen(string) + 1;
-	log_trace(logger, "Se agregara el largo del string (%d) para poder luego deserializarlo al paquete de origen %s, destino %s, y codigo de operacion %s.", string_length, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+	log_trace(logger, "Se agregara el largo del string %d para poder luego deserializarlo al paquete de origen %s, destino %s, y codigo de operacion %s.", string_length, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
 	agregar_int_a_paquete(logger, paquete, string_length, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
 	paquete->buffer->stream = realloc(paquete->buffer->stream, paquete->buffer->size + string_length);
 	memcpy((paquete->buffer->stream) + (paquete->buffer->size), string, string_length);
 	paquete->buffer->size += string_length;
 
-	log_trace(logger, "Se agrego el string (%s) al paquete de origen %s, destino %s, y codigo de operacion %s.", string, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+	log_trace(logger, "Se agrego el string '%s' al paquete de origen %s, destino %s, y codigo de operacion %s.", string, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
 }
 
 // Agrega una lista de enteros al stream del buffer del paquete (tamanio de la lista primero, luego cada elemento de la lista en orden)

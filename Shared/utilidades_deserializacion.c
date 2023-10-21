@@ -22,6 +22,40 @@ bool leer_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, int conexi
 	return respuesta_iniciar_proceso_en_memoria;
 }
 
+// Kernel recibe de CPU
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, int conexion_con_cpu_dispatch, int* motivo_interrupcion)
+{
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + MOTIVO INTERRUPCION' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &tamanio_buffer, conexion_con_cpu_dispatch, SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO);
+	void *buffer_con_offset = buffer;
+
+	t_contexto_de_ejecucion *contexto_de_ejecucion = leer_contexto_de_ejecucion_de_paquete(logger, conexion_con_cpu_dispatch, SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, &buffer_con_offset);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, motivo_interrupcion, SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+}
+
+// Kernel recibe de CPU
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_sleep(t_log *logger, int conexion_con_cpu_dispatch, int* tiempo_sleep)
+{
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + TIEMPO SLEEP' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &tamanio_buffer, conexion_con_cpu_dispatch, SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP);
+	void *buffer_con_offset = buffer;
+
+	t_contexto_de_ejecucion *contexto_de_ejecucion = leer_contexto_de_ejecucion_de_paquete(logger, conexion_con_cpu_dispatch, SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, &buffer_con_offset);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, tiempo_sleep, SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + TIEMPO SLEEP' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
+}
+
 // CPU recibe de Kernel
 t_contexto_de_ejecucion *leer_paquete_solicitud_ejecutar_proceso(t_log *logger, int conexion_con_kernel_dispatch)
 {
@@ -205,18 +239,26 @@ t_contexto_de_ejecucion *leer_paquete_contexto_de_ejecucion(t_log *logger, int c
 	void *buffer = recibir_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &tamanio_buffer, conexion, codigo_operacion);
 	void *buffer_con_offset = buffer;
 
-	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
-
-	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->pid), codigo_operacion);
-	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->program_counter), codigo_operacion);
-	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_ax), codigo_operacion);
-	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_bx), codigo_operacion);
-	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_cx), codigo_operacion);
-	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->registro_dx), codigo_operacion);
-	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(contexto_de_ejecucion->motivo_interrupcion), codigo_operacion);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = leer_contexto_de_ejecucion_de_paquete(logger, conexion, codigo_operacion, nombre_proceso_origen, nombre_proceso_destino, &buffer_con_offset);
 
 	free(buffer);
 
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+
+	return contexto_de_ejecucion;
+}
+
+t_contexto_de_ejecucion *leer_contexto_de_ejecucion_de_paquete(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, void ** buffer_con_offset)
+{
+	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, buffer_con_offset, &(contexto_de_ejecucion->pid), codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, buffer_con_offset, &(contexto_de_ejecucion->program_counter), codigo_operacion);
+	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, buffer_con_offset, &(contexto_de_ejecucion->registro_ax), codigo_operacion);
+	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, buffer_con_offset, &(contexto_de_ejecucion->registro_bx), codigo_operacion);
+	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, buffer_con_offset, &(contexto_de_ejecucion->registro_cx), codigo_operacion);
+	leer_int32_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, buffer_con_offset, &(contexto_de_ejecucion->registro_dx), codigo_operacion);
+
+	return contexto_de_ejecucion;
 }

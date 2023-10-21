@@ -2,6 +2,8 @@
 #define ESTRUCTURAS_H_
 
 #include <stdint.h>
+#include <commons/collections/list.h>
+#include <commons/collections/queue.h>
 
 typedef struct
 {
@@ -39,7 +41,6 @@ typedef struct
     uint32_t registro_bx;
     uint32_t registro_cx;
     uint32_t registro_dx;
-    int motivo_interrupcion;
 } t_contexto_de_ejecucion;
 
 typedef struct
@@ -77,6 +78,7 @@ typedef struct
 	char* nombre;
 	int instancias_iniciales;
     int instancias_disponibles;
+    t_queue* pids_bloqueados;
 } t_recurso;
 
 #endif /* ESTRUCTURAS_H_ */
