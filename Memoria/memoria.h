@@ -37,6 +37,8 @@
 // Handshake con CPU
 void enviar_info_de_memoria_inicial_para_cpu();
 
+// Inicializacion de estructuras
+void inicializar_tabla_de_paginas();
 
 //Iniciar proceso
 void iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);

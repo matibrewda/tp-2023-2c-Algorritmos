@@ -9,8 +9,12 @@ typedef struct
 
 typedef struct
 {
-    int tam_pagina;
-} t_tabla_paginas_memoria;
+    int numero_de_pagina;
+    int marco;
+    int presencia;
+    int modificado;
+    int posicion_en_swap;
+} t_pagina_de_memoria;
 
 typedef struct
 {

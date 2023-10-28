@@ -5,6 +5,8 @@ t_log *logger = NULL;
 t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
+t_list *tabla_de_paginas = NULL;
+int CANTIDAD_DE_PAGINAS = 0;
 
 // Conexiones
 int socket_kernel = -1;
@@ -91,6 +93,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Listas
 	procesos_iniciados = list_create();
+	tabla_de_paginas = list_create();
+
+	// Creacion de Estructuras
+	inicializar_tabla_de_paginas();
 
 	// Hilos
 	pthread_create(&hilo_atiendo_cpu, NULL, atender_cpu, NULL);
@@ -343,9 +349,24 @@ void pedir_liberacion_de_bloques_a_filesystem()
 	// TODO esperar respuesta de liberacion de bloques?
 }
 
+// Función para inicializar la tabla de páginas
+void inicializar_tabla_de_paginas() {
+	// TODO es necesario que sea global la cantidad de paginas?
+	CANTIDAD_DE_PAGINAS = (configuracion_memoria->tam_memoria) / (configuracion_memoria->tam_pagina);
+    for (int i = 0; i < CANTIDAD_DE_PAGINAS; i++) {
+		t_pagina_de_memoria *pagina_de_memoria = malloc(sizeof(t_pagina_de_memoria));
+		pagina_de_memoria->numero_de_pagina = i;
+		list_add(tabla_de_paginas, pagina_de_memoria);
+    }
+	log_trace(logger, "Se genera correctamente la tabla de paginas con %d cantidad de paginas", CANTIDAD_DE_PAGINAS);
+}
+
+
 void destruir_listas()
 {
 	list_destroy(procesos_iniciados);
+	list_destroy(tabla_de_paginas);
+	log_trace(logger, "Se destruyen todas las listas de manera correcta");
 }
 
 void terminar_memoria()
@@ -385,4 +406,5 @@ void terminar_memoria()
 	{
 		close(conexion_con_filesystem);
 	}
+	destruir_listas();
 }
