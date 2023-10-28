@@ -54,6 +54,7 @@ void notificar_escritura_a_filesystem();
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
 void cerrar_archivo_con_pid(int pid);
+int obtener_marco_de_pagina(int pid, int numero_de_pagina);
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);

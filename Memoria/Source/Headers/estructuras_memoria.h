@@ -10,6 +10,7 @@ typedef struct
 typedef struct
 {
     int numero_de_pagina;
+    int pid;
     int marco;
     int presencia;
     int modificado;

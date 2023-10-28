@@ -361,6 +361,30 @@ void inicializar_tabla_de_paginas() {
 	log_trace(logger, "Se genera correctamente la tabla de paginas con %d cantidad de paginas", CANTIDAD_DE_PAGINAS);
 }
 
+// TODO el Page Fault deberia enviarse como un paquete?
+int obtener_marco_de_pagina(int pid, int numero_de_pagina) {
+    bool _filtro_pagina_de_memoria_por_numero_y_pid(t_pagina_de_memoria *pagina_de_memoria)
+	{
+        return pagina_de_memoria->pid == pid && pagina_de_memoria->numero_de_pagina == numero_de_pagina;
+    };
+
+    t_pagina_de_memoria *pagina = list_find(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid);
+
+    if (pagina == NULL) {
+        // Página no encontrada, responde con Page Fault
+		log_warning(logger, "No se encontro una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
+        return -1;
+    }
+
+    if (pagina->presencia == 0) {
+        // Página no está en memoria, responde con Page Fault
+		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
+        return -1;
+    }
+
+    // La página está en memoria, devuelve el número de marco
+    return pagina->marco;
+}
 
 void destruir_listas()
 {
