@@ -354,11 +354,93 @@ void inicializar_tabla_de_paginas() {
 	// TODO es necesario que sea global la cantidad de paginas?
 	CANTIDAD_DE_PAGINAS = (configuracion_memoria->tam_memoria) / (configuracion_memoria->tam_pagina);
     for (int i = 0; i < CANTIDAD_DE_PAGINAS; i++) {
+		// TODO el malloc debe ir por pagina o por toda la tabla de paginas
 		t_pagina_de_memoria *pagina_de_memoria = malloc(sizeof(t_pagina_de_memoria));
 		pagina_de_memoria->numero_de_pagina = i;
+		pagina_de_memoria->presencia = 0;
 		list_add(tabla_de_paginas, pagina_de_memoria);
     }
 	log_trace(logger, "Se genera correctamente la tabla de paginas con %d cantidad de paginas", CANTIDAD_DE_PAGINAS);
+}
+
+void cargar_pagina_en_ram(int pid, int posicion_en_swap, t_pagina_de_memoria *victima)
+{
+    // Cargar la página desde el swap a un marco libre en la RAM
+	// Supongamos que tienes una función para obtener el contenido de la página desde el swap
+    char *contenido_en_swap = obtener_contenido_de_pagina_en_swap(posicion_en_swap);
+
+    if (contenido_en_swap == NULL) {
+		/* TODO Manejar el caso de que no se pudo cargar la página desde el swaP
+		Esto podría deberse a una falta de espacio en el swap u otros errores
+		Puedes implementar la lógica de manejo de errores aquí */
+    } else {
+        // Supongamos que memoriaRAM es un puntero a la memoria principal
+        char *marco_en_RAM = memoriaRAM + (victima->marco * configuracion_memoria->tam_pagina);
+        memcpy(marco_en_RAM, contenido_en_swap, configuracion_memoria->tam_pagina);
+
+        // Actualiza la información de la nueva página en la lista tabla_de_paginas
+        victima->presencia = 0;  // La víctima se marca como ausente en RAM
+        victima->marco = -1;     // La víctima no tiene marco asignado
+        victima->pid = -1;       // La víctima no está asociada a ningún proceso
+        victima->numero_de_pagina = -1; // La víctima no tiene número de página
+
+        // Actualiza la información de la nueva página que se está cargando
+        t_pagina_de_memoria *nueva_pagina = list_get(tabla_de_paginas, numero_de_pagina);
+        nueva_pagina->presencia = 1;
+        nueva_pagina->marco = victima->marco; // Reemplaza la víctima en el mismo marco
+        nueva_pagina->pid = pid;
+        nueva_pagina->numero_de_pagina = numero_de_pagina;
+    }
+}
+
+char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
+{
+	// TODO implementame
+}
+
+void escribir_pagina_en_swap()
+{
+	// TODO IMPLEMENTAME PAA
+}
+
+int es_pagina_presente(t_pagina_de_memoria *victima)
+{
+	if (victima->presencia == 1) {
+		return 1;
+	}
+	return 0;
+}
+
+int es_pagina_modificada(t_pagina_de_memoria *victima)
+{
+	if (victima->modificado == 1) {
+		return 1;
+	}
+	return 0;
+}
+
+t_pagina_de_memoria *encontrar_pagina_victima()
+{
+	// TODO IMPLEMENTAME PORFI
+	return NULL;
+}
+
+void reemplazar_pagina(int pid, int numero_de_pagina)
+{
+    // Seleccionar una página víctima para reemplazo (FIFO o LRU)
+    // Escribir la página víctima de la RAM al swap si está modificada
+    // Cargar la nueva página desde el swap a la RAM
+    // Actualizar la tabla de páginas
+	// Encuentra la página víctima según el algoritmo de reemplazo
+    t_pagina_de_memoria *victima = encontrar_pagina_victima();
+
+    // Verifica si la página víctima está modificada y la escribe en el swap si es necesario
+    if (es_pagina_presente(victima) == 1 && es_pagina_modificada(victima) == 1) {
+        escribir_pagina_en_swap(pid, victima);
+    }
+
+    // Carga la nueva página en la RAM
+    cargar_pagina_en_ram(pid, numero_de_pagina);
 }
 
 // TODO el Page Fault deberia enviarse como un paquete?
