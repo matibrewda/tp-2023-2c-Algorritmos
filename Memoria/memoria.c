@@ -419,9 +419,24 @@ int es_pagina_modificada(t_pagina_de_memoria *victima)
 	return 0;
 }
 
+t_pagina_de_memoria *encontrar_pagina_victima_fifo()
+{
+	// TODO implementame PORFI
+}
+
+t_pagina_de_memoria *encontrar_pagina_victima_lru()
+{
+	// TODO implementame PORFI
+}
+
 t_pagina_de_memoria *encontrar_pagina_victima()
 {
-	// TODO IMPLEMENTAME PORFI
+	// TODO no va a cambiar dinamicamente, no hace falta chequearlo siempre que se quiera reemplazar una pagina
+	if (configuracion_memoria->algoritmo_reemplazo == "FIFO") {
+		return encontrar_pagina_victima_fifo();
+	} else {
+		return encontrar_pagina_victima_lru();
+	}
 	return NULL;
 }
 
@@ -440,7 +455,7 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
     }
 
     // Carga la nueva página en la RAM
-    cargar_pagina_en_ram(pid, numero_de_pagina);
+    cargar_pagina_en_ram(pid, numero_de_pagina, victima);
 }
 
 // TODO el Page Fault deberia enviarse como un paquete?
