@@ -7,6 +7,7 @@ t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
 t_list *tabla_de_paginas = NULL;
 int CANTIDAD_DE_PAGINAS = 0;
+void* memoria_real;
 
 // Conexiones
 int socket_kernel = -1;
@@ -96,6 +97,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	tabla_de_paginas = list_create();
 
 	// Creacion de Estructuras
+	inicializar_espacio_contiguo_de_memoria();
 	inicializar_tabla_de_paginas();
 
 	// Hilos
@@ -120,7 +122,7 @@ void *atender_kernel()
 		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_kernel), NOMBRE_MODULO_KERNEL);
 
 		if (operacion_recibida_de_kernel == SOLICITUD_INICIAR_PROCESO_MEMORIA)
-		{
+		{//TODO agregar que tome el size( en bytes ) para despues saber cuantos bloques pedirle a filesystem
 			t_proceso_memoria *proceso_memoria = leer_paquete_solicitud_iniciar_proceso_en_memoria(logger, conexion_con_kernel);
 			iniciar_proceso_memoria(proceso_memoria->path, proceso_memoria->size, proceso_memoria->prioridad, proceso_memoria->pid);
 			free(proceso_memoria->path);
@@ -192,6 +194,10 @@ void enviar_info_de_memoria_inicial_para_cpu()
 	free(info_memoria);
 }
 
+void inicializar_espacio_contiguo_de_memoria(){
+	memoria_real= malloc(configuracion_memoria->tam_memoria);
+}
+
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 {
 	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
@@ -225,7 +231,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	log_trace(logger, "Intento agregar proceso PID: %d a la lista", pid);
 	list_add(procesos_iniciados, iniciar_proceso);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
-
+	//todo calcular con el size del proceso la cantidad de paginas que va a ocupar
 	int cantidad_de_bloques_mock = 1; // TODO MOCK
 	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques_mock); // TODO pasar cantidad de bloques correspondiente
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
