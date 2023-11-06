@@ -196,7 +196,7 @@ void *comunicacion_kernel()
 	return 0;
 } 
 
-// PETICIONES KERNEL
+// PETICIONES KERNEL...
 
 /* void abrirArchivo(char* ruta_archivo){
 Abrir archivo:
