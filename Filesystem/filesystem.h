@@ -35,8 +35,7 @@
 
 void *comunicacion_kernel();
 void *comunicacion_memoria();
-bool crear_archivo(char* path);
-
+int crear_archivo (char* path,char* nombreNuevoArchivo);
 
 // Terminar
 void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_filesystem, t_config_filesystem *configuracion_filesystem, int socket_kernel, int conexion_con_kernel, int conexion_con_memoria);

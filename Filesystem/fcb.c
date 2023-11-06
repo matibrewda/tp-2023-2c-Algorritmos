@@ -32,17 +32,29 @@ FCB *iniciar_fcb(char *nombre_archivo, uint32_t tamanio_archivo, uint32_t bloque
 
 // Guardar un FCB en un archivo de configuración
 
-void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo)
-{
+void generar_archivo_fcb_vacio(const char* rutaCompleta) {
+    FILE* archivo = fopen(rutaCompleta, "w");
+    
+    if (archivo != NULL) {
+        fclose(archivo);
+        printf("Archivo %s creado con éxito.\n", rutaCompleta);
+    } else {
+        printf("Error al crear el archivo %s.\n", rutaCompleta);
+    }
+}
+
+void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo){
+
+    generar_archivo_fcb_vacio (ruta_archivo);
+
     t_config *config = config_create(ruta_archivo);
 
-    // Convierte los valores numéricos a cadenas de caracteres
     char tamanio_archivo_str[12]; // Suficientemente grande para un uint32_t
     char bloque_inicial_str[12];  // Suficientemente grande para un uint32_t
     sprintf(tamanio_archivo_str, "%u", fcb->tamanio_archivo);
-    sprintf(bloque_inicial_str, "%u", fcb->bloque_inicial);
-
-    // Asigna los valores a la configuración
+    sprintf(bloque_inicial_str, "%u", fcb->bloque_inicial); // Cambio %u a %d para valores negativos
+    
+     // Asigna los valores a la configuración
     config_set_value(config, "NOMBRE_ARCHIVO", fcb->nombre_archivo);
     config_set_value(config, "TAMANIO_ARCHIVO", tamanio_archivo_str);
     config_set_value(config, "BLOQUE_INICIAL", bloque_inicial_str);

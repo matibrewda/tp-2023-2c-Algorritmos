@@ -57,6 +57,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
+
+	crear_archivo (configuracion_filesystem->path_fcb,"LuchoPruebaGenerarFCBNUEVO.fcb");
+
+
 	// INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES
 
 	int blocks_file_checker = iniciarSWAP(logger, configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_swap);
@@ -66,6 +70,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 	else
 		log_debug(logger, "FS BLOCKS FILE: No fue posible iniciar BLOCKS FILE.");
+
 
 	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
 
@@ -154,6 +159,7 @@ void *comunicacion_kernel()
 	{
 		int operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
 		log_debug(logger, "se recibio la operacion %s de %s", nombre_opcode(operacion_recibida_kernel), NOMBRE_MODULO_KERNEL);
+		
 		/*
 		t_paquete *paquete_para_cpu = crear_paquete(logger, operacion_recibida_kernel);
 		log_debug(logger,"creo un paquete con el codigo de operacion recibido: %s , y se lo devuelvo a",operacion_recibida_kernel, NOMBRE_MODULO_KERNEL);
@@ -161,13 +167,34 @@ void *comunicacion_kernel()
 		*/
 	}
 }
-/* int crear_archivo (char* path) {
 
-	//crear un archivo FCB con tamaño 0 y sin bloque inicial.
+
+ int crear_archivo (char* path,char* nombreNuevoArchivo) {
+
+	//Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
+	FCB *fcbArchivoNuevo = iniciar_fcb(nombreNuevoArchivo, 0, UINT32_MAX);
+
+	if (fcbArchivoNuevo!= NULL){
+		log_debug(logger,"FS: EStructura FCB de nuevo archivo creado correctamente.");
+		//Guardar el fcb creado en un archivo .fcb en el disco.
+
+		 char rutaCompleta[256];  // Tamaño suficientemente grande para contener la ruta completa
+
+    	// Concatenar la ruta base con el nombre del nuevo archivo
+    	snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s", path, nombreNuevoArchivo);
+
+		guardar_fcb_en_archivo (fcbArchivoNuevo,rutaCompleta);
+		//Liberar la memoria no utilizada.
+		log_debug(logger,"FS: Archivo FCB, del nuevo archivo, creado correctamente.");
+
+		//LOG MINIMO PEDIDO POR TP:
+		log_info(logger,"Crear Archivo: Crear Archivo: %s",nombreNuevoArchivo);
+		free(fcbArchivoNuevo);
+	}
+
 	// Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK.
-
-	return EXIT_SUCCESS;
-} */
+	return 0;
+} 
 
 // PETICIONES KERNEL
 
