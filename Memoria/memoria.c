@@ -231,11 +231,16 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	log_trace(logger, "Intento agregar proceso PID: %d a la lista", pid);
 	list_add(procesos_iniciados, iniciar_proceso);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
-	//todo calcular con el size del proceso la cantidad de paginas que va a ocupar
-	int cantidad_de_bloques_mock = 1; // TODO MOCK
-	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques_mock); // TODO pasar cantidad de bloques correspondiente
+	int cantidad_de_bloques = size/configuracion_memoria->tam_pagina; // ver como hacer para que no tire error si no da numero entero
+	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques);
+	crear_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap,pid);
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 }
+
+	void crear_tabla_de_paginas_de_proceso(int cantidad_de_paginas,t_list *posiciones_swap,int pid) {
+		//TODO
+	}
+
 
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria)
 {
