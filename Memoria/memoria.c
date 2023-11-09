@@ -291,6 +291,7 @@ void finalizar_proceso_en_memoria(int pid)
 	cerrar_archivo_con_pid(pid);
 
 	pedir_liberacion_de_bloques_a_filesystem();//todo pasar lista de bloques
+	//todo borrar entradas a la tabla de paginas
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 	free(archivo_proceso);
 }
