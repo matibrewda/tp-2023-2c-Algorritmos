@@ -73,7 +73,7 @@ void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion);
 void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
 void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
 void enviar_paquete_respuesta_devolver_proceso_por_sleep();
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int* tiempo_sleep, int* motivo_interrupcion);
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char** nombre_recurso);
 bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado);
 bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado);
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
@@ -107,6 +107,8 @@ t_pcb *buscar_pcb_con_pid(int pid);
 t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex, bool destruir_pcb);
 void push_cola_ready(t_pcb* pcb);
+
+// Recursos
 void crear_recursos();
 t_recurso* crear_recurso(char* nombre, int instancias);
 bool recurso_existe(char* nombre);

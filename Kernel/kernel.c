@@ -209,8 +209,9 @@ void *planificador_corto_plazo()
 			op_code codigo_operacion_recibido;
 			int tiempo_sleep = -1;
 			int motivo_interrupcion = -1;
+			char* nombre_recurso;
 
-			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion);
+			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso);
 			actualizar_pcb(pcb, contexto_de_ejecucion);
 
 			sem_wait(&semaforo_planificador_corto_plazo);
@@ -235,6 +236,16 @@ void *planificador_corto_plazo()
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
 				crear_hilo_sleep(pcb, tiempo_sleep);
+			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
+			{
+				// TO DO
+				log_info(logger, "RECIBI UN WAIT DE %s", nombre_recurso);
+			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
+			{
+				// TO DO
+				log_info(logger, "RECIBI UN SIGNAL DE %s", nombre_recurso);
 			}
 		}
 		else
@@ -742,7 +753,19 @@ void enviar_paquete_respuesta_devolver_proceso_por_sleep()
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion)
+void enviar_paquete_respuesta_devolver_proceso_por_wait()
+{
+	t_paquete *paquete_respuesta_devolver_proceso_por_wait = crear_paquete_respuesta_devolver_proceso_por_wait(logger);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
+void enviar_paquete_respuesta_devolver_proceso_por_signal()
+{
+	t_paquete *paquete_respuesta_devolver_proceso_por_signal = crear_paquete_respuesta_devolver_proceso_por_signal(logger);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char** nombre_recurso)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
@@ -763,6 +786,16 @@ t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operaci
 	{
 		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_sleep(logger, conexion_con_cpu_dispatch, tiempo_sleep);
 		enviar_paquete_respuesta_devolver_proceso_por_sleep();
+	}
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
+	{
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_wait(logger, conexion_con_cpu_dispatch, nombre_recurso);
+		enviar_paquete_respuesta_devolver_proceso_por_wait();
+	}
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
+	{
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_signal(logger, conexion_con_cpu_dispatch, nombre_recurso);
+		enviar_paquete_respuesta_devolver_proceso_por_signal();
 	}
 
 	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
@@ -1055,6 +1088,10 @@ void push_cola_ready(t_pcb *pcb)
 	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
 }
 
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* RECURSOS *//////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+
 void crear_recursos()
 {
 	recursos = list_create();
@@ -1074,7 +1111,7 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 
 	recurso->instancias_iniciales = instancias;
 	recurso->instancias_disponibles = instancias;
-	recurso->pids_bloqueados = queue_create();
+	recurso->pcbs_bloqueados = queue_create();
 
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 

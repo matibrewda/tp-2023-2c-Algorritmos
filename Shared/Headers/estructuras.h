@@ -78,7 +78,7 @@ typedef struct
 	char* nombre;
 	int instancias_iniciales;
     int instancias_disponibles;
-    t_queue* pids_bloqueados;
+    t_queue* pcbs_bloqueados;
 } t_recurso;
 
 typedef struct
