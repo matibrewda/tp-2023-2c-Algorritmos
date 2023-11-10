@@ -209,7 +209,7 @@ void *planificador_corto_plazo()
 			op_code codigo_operacion_recibido;
 			int tiempo_sleep = -1;
 			int motivo_interrupcion = -1;
-			char* nombre_recurso;
+			char *nombre_recurso;
 
 			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso);
 			actualizar_pcb(pcb, contexto_de_ejecucion);
@@ -239,13 +239,48 @@ void *planificador_corto_plazo()
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
 			{
-				// TO DO
-				log_info(logger, "RECIBI UN WAIT DE %s", nombre_recurso);
+				if (!recurso_existe(nombre_recurso))
+				{
+					log_warning(logger, "PID: %d hace WAIT del recurso inexistente %s!", pcb->pid, nombre_recurso);
+					finalizar_proceso(pcb->pid);
+				}
+				else
+				{
+					t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
+					recurso_para_wait->instancias_disponibles--;
+					log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
+					list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
+					if (recurso_para_wait->instancias_disponibles < 0)
+					{
+						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+						queue_push_thread_safe(recurso_para_wait->pcbs_bloqueados, pcb, &recurso_para_wait->mutex_pcbs_bloqueados);
+						log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
+					}
+					else
+					{
+						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+					}
+				}
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
 			{
-				// TO DO
-				log_info(logger, "RECIBI UN SIGNAL DE %s", nombre_recurso);
+				if (!recurso_existe(nombre_recurso))
+				{
+					log_warning(logger, "PID: %d hace SIGNAL del recurso inexistente %s!", pcb->pid, nombre_recurso);
+					finalizar_proceso(pcb->pid);
+				}
+				else if (!recurso_esta_asignado_a_pcb(nombre_recurso, pcb->pid))
+				{
+					log_warning(logger, "PID: %d hace SIGNAL del recurso %s que NO tenia asignado previamente!", pcb->pid, nombre_recurso);
+					finalizar_proceso(pcb->pid);
+				}
+				else
+				{
+					t_recurso *recurso_para_signal = buscar_recurso_por_nombre(nombre_recurso);
+					log_info(logger, "PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+					desasignar_recurso_a_pcb(nombre_recurso, pcb->pid);
+				}
 			}
 		}
 		else
@@ -368,7 +403,8 @@ void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
-	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new, true);
+	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new);
+	free(pcb);
 }
 
 void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
@@ -396,7 +432,10 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
-	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready, true);
+	desasignar_todos_los_recursos_a_pcb(pcb->pid);
+	destruir_estructuras_de_proceso_en_memoria(pcb);
+	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready);
+	free(pcb);
 	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
@@ -420,6 +459,7 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
 	pcb_ejecutando = NULL;
+	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
 	sem_post(&semaforo_grado_max_multiprogramacion);
@@ -436,7 +476,10 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
-	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep, true);
+	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+	desasignar_todos_los_recursos_a_pcb(pcb->pid);
+	destruir_estructuras_de_proceso_en_memoria(pcb);
+	free(pcb);
 	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
@@ -465,7 +508,7 @@ void *bloqueo_sleep(void *argumentos)
 
 	if (pcb != NULL)
 	{
-		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep, false);
+		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
 }
@@ -765,7 +808,7 @@ void enviar_paquete_respuesta_devolver_proceso_por_signal()
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char** nombre_recurso)
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
@@ -953,6 +996,11 @@ void imprimir_proceso_en_consola(t_pcb *pcb)
 	printf("Proceso PID: %d - Estado %s\n", pcb->pid, nombre_estado_proceso(pcb->estado));
 }
 
+void imprimir_bloqueados_por_recurso_en_consola(t_recurso *recurso)
+{
+	queue_iterate_thread_safe(recurso->pcbs_bloqueados, (void (*)(void *)) & imprimir_proceso_en_consola, &recurso->mutex_pcbs_bloqueados);
+}
+
 void listar_procesos()
 {
 	queue_iterate_thread_safe(cola_new, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_new);
@@ -964,6 +1012,8 @@ void listar_procesos()
 	}
 
 	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_sleep);
+
+	list_iterate(recursos, (void (*)(void *)) & imprimir_bloqueados_por_recurso_en_consola);
 }
 
 t_pcb *crear_pcb(char *path, int size, int prioridad)
@@ -1017,6 +1067,17 @@ t_pcb *buscar_pcb_con_pid(int pid)
 		return pcb;
 	}
 
+	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	{
+		t_recurso *recurso = list_get(recursos, i);
+		pcb = buscar_pcb_con_pid_en_cola(pid, recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
+
+		if (pcb != NULL)
+		{
+			return pcb;
+		}
+	}
+
 	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid)
 	{
 		return pcb_ejecutando;
@@ -1038,23 +1099,14 @@ t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex
 	return pcb;
 }
 
-void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex, bool destruir_pcb)
+void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 {
 	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
 		return pcb->pid == pid;
 	};
 
-	void _finalizar_pcb(t_pcb * pcb)
-	{
-		if (destruir_pcb)
-		{
-			destruir_estructuras_de_proceso_en_memoria(pcb);
-			free(pcb);
-		}
-	}
-
-	list_remove_and_destroy_by_condition_thread_safe(cola->elements, (void *)_filtro_proceso_por_id, (void *)_finalizar_pcb, mutex);
+	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_proceso_por_id, mutex);
 }
 
 void push_cola_ready(t_pcb *pcb)
@@ -1112,6 +1164,7 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 	recurso->instancias_iniciales = instancias;
 	recurso->instancias_disponibles = instancias;
 	recurso->pcbs_bloqueados = queue_create();
+	recurso->pcbs_asignados = list_create();
 
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 
@@ -1126,4 +1179,60 @@ bool recurso_existe(char *nombre)
 	}
 
 	return list_any_satisfy(recursos, (void *)_filtro_nombre_recurso);
+}
+
+t_recurso *buscar_recurso_por_nombre(char *nombre_recurso)
+{
+	bool _filtro_recurso_por_nombre(t_recurso * recurso)
+	{
+		return strcmp(nombre_recurso, recurso->nombre) == 0;
+	};
+
+	t_recurso *recurso = list_find(recursos, (void *)_filtro_recurso_por_nombre);
+	return recurso;
+}
+
+bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid)
+{
+	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
+
+	bool _filtro_proceso_por_id(t_pcb * pcb)
+	{
+		return pcb->pid == pid;
+	};
+
+	return list_find_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_asignados) != NULL;
+}
+
+void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
+{
+	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
+
+	bool _filtro_proceso_por_id(t_pcb * pcb)
+	{
+		return pcb->pid == pid;
+	};
+
+	list_remove_by_condition_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_asignados);
+
+	recurso->instancias_disponibles++;
+
+	if (recurso->instancias_disponibles <= 0)
+	{
+		t_pcb *pcb_a_desbloquear = queue_pop_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
+		transicionar_proceso(pcb_a_desbloquear, CODIGO_ESTADO_PROCESO_READY);
+	}
+}
+
+void desasignar_todos_los_recursos_a_pcb(int pid)
+{
+	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	{
+		t_recurso *recurso = list_get(recursos, i);
+
+		while (recurso_esta_asignado_a_pcb(recurso->nombre, pid))
+		{
+			desasignar_recurso_a_pcb(recurso->nombre, pid);
+		}
+	}
 }

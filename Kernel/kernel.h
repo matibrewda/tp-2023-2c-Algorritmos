@@ -100,17 +100,22 @@ int obtener_nuevo_pid();
 void agregar_pid_a_aux_pids_cola(t_pcb *pcb);
 void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola);
 void imprimir_proceso_en_consola(t_pcb *pcb);
+void imprimir_bloqueados_por_recurso_en_consola(t_recurso *recurso);
 void listar_procesos();
 t_pcb *crear_pcb(char *path, int size, int prioridad);
 void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion);
 t_pcb *buscar_pcb_con_pid(int pid);
 t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
-void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex, bool destruir_pcb);
+void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void push_cola_ready(t_pcb* pcb);
 
 // Recursos
 void crear_recursos();
 t_recurso* crear_recurso(char* nombre, int instancias);
 bool recurso_existe(char* nombre);
+t_recurso* buscar_recurso_por_nombre(char* nombre_recurso);
+bool recurso_esta_asignado_a_pcb(char* nombre_recurso, int pid);
+void desasignar_recurso_a_pcb(char* nombre_recurso, int pid);
+void desasignar_todos_los_recursos_a_pcb(int pid);
 
 #endif /* KERNEL_H_ */

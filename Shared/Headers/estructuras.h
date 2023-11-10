@@ -23,6 +23,7 @@ typedef struct
     uint32_t registro_dx;
 
     // tabla de archivos abiertos
+    t_list* recursos_asignados;
     
 } t_pcb;
 
@@ -79,6 +80,9 @@ typedef struct
 	int instancias_iniciales;
     int instancias_disponibles;
     t_queue* pcbs_bloqueados;
+    t_list* pcbs_asignados;
+    pthread_mutex_t mutex_pcbs_bloqueados;
+    pthread_mutex_t mutex_pcbs_asignados;
 } t_recurso;
 
 typedef struct
