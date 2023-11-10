@@ -242,26 +242,34 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_
     return paquete;
 }
 
-t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list * posiciones_swap)
+t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicion_swap)
 {
     op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
-    t_list_iterator *iterador = list_iterator_create(posiciones_swap);
+	// RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
-	while (list_iterator_has_next(iterador))
-	{
-		int *posicion_en_swap = list_iterator_next(iterador);
-		// RESPETAR EL ORDEN -> SERIALIZACION!
-        log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", *posicion_en_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-        agregar_int_a_paquete(logger, paquete, *posicion_en_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
-	}
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
-	list_iterator_destroy(iterador);
+    return paquete;
+}
 
-    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+t_paquete *crear_paquete_respuesta_pedido_numero_de_marco(t_log *logger, int numero_de_marco)
+{
+    op_code codigo_operacion = RESPUESTA_NUMERO_DE_MARCO_A_CPU;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NUMERO DE MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+	// RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego el numero de marco %d a paquete de codigo de operacion %s y contenido 'NUMERO DE MARCO' (Origen: %s - Destino %s).", numero_de_marco, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+    agregar_int_a_paquete(logger, paquete, numero_de_marco, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NUMERO DE MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 
     return paquete;
 }

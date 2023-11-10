@@ -39,6 +39,7 @@ char* leer_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, int cone
 
 // Memoria recibe de CPU
 t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, int conexion_con_cpu);
+t_pedido_numero_de_marco *leer_paquete_solicitud_pedir_numero_de_marco_a_memoria(t_log *logger, int conexion_con_cpu);
 
 // Memoria recibe de FileSystem
 t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem);

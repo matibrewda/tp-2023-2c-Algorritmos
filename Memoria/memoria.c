@@ -153,6 +153,13 @@ void *atender_cpu()
 			enviar_instruccion_a_cpu(pedido_instruccion->pid, pedido_instruccion->pc);
 			free(pedido_instruccion);
 		}
+		else if (operacion_recibida_de_cpu == SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA)
+		{
+			t_pedido_numero_de_marco *pedido_numero_de_marco = leer_paquete_solicitud_pedir_numero_de_marco_a_memoria(logger, conexion_con_cpu);
+			enviar_numero_de_marco_a_cpu(pedido_numero_de_marco->pid, pedido_numero_de_marco->numero_de_pagina);
+			free(pedido_numero_de_marco);
+		}
+		
 	}
 }
 
@@ -335,6 +342,13 @@ void notificar_lectura_a_filesystem()
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
+void notificar_page_fault_a_cpu()
+{
+	log_debug(logger, "Notificando Page Fault a CPU");
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_PAGE_FAULT_A_CPU, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+}
+
 void notificar_escritura_a_filesystem()
 {
 	log_debug(logger, "Notificando a File System de lectura exitosa en memoria");
@@ -352,14 +366,14 @@ t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 
 t_list *recibir_paquete_pedir_bloques_a_filesystem()
 {
-	op_code *codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
 	t_list *posiciones_swap;
-	if (*codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
+	if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
 	{
 		// TODO preguntar LUCAS QUE ES EL BUFFER CON OFFSET
 		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, NULL, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
 	}
-	
+
 	return posiciones_swap;
 }
 
@@ -367,16 +381,18 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 {
 	t_list *entradas_tabla_de_paginas = obtener_entradas_de_tabla_de_pagina_por_pid(pid);
 	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
-	{	
-		pedir_liberacion_de_bloques_a_filesystem(0);
-		// ELIMINAR ENTRADA DE TABLA
+	{
+		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
+		list_remove_element(tabla_de_paginas, entrada_tabla_de_paginas);
+		free(entrada_tabla_de_paginas);
 	}
 	log_trace(logger, "Se limpian correctamente las entradas de tabla de paginas para el pid %d", pid);
 }
 
 void pedir_liberacion_de_bloques_a_filesystem(int posicion_de_swap)
 {
-	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, posicion_de_swap);
+	t_paquete *paquete = crear_paquete_liberar_bloque_en_filesystem(logger, posicion_de_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	// TODO esperar respuesta de liberacion de bloques?
 }
@@ -389,12 +405,14 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = malloc(sizeof(t_entrada_de_tabla_de_pagina));
 		entrada_tabla_de_paginas->numero_de_pagina = i;
 		entrada_tabla_de_paginas->presencia = 0;
-		entrada_tabla_de_paginas->posicion_en_swap = list_get(posiciones_swap, i);
+		entrada_tabla_de_paginas->posicion_en_swap = (int)list_get(posiciones_swap, i);
 		list_add(tabla_de_paginas, entrada_tabla_de_paginas);
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
 }
 
+/*
+TODO
 void cargar_pagina_en_ram(int pid, int posicion_en_swap, t_entrada_de_tabla_de_pagina *victima)
 {
 	// Cargar la página desde el swap a un marco libre en la RAM
@@ -403,9 +421,9 @@ void cargar_pagina_en_ram(int pid, int posicion_en_swap, t_entrada_de_tabla_de_p
 
 	if (contenido_en_swap == NULL)
 	{
-		/* TODO Manejar el caso de que no se pudo cargar la página desde el swaP
+		TODO Manejar el caso de que no se pudo cargar la página desde el swaP
 		Esto podría deberse a una falta de espacio en el swap u otros errores
-		Puedes implementar la lógica de manejo de errores aquí */
+		Puedes implementar la lógica de manejo de errores aquí
 	}
 	else
 	{
@@ -427,6 +445,7 @@ void cargar_pagina_en_ram(int pid, int posicion_en_swap, t_entrada_de_tabla_de_p
 		nueva_pagina->numero_de_pagina = numero_de_pagina;
 	}
 }
+*/
 
 char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
@@ -492,7 +511,8 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	if (entradas_tabla_de_pagina == NULL)
 	{
 		log_warning(logger, "No se encontraron entradas de tabla de pagina con el PID %d", pid);
-		return -1;
+		// TODO ver que hay que retornar en este caso
+		return NULL;
 	}
 
 	return entradas_tabla_de_pagina;
@@ -514,11 +534,11 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 	}
 
 	// Carga la nueva página en la RAM
-	cargar_pagina_en_ram(pid, numero_de_pagina, victima);
+	//cargar_pagina_en_ram(pid, numero_de_pagina, victima);
 }
 
 // TODO el Page Fault deberia enviarse como un paquete?
-int obtener_marco_de_pagina(int pid, int numero_de_pagina)
+void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
 	bool _filtro_pagina_de_memoria_por_numero_y_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
 	{
@@ -529,20 +549,22 @@ int obtener_marco_de_pagina(int pid, int numero_de_pagina)
 
 	if (pagina == NULL)
 	{
-		// Página no encontrada, responde con Page Fault
 		log_warning(logger, "No se encontro una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
-		return -1;
+		// TODO ver que notificar aca, es Page Fault?
+		notificar_page_fault_a_cpu();
+		return;
 	}
 
 	if (pagina->presencia == 0)
 	{
-		// Página no está en memoria, responde con Page Fault
 		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
-		return -1;
+		notificar_page_fault_a_cpu();
+		return;
 	}
 
 	// La página está en memoria, devuelve el número de marco
-	return pagina->marco;
+	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, pagina->marco);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
 
 void destruir_listas()

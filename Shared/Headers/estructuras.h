@@ -75,6 +75,13 @@ typedef struct
 
 typedef struct
 {
+    /* PEDIIIILLOOOOOOO */
+    int pid;
+    int numero_de_pagina;
+} t_pedido_numero_de_marco;
+
+typedef struct
+{
 	char* nombre;
 	int instancias_iniciales;
     int instancias_disponibles;
