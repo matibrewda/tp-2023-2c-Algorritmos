@@ -15,7 +15,7 @@ typedef struct
     int presencia;
     int modificado;
     int posicion_en_swap;
-} t_pagina_de_memoria;
+} t_entrada_de_tabla_de_pagina;
 
 typedef struct
 {
