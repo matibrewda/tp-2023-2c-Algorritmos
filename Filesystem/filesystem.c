@@ -196,6 +196,24 @@ void *comunicacion_kernel()
 	return 0;
 } 
 
+
+int truncar_archivo(char* path, uint32_t nuevo_tamano) {
+
+	// FCB *fcb = iniciar_fcb();
+	//Agarro el fcb y el nuevo tamaño para truncarlo.
+	//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
+
+    if (nuevo_tamano > fcb->tamanio_archivo) {
+        // Ampliar el tamaño del archivo
+        ampliar_tamano_archivo(fcb, nuevo_tamano);
+		return 0;
+    } else if (nuevo_tamano < fcb->tamanio_archivo) {
+        // Reducir el tamaño del archivo
+        reducir_tamano_archivo(fcb, nuevo_tamano);
+    }
+    // Si el nuevo tamaño es igual al actual, no se requiere acción.
+}
+
 // PETICIONES KERNEL...
 
 /* void abrirArchivo(char* ruta_archivo){
