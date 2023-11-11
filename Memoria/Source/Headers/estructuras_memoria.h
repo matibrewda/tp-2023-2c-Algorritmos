@@ -14,7 +14,8 @@ typedef struct
     int marco;
     int presencia;
     int modificado;
-    int posicion_en_swap;
+    // TODO nose si es puntero, revisar, no compila sino (list_get)
+    int * posicion_en_swap;
 } t_entrada_de_tabla_de_pagina;
 
 typedef struct

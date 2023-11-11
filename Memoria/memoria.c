@@ -159,7 +159,6 @@ void *atender_cpu()
 			enviar_numero_de_marco_a_cpu(pedido_numero_de_marco->pid, pedido_numero_de_marco->numero_de_pagina);
 			free(pedido_numero_de_marco);
 		}
-		
 	}
 }
 
@@ -405,7 +404,7 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = malloc(sizeof(t_entrada_de_tabla_de_pagina));
 		entrada_tabla_de_paginas->numero_de_pagina = i;
 		entrada_tabla_de_paginas->presencia = 0;
-		entrada_tabla_de_paginas->posicion_en_swap = (int)list_get(posiciones_swap, i);
+		entrada_tabla_de_paginas->posicion_en_swap = list_get(posiciones_swap, i);
 		list_add(tabla_de_paginas, entrada_tabla_de_paginas);
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
@@ -413,7 +412,7 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 
 /*
 TODO
-void cargar_pagina_en_ram(int pid, int posicion_en_swap, t_entrada_de_tabla_de_pagina *victima)
+void cargar_pagina_en_memoria(int pid, int posicion_en_swap, t_entrada_de_tabla_de_pagina *victima)
 {
 	// Cargar la página desde el swap a un marco libre en la RAM
 	// Supongamos que tienes una función para obtener el contenido de la página desde el swap
@@ -492,10 +491,11 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
 	{
 		return encontrar_pagina_victima_fifo();
 	}
-	else
+	else if (configuracion_memoria->algoritmo_reemplazo == "LRU")
 	{
 		return encontrar_pagina_victima_lru();
 	}
+	log_debug(logger, "No se encontro un algoritmo de reemplazo correcto en la configuracion de la memoria");
 	return NULL;
 }
 
@@ -521,10 +521,9 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 void reemplazar_pagina(int pid, int numero_de_pagina)
 {
 	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
-	// Escribir la página víctima de la RAM al swap si está modificada
-	// Cargar la nueva página desde el swap a la RAM
+	// Escribir la página víctima de la memoria al swap si está modificada
+	// Cargar la nueva página desde el swap a la memoria
 	// Actualizar la tabla de páginas
-	// Encuentra la página víctima según el algoritmo de reemplazo
 	t_entrada_de_tabla_de_pagina *victima = encontrar_pagina_victima();
 
 	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
@@ -534,10 +533,9 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 	}
 
 	// Carga la nueva página en la RAM
-	//cargar_pagina_en_ram(pid, numero_de_pagina, victima);
+	// cargar_pagina_en_memoria(pid, numero_de_pagina, victima);
 }
 
-// TODO el Page Fault deberia enviarse como un paquete?
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
 	bool _filtro_pagina_de_memoria_por_numero_y_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
@@ -562,7 +560,6 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 		return;
 	}
 
-	// La página está en memoria, devuelve el número de marco
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, pagina->marco);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
