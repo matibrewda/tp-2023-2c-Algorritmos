@@ -36,6 +36,7 @@
 void *comunicacion_kernel();
 void *comunicacion_memoria();
 int crear_archivo (char* path,char* nombreNuevoArchivo);
+int truncar_archivo(char* path, uint32_t nuevo_tamano);
 
 // Terminar
 void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_filesystem, t_config_filesystem *configuracion_filesystem, int socket_kernel, int conexion_con_kernel, int conexion_con_memoria);

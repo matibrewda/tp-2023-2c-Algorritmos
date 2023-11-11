@@ -82,6 +82,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	else
 		log_debug(logger, "FS FAT: No fue posible iniciar FAT.");
 
+	// PRUEBA DE TRUNCAR truncar_archivo
+
+	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",10);
+
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
 	{
@@ -197,36 +201,66 @@ void *comunicacion_kernel()
 } 
 
 
+
+/* void ampliar_tamano_archivo(FCB *fcb , t_config *config,int nuevo_tamano) {
+ 	fcb->tamanio_archivo = nuevo_tamano;
+	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
+    sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
+	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
+} */
+
+
+void ampliar_tamano_archivo(FCB *fcb, t_config *config, int nuevo_tamano) {
+    // Actualizar tamaño en la estructura FCB
+    fcb->tamanio_archivo = nuevo_tamano;
+
+    // Actualizar tamaño en la configuración
+    char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
+    int result = snprintf(nuevo_tamano_str, sizeof(nuevo_tamano_str), "%u", fcb->tamanio_archivo);
+
+    if (result >= 0 && result < sizeof(nuevo_tamano_str)) {
+        config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
+		config_save(config);
+    } else {
+        // Manejar el error (puede ser útil devolver un código de error o imprimir un mensaje de error)
+    }
+}
+
+void reducir_tamano_archivo(FCB *fcb,t_config *config, int nuevo_tamano) {
+	fcb->tamanio_archivo = nuevo_tamano;
+	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
+    sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
+	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
+}
+
+
 int truncar_archivo(char* path, uint32_t nuevo_tamano) {
 	FCB *fcb;
+	t_config *config;
+	log_debug(logger,"CREACION DE ESTRUCTURAS");
 	//Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
 	if (path!= NULL) {
 		// creo la estructura para manejarlo.
-		FCB *fcb = crear_fcb(path);
+		log_debug(logger,"CREO FCB");
+		fcb = crear_fcb(path);
+		log_debug(logger,"ABRO CONFIG");
+		config = config_create(path);
 	} else {return -1;}
+
+	printf("%d",fcb->tamanio_archivo);
+
 		//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
     if (nuevo_tamano > fcb->tamanio_archivo) {
+		log_debug(logger,"nuevo tamaño mas grande");
         // Ampliar el tamaño del archivo
-        ampliar_tamano_archivo(fcb, nuevo_tamano);
+        ampliar_tamano_archivo(fcb,config, nuevo_tamano);
 		return 0;
     } else if (nuevo_tamano < fcb->tamanio_archivo) {
+		log_debug(logger,"nuevo tamaño mas chico");
         // Reducir el tamaño del archivo
-        reducir_tamano_archivo(fcb, nuevo_tamano);
+        reducir_tamano_archivo(fcb, config, nuevo_tamano);
     }
     // Si el nuevo tamaño es igual al actual, no se requiere acción.
-}
-
-char* obtener_nombre_archivo(char* ruta) {
-    char* nombre_archivo = strrchr(ruta, '/'); // Busca la última aparición de '/' en la cadena
-    if (nombre_archivo != NULL) {
-        // Avanza al siguiente carácter para obtener el nombre del archivo
-        nombre_archivo++;
-    } else {
-        // Si no hay '/', asumimos que toda la ruta es el nombre del archivo
-        nombre_archivo = ruta;
-    }
-
-    return nombre_archivo;
 }
 
 
