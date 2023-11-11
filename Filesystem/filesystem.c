@@ -66,7 +66,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	 crearArchivoDeBloques("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
 
-	// INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES
+	/* // INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES -- NO NECESARIO, POR EL MOMENTO NO MANEJO LA SWAP.
 
 	int blocks_file_checker = iniciarSWAP(logger, configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_swap);
 	if (blocks_file_checker == 0)
@@ -75,26 +75,27 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 	else
 		log_debug(logger, "FS BLOCKS FILE: No fue posible iniciar BLOCKS FILE.");
-
+ */
 
 	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
 
-	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap);
+	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
 	if (fat_checker == 0)
 	{
-		log_debug(logger, "FS FAT: FAT iniciado correctamente.");
+		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.");
 	}
 	else
-		log_debug(logger, "FS FAT: No fue posible iniciar FAT.");
+		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.");
 
    
 	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
 		//Nombre: El nombre de archivo, utilizado como ID de archivo.
 		//Bloque inicial: El bloque logico inicial, se utilizará en la tabla FAT para buscar su bloque siguiente.		
     
-	DirectorioArray directorio = inicializarDirectorioArray();
+	DirectorioArray directorio = inicializarDirectorioArray(logger);
     procesarArchivosEnDirectorio(&directorio, configuracion_filesystem->path_fcb);
 
+	
     // Utilizar el array de directorios como desees
     for (size_t i = 0; i < directorio.cantidadDirectorios; i++) {
         printf("Nombre: %s, Bloque Inicial: %u\n", directorio.directorios[i].nombreArchivo, directorio.directorios[i].numBloqueInicial);
@@ -105,7 +106,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
   	// PRUEBA DE TRUNCAR truncar_archivo
 
-	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",10);
+	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",10); 
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
@@ -260,13 +261,12 @@ void reducir_tamano_archivo(FCB *fcb,t_config *config, int nuevo_tamano) {
 int truncar_archivo(char* path, uint32_t nuevo_tamano) {
 	FCB *fcb;
 	t_config *config;
-	log_debug(logger,"CREACION DE ESTRUCTURAS");
+	log_debug(logger,"Truncar Archivo: Iniciado.");
 	//Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
 	if (path!= NULL) {
 		// creo la estructura para manejarlo.
-		log_debug(logger,"CREO FCB");
+		log_debug(logger,"Truncar Archivo: Creo estructuras.");
 		fcb = crear_fcb(path);
-		log_debug(logger,"ABRO CONFIG");
 		config = config_create(path);
 	} else {return -1;}
 
@@ -274,16 +274,17 @@ int truncar_archivo(char* path, uint32_t nuevo_tamano) {
 
 		//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
     if (nuevo_tamano > fcb->tamanio_archivo) {
-		log_debug(logger,"nuevo tamaño mas grande");
+		log_debug(logger,"Truncar Archivo: Nuevo tamaño mas grande.");
         // Ampliar el tamaño del archivo
         ampliar_tamano_archivo(fcb,config, nuevo_tamano);
 		return 0;
     } else if (nuevo_tamano < fcb->tamanio_archivo) {
-		log_debug(logger,"nuevo tamaño mas chico");
+		log_debug(logger,"truncar Archivo: nuevo tamaño mas chico.");
         // Reducir el tamaño del archivo
         reducir_tamano_archivo(fcb, config, nuevo_tamano);
     }
     // Si el nuevo tamaño es igual al actual, no se requiere acción.
+	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
 }
 
 

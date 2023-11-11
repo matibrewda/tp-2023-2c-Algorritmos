@@ -2,16 +2,9 @@
 
 // Implementacion de funciones
 
-int iniciarFAT(t_log *logger, char *fat_path, char *blocks_file_path, uint32_t cant_bloques_total, uint32_t cant_bloques_swap)
+int iniciarFAT(t_log *logger, char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bloques_swap,uint32_t tamanio_bloque)
 {
     size_t total_blocks = cant_bloques_total - cant_bloques_swap;
-
-    // Abro archivo BLOCKS FILE para sincronizar la info de mi FAT en el.
-    log_info(logger, "HOLA 1");
-    FILE *blocks_file = fopen(blocks_file_path, "rb+");
-    size_t posicionSiguienteParaEscritura = cant_bloques_swap * sizeof(u_int32_t);
-    fseek(blocks_file, posicionSiguienteParaEscritura, SEEK_SET);
-    log_info(logger, "HOLA 2");
 
     // Abro archivo FAT para escribir en el.
     FILE *fat_file = fopen(fat_path, "r+");
@@ -19,8 +12,12 @@ int iniciarFAT(t_log *logger, char *fat_path, char *blocks_file_path, uint32_t c
     {
         // No se pudo abrir el archivo, entonces lo creamos y lo inicializamos
         fat_file = fopen(fat_path, "w+");
+
+
+
+
         if (fat_file == NULL)
-        {
+        { 
             log_debug(logger, "FS FAT: No se pudo crear el archivo fat.bin");
             return 1;
         }
@@ -42,7 +39,6 @@ int iniciarFAT(t_log *logger, char *fat_path, char *blocks_file_path, uint32_t c
             }
 
             arreglo[0].block_value = UINT32_MAX;
-            arreglo[total_blocks-1].block_value = UINT32_MAX;
 
             // EScribimos el contenido del array en LOS archivos
 
@@ -50,22 +46,20 @@ int iniciarFAT(t_log *logger, char *fat_path, char *blocks_file_path, uint32_t c
             {
 
                 fwrite(&arreglo[j], sizeof(u_int32_t), 1, fat_file);
-                fwrite(&arreglo[j], sizeof(u_int32_t), 1, blocks_file);
             }
 
-            log_debug(logger, "FS FAT: El archivo FAT se ha creado y inicializado con %ld bloques, todos ellos con 0.\n", total_blocks);
-            log_debug(logger, "FS BLOCKS FILE: El archivo FAT fue sincronizado en el BLOCKS FILE.\n");
+            log_debug(logger, "FS FAT: La tabla FAT se ha creado y inicializado con %ld entradas (bloques), todos ellos con direccion 0.\n", total_blocks);
             free(arreglo);
+
+        
         }
     }
     else
     {
-        log_debug(logger, "FS FAT: El archivo FAT ya existe.\n");
-        log_debug(logger, "FS BLOCKS FILE: No se realiza sincronizacion con BLOCKS FILE.\n");
+        log_debug(logger, "FS FAT: La tabla FAT ya existe.\n");
     }
 
     fclose(fat_file);
-    fclose(blocks_file);
 
     return 0;
 }

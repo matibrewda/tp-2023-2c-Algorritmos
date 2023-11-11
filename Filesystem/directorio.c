@@ -4,10 +4,12 @@
 #include <string.h>
 #include <dirent.h>
 #include <commons/config.h>
+#include <commons/log.h>
 #include <limits.h>  
 
 // Función para inicializar el array de directorios
-DirectorioArray inicializarDirectorioArray() {
+DirectorioArray inicializarDirectorioArray(t_log* logger) {
+
     DirectorioArray array;
     array.directorios = NULL;
     array.cantidadDirectorios = 0;
@@ -42,7 +44,6 @@ void agregarEntradaDesdeFCB(DirectorioArray* array, char* rutaArchivoFCB) {
     // Incrementar el tamaño del array de directorios
     array->directorios = realloc(array->directorios, (array->cantidadDirectorios + 1) * sizeof(EntradaDirectorio));
     if (array->directorios == NULL) {
-        perror("Error al reallocar memoria para el array de directorios");
         config_destroy(config);
         return;
     }
