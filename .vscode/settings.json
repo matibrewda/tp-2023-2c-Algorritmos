@@ -23,6 +23,8 @@
         "queue.h": "c",
         "configuracion_filesystem.h": "c",
         "argumentos_filesystem.h": "c",
-        "utilidades_configuracion.h": "c"
+        "utilidades_configuracion.h": "c",
+        "main.h": "c",
+        "math.h": "c"
     }
 }

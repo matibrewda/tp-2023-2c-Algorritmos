@@ -120,6 +120,15 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		sem_init(&semaforo_planificador_largo_plazo, false, 1);
 	}
 
+	pthread_mutex_init(&mutex_cola_new, NULL);
+	pthread_mutex_init(&mutex_cola_ready, NULL);
+	pthread_mutex_init(&mutex_cola_bloqueados_sleep, NULL);
+	pthread_mutex_init(&mutex_conexion_cpu_dispatch, NULL);
+	pthread_mutex_init(&mutex_conexion_cpu_interrupt, NULL);
+	pthread_mutex_init(&mutex_conexion_memoria, NULL);
+	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
+	pthread_mutex_init(&mutex_id_hilo_quantum, NULL);
+
 	// Colas de planificacion
 	cola_new = queue_create();
 	cola_ready = queue_create();
@@ -249,7 +258,9 @@ void *planificador_corto_plazo()
 					t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
 					recurso_para_wait->instancias_disponibles--;
 					log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
+					log_info(logger, "BUBA2");
 					list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
+					log_info(logger, "BUBA");
 					if (recurso_para_wait->instancias_disponibles < 0)
 					{
 						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
@@ -481,6 +492,7 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
 	sem_post(&semaforo_grado_max_multiprogramacion);
+	log_info(logger, "FINALICE TODOOOAFASFASFG");
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -1166,6 +1178,9 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 	recurso->pcbs_bloqueados = queue_create();
 	recurso->pcbs_asignados = list_create();
 
+	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
+	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
+
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 
 	return recurso;
@@ -1226,6 +1241,18 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 
 void desasignar_todos_los_recursos_a_pcb(int pid)
 {
+	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	{
+		t_recurso *recurso = list_get(recursos, i);
+
+		bool _filtro_proceso_por_id(t_pcb * pcb)
+		{
+			return pcb->pid == pid;
+		};
+
+		list_remove_by_condition_thread_safe(recurso->pcbs_bloqueados->elements, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_bloqueados);
+	}
+
 	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
 	{
 		t_recurso *recurso = list_get(recursos, i);
