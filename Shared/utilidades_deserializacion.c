@@ -168,28 +168,6 @@ t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *
 	return pedido_instruccion;
 }
 
-t_pedido_numero_de_marco *leer_paquete_solicitud_pedir_numero_de_marco_a_memoria(t_log *logger, int conexion_con_cpu)
-{
-	op_code codigo_operacion = SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA;
-	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO NUMERO DE MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-
-	int tamanio_buffer;
-	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &tamanio_buffer, conexion_con_cpu, codigo_operacion);
-	void *buffer_con_offset = buffer;
-
-	t_pedido_numero_de_marco *pedido_numero_de_marco = malloc(sizeof(t_pedido_numero_de_marco));
-
-	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_numero_de_marco->pid), codigo_operacion);
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_numero_de_marco->numero_de_pagina), codigo_operacion);
-
-	free(buffer);
-
-	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO NUMERO DE MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-
-	return pedido_numero_de_marco;
-}
-
 // Memoria recibe de Filesystem
 t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem)
 {
@@ -230,6 +208,28 @@ t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, i
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO ESCRIBIR ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 
 	return pedido_escribir_archivo;
+}
+
+// Comunes
+t_pedido_pagina_en_memoria *leer_paquete_solicitud_pedido_pagina_en_memoria(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino)
+{
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO PAGINA EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &tamanio_buffer, conexion, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_pedido_pagina_en_memoria *pedido_numero_de_marco = malloc(sizeof(t_pedido_pagina_en_memoria));
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(pedido_numero_de_marco->pid), codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, nombre_proceso_destino, nombre_proceso_origen, &buffer_con_offset, &(pedido_numero_de_marco->numero_de_pagina), codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PEDIDO PAGINA EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+
+	return pedido_numero_de_marco;
 }
 
 // Comunes

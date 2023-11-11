@@ -64,6 +64,10 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid);
 void cerrar_archivo_con_pid(int pid);
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina);
 t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid);
+t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
+
+// Manejo de Paginas
+void cargar_pagina_en_memoria(int pid, int numero_de_pagina);
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);

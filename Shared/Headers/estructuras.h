@@ -78,7 +78,7 @@ typedef struct
     /* PEDIIIILLOOOOOOO */
     int pid;
     int numero_de_pagina;
-} t_pedido_numero_de_marco;
+} t_pedido_pagina_en_memoria;
 
 typedef struct
 {

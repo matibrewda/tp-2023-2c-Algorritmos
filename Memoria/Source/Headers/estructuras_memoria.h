@@ -14,8 +14,8 @@ typedef struct
     int marco;
     int presencia;
     int modificado;
-    // TODO nose si es puntero, revisar, no compila sino (list_get)
-    int * posicion_en_swap;
+    int posicion_en_swap;
+    // TODO agregar timestamp para LRU
 } t_entrada_de_tabla_de_pagina;
 
 typedef struct

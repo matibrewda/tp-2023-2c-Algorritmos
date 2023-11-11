@@ -14,6 +14,7 @@ const char* nombre_opcode(op_code opcode)
         // Kernel a Memoria
         case SOLICITUD_INICIAR_PROCESO_MEMORIA: return "'SOLICITUD_INICIAR_PROCESO_MEMORIA'";
         case SOLICITUD_FINALIZAR_PROCESO_MEMORIA: return "'SOLICITUD_FINALIZAR_PROCESO_MEMORIA'";
+        case SOLICITUD_CARGAR_PAGINA_EN_MEMORIA: return "'SOLICITUD_CARGAR_PAGINA_EN_MEMORIA'";
         
         // CPU a Kernel
         case RESPUESTA_EJECUTAR_PROCESO: return "'RESPUESTA_EJECUTAR_PROCESO'";

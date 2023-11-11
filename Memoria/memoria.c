@@ -133,6 +133,12 @@ void *atender_kernel()
 			free(proceso_memoria->path);
 			free(proceso_memoria);
 		}
+		else if (operacion_recibida_de_kernel == SOLICITUD_CARGAR_PAGINA_EN_MEMORIA)
+		{
+			t_pedido_pagina_en_memoria *pedido_cargar_pagina = leer_paquete_solicitud_pedido_pagina_en_memoria(logger, conexion_con_cpu, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+			cargar_pagina_en_memoria(pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
+			free(pedido_cargar_pagina);
+		}
 	}
 }
 
@@ -155,7 +161,7 @@ void *atender_cpu()
 		}
 		else if (operacion_recibida_de_cpu == SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA)
 		{
-			t_pedido_numero_de_marco *pedido_numero_de_marco = leer_paquete_solicitud_pedir_numero_de_marco_a_memoria(logger, conexion_con_cpu);
+			t_pedido_pagina_en_memoria *pedido_numero_de_marco = leer_paquete_solicitud_pedido_pagina_en_memoria(logger, conexion_con_cpu, SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 			enviar_numero_de_marco_a_cpu(pedido_numero_de_marco->pid, pedido_numero_de_marco->numero_de_pagina);
 			free(pedido_numero_de_marco);
 		}
@@ -404,7 +410,7 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = malloc(sizeof(t_entrada_de_tabla_de_pagina));
 		entrada_tabla_de_paginas->numero_de_pagina = i;
 		entrada_tabla_de_paginas->presencia = 0;
-		entrada_tabla_de_paginas->posicion_en_swap = list_get(posiciones_swap, i);
+		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int*)list_get(posiciones_swap, i)));
 		list_add(tabla_de_paginas, entrada_tabla_de_paginas);
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
@@ -445,11 +451,6 @@ void cargar_pagina_en_memoria(int pid, int posicion_en_swap, t_entrada_de_tabla_
 	}
 }
 */
-
-char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
-{
-	// TODO implementame
-}
 
 void escribir_pagina_en_swap()
 {
@@ -518,6 +519,16 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	return entradas_tabla_de_pagina;
 }
 
+char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
+{
+	// TODO implementame
+}
+
+void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
+{
+	// TODO implementar
+}
+
 void reemplazar_pagina(int pid, int numero_de_pagina)
 {
 	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
@@ -536,7 +547,7 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 	// cargar_pagina_en_memoria(pid, numero_de_pagina, victima);
 }
 
-void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
+t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
 {
 	bool _filtro_pagina_de_memoria_por_numero_y_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
 	{
@@ -544,6 +555,13 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 	};
 
 	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid);
+
+	return pagina;
+}
+
+void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
+{
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 
 	if (pagina == NULL)
 	{
