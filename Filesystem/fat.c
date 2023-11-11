@@ -41,6 +41,9 @@ int iniciarFAT(t_log *logger, char *fat_path, char *blocks_file_path, uint32_t c
                 arreglo[i].block_value = 0;
             }
 
+            arreglo[0].block_value = UINT32_MAX;
+            arreglo[total_blocks-1].block_value = UINT32_MAX;
+
             // EScribimos el contenido del array en LOS archivos
 
             for (size_t j = 0; j < total_blocks; j++)

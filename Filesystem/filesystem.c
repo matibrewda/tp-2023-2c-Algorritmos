@@ -3,6 +3,8 @@
 #include "fcb.h"
 #include "fat.h"
 #include "swap.h"
+#include "bloque.h"
+#include "directorio.h"
 
 pthread_t hilo_memoria;
 pthread_t hilo_kernel;
@@ -58,8 +60,11 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 
-	crear_archivo (configuracion_filesystem->path_fcb,"LuchoPruebaGenerarFCBNUEVO.fcb");
+	crear_archivo (configuracion_filesystem->path_fcb,"EstoEsUnNuevoArchivo");
 
+	// INICIAR ARCHIVO DE BLOQUES V2
+
+	 crearArchivoDeBloques("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
 
 	// INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES
 
@@ -82,7 +87,23 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	else
 		log_debug(logger, "FS FAT: No fue posible iniciar FAT.");
 
-	// PRUEBA DE TRUNCAR truncar_archivo
+   
+	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
+		//Nombre: El nombre de archivo, utilizado como ID de archivo.
+		//Bloque inicial: El bloque logico inicial, se utilizará en la tabla FAT para buscar su bloque siguiente.		
+    
+	DirectorioArray directorio = inicializarDirectorioArray();
+    procesarArchivosEnDirectorio(&directorio, configuracion_filesystem->path_fcb);
+
+    // Utilizar el array de directorios como desees
+    for (size_t i = 0; i < directorio.cantidadDirectorios; i++) {
+        printf("Nombre: %s, Bloque Inicial: %u\n", directorio.directorios[i].nombreArchivo, directorio.directorios[i].numBloqueInicial);
+    }
+
+    // Liberar la memoria utilizada por el array de directorios, al final, al terminar filesystem.
+    
+
+  	// PRUEBA DE TRUNCAR truncar_archivo
 
 	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",10);
 
@@ -115,6 +136,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+	liberarDirectorioArray(&directorio);
 	return EXIT_SUCCESS;
 }
 
@@ -174,7 +196,8 @@ void *comunicacion_kernel()
 
 
  int crear_archivo (char* path,char* nombreNuevoArchivo) {
-
+	char nombreFormateado[256]; // Asegúrate de que este array es lo suficientemente grande
+    sprintf(nombreFormateado, "%s.fcb", nombreNuevoArchivo);
 	//Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
 	FCB *fcbArchivoNuevo = iniciar_fcb(nombreNuevoArchivo, 0, UINT32_MAX);
 
@@ -185,7 +208,7 @@ void *comunicacion_kernel()
 		 char rutaCompleta[256];  // Tamaño suficientemente grande para contener la ruta completa
 
     	// Concatenar la ruta base con el nombre del nuevo archivo
-    	snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s", path, nombreNuevoArchivo);
+    	snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s", path, nombreFormateado);
 
 		guardar_fcb_en_archivo (fcbArchivoNuevo,rutaCompleta);
 		//Liberar la memoria no utilizada.
