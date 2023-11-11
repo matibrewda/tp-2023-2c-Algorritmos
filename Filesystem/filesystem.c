@@ -198,11 +198,13 @@ void *comunicacion_kernel()
 
 
 int truncar_archivo(char* path, uint32_t nuevo_tamano) {
-
-	// FCB *fcb = iniciar_fcb();
-	//Agarro el fcb y el nuevo tamaño para truncarlo.
-	//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
-
+	FCB *fcb;
+	//Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
+	if (path!= NULL) {
+		// creo la estructura para manejarlo.
+		FCB *fcb = crear_fcb(path);
+	} else {return -1;}
+		//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
     if (nuevo_tamano > fcb->tamanio_archivo) {
         // Ampliar el tamaño del archivo
         ampliar_tamano_archivo(fcb, nuevo_tamano);
@@ -213,6 +215,20 @@ int truncar_archivo(char* path, uint32_t nuevo_tamano) {
     }
     // Si el nuevo tamaño es igual al actual, no se requiere acción.
 }
+
+char* obtener_nombre_archivo(char* ruta) {
+    char* nombre_archivo = strrchr(ruta, '/'); // Busca la última aparición de '/' en la cadena
+    if (nombre_archivo != NULL) {
+        // Avanza al siguiente carácter para obtener el nombre del archivo
+        nombre_archivo++;
+    } else {
+        // Si no hay '/', asumimos que toda la ruta es el nombre del archivo
+        nombre_archivo = ruta;
+    }
+
+    return nombre_archivo;
+}
+
 
 // PETICIONES KERNEL...
 
