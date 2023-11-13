@@ -149,6 +149,12 @@ t_paquete *crear_paquete_respuesta_finalizar_proceso_en_memoria(t_log *logger)
     return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_FINALIZAR_PROCESO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 }
 
+// Memoria a Kernel
+t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+}
+
 // Memoria a CPU
 t_paquete *crear_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, char *linea_instruccion)
 {
@@ -245,6 +251,23 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_
 t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicion_swap)
 {
     op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+	// RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Memoria a Filesystem
+t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posicion_swap)
+{
+    op_code codigo_operacion = SOLICITUD_CONTENIDO_BLOQUE_EN_FILESYSTEM;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);

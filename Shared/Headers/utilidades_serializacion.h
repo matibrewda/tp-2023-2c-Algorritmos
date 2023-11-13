@@ -43,6 +43,7 @@ t_paquete *crear_paquete_solicitud_pedir_info_de_memoria_inicial_para_cpu(t_log 
 // Memoria a Kernel
 t_paquete *crear_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, bool resultado_iniciar_proceso);
 t_paquete *crear_paquete_respuesta_finalizar_proceso_en_memoria(t_log *logger);
+t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger);
 
 // Memoria a CPU
 t_paquete *crear_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, char *linea_instruccion);
@@ -52,6 +53,7 @@ t_paquete *crear_paquete_respuesta_pedido_numero_de_marco(t_log *logger, int num
 // Memoria a Filesystem
 t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_de_bloques);
 t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicion_swap);
+t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posicion_swap);
 
 // Comunes
 t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_proceso_memoria *proceso_memoria);

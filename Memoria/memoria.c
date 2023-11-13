@@ -375,8 +375,11 @@ t_list *recibir_paquete_pedir_bloques_a_filesystem()
 	t_list *posiciones_swap;
 	if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
 	{
-		// TODO preguntar LUCAS QUE ES EL BUFFER CON OFFSET
-		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, NULL, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+		int tamanio_buffer;
+		void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+		void *buffer_con_offset = buffer;
+
+		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
 	}
 
 	return posiciones_swap;
@@ -415,42 +418,6 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
 }
-
-/*
-TODO
-void cargar_pagina_en_memoria(int pid, int posicion_en_swap, t_entrada_de_tabla_de_pagina *victima)
-{
-	// Cargar la página desde el swap a un marco libre en la RAM
-	// Supongamos que tienes una función para obtener el contenido de la página desde el swap
-	char *contenido_en_swap = obtener_contenido_de_pagina_en_swap(posicion_en_swap);
-
-	if (contenido_en_swap == NULL)
-	{
-		TODO Manejar el caso de que no se pudo cargar la página desde el swaP
-		Esto podría deberse a una falta de espacio en el swap u otros errores
-		Puedes implementar la lógica de manejo de errores aquí
-	}
-	else
-	{
-		// Supongamos que memoriaRAM es un puntero a la memoria principal
-		char *marco_en_RAM = memoriaRAM + (victima->marco * configuracion_memoria->tam_pagina);
-		memcpy(marco_en_RAM, contenido_en_swap, configuracion_memoria->tam_pagina);
-
-		// Actualiza la información de la nueva página en la lista tabla_de_paginas
-		victima->presencia = 0;			// La víctima se marca como ausente en RAM
-		victima->marco = -1;			// La víctima no tiene marco asignado
-		victima->pid = -1;				// La víctima no está asociada a ningún proceso
-		victima->numero_de_pagina = -1; // La víctima no tiene número de página
-
-		// Actualiza la información de la nueva página que se está cargando
-		t_entrada_de_tabla_de_pagina *nueva_pagina = list_get(tabla_de_paginas, numero_de_pagina);
-		nueva_pagina->presencia = 1;
-		nueva_pagina->marco = victima->marco; // Reemplaza la víctima en el mismo marco
-		nueva_pagina->pid = pid;
-		nueva_pagina->numero_de_pagina = numero_de_pagina;
-	}
-}
-*/
 
 void escribir_pagina_en_swap()
 {
@@ -521,20 +488,49 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 
 char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
-	// TODO implementame
+	// TODO ver que retorna esta funcion
+	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	// TODO hace falta sincronizar
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+	char *contenido_del_bloque;
+	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
+	{
+		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem);
+	}
+
+	return contenido_del_bloque;
 }
 
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 {
-	// TODO implementar
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	char *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
+
+	/*
+	TODO Listas de marcos? Posible solucion
+	if (marco_vacio)
+	{
+		cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		return;
+	}
+	*/
+
+	reemplazar_pagina(pid, numero_de_pagina);
+	cargar_datos_de_pagina_en_memoria_real(pagina);
+
+	// Actualizar entrada tabla de paginas de la nueva pagina
+	pagina->presencia = 1;
+	// pagina->marco = ?;
+
+	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger);
+	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 }
 
 void reemplazar_pagina(int pid, int numero_de_pagina)
 {
 	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
-	// Escribir la página víctima de la memoria al swap si está modificada
-	// Cargar la nueva página desde el swap a la memoria
-	// Actualizar la tabla de páginas
 	t_entrada_de_tabla_de_pagina *victima = encontrar_pagina_victima();
 
 	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
@@ -543,8 +539,24 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 		escribir_pagina_en_swap(pid, victima);
 	}
 
-	// Carga la nueva página en la RAM
-	// cargar_pagina_en_memoria(pid, numero_de_pagina, victima);
+	// TODO numero de marco
+	borrar_contenido_de_marco_en_memoria_real(victima->marco);
+
+	// Actualizar entrada tabla de paginas de la victima
+	victima->presencia = 0;
+}
+
+void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
+{
+	// TODO todavia no sabemos lo que devuelve, es lo que ocupa un marco de bytes
+	// obtener_contenido_de_marco_en_memoria_real
+	// TODO implementar el borrado de datos de la victima en memoria real
+}
+
+void cargar_datos_de_pagina_en_memoria_real(t_entrada_de_tabla_de_pagina *pagina)
+{
+	// TODO implementar
+	// Cargar datos de la nueva pagina a reemplazar en memoria real
 }
 
 t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
@@ -556,20 +568,19 @@ t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_nume
 
 	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid);
 
+	if (pagina == NULL)
+	{
+		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
+		// TODO ver que notificar aca, es Page Fault? Es un error?
+		return;
+	}
+
 	return pagina;
 }
 
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
-
-	if (pagina == NULL)
-	{
-		log_warning(logger, "No se encontro una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
-		// TODO ver que notificar aca, es Page Fault?
-		notificar_page_fault_a_cpu();
-		return;
-	}
 
 	if (pagina->presencia == 0)
 	{
