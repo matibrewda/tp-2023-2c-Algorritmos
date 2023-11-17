@@ -182,6 +182,36 @@ t_paquete *crear_paquete_respuesta_pedir_info_de_memoria_inicial_para_cpu(t_log 
     return paquete;
 }
 
+
+// Kernel a FileSystem
+t_paquete* crear_paquete_para_filesystem(op_code codigo,uint32_t puntero , uint32_t tamanio, double direccion_fisica,char* nombre){
+    t_paquete* paquete = malloc(sizeof(t_paquete));
+    paquete->codigo_operacion=codigo;
+    paquete->buffer= malloc(sizeof(t_buffer));
+    uint32_t tamaniochar = strlen(nombre)+1;
+    int bytes =
+    sizeof(uint32_t)*3
+    + tamaniochar
+    + sizeof(double);
+
+    paquete->buffer->size = bytes;
+    void *stream = malloc(bytes);
+    memcpy(stream,&puntero,sizeof(uint32_t));
+    memcpy(stream+sizeof(uint32_t),&tamanio,sizeof(uint32_t));
+    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t),&direccion_fisica,sizeof(double));
+    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double),&tamaniochar,sizeof(uint32_t));
+    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double)+sizeof(uint32_t),nombre,tamaniochar);
+
+    paquete->buffer->stream=stream;
+
+    return paquete;
+}
+
+
+
+
+
+
 // Comunes
 t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_proceso_memoria *proceso_memoria)
 {
