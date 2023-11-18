@@ -207,6 +207,16 @@ t_paquete* crear_paquete_para_filesystem(op_code codigo,uint32_t puntero , uint3
     return paquete;
 }
 
+void deserializar_paquete_filesystem(t_buffer* buffer, uint32_t* puntero , uint32_t* tamanio, double* direccion_fisica,char* nombre){
+    void *stream = buffer->stream;
+    uint32_t tamaniochar;
+    memcpy(puntero,stream,sizeof(uint32_t));
+    memcpy(tamanio,stream+sizeof(uint32_t),sizeof(uint32_t));
+    memcpy(direccion_fisica,stream+sizeof(uint32_t)+sizeof(uint32_t),sizeof(double));
+    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double),tamaniochar,sizeof(uint32_t));
+    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double)+sizeof(uint32_t),nombre,tamaniochar);
+}
+
 
 
 
