@@ -17,6 +17,28 @@ int socket_kernel = -1;
 int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
+char* concatenarRutas(const char* rutaFat, const char* nombreFCB) {
+    // Asegúrate de tener suficiente espacio para ambas cadenas más el carácter nulo
+    size_t longitudTotal = strlen(rutaFat) + strlen(nombreFCB) + 1;
+
+    // Reserva memoria para la nueva cadena
+    char* rutaCompleta = (char*)malloc(longitudTotal);
+
+    // Verifica si la asignación de memoria fue exitosa
+    if (rutaCompleta == NULL) {
+        perror("Error al asignar memoria");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copia la primera cadena en la nueva cadena
+    strcpy(rutaCompleta, rutaFat);
+
+    // Concatena la segunda cadena en la nueva cadena
+    strcat(rutaCompleta, nombreFCB);
+
+    return rutaCompleta;
+}
+
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	// Inicializacion
@@ -103,6 +125,22 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
     // Liberar la memoria utilizada por el array de directorios, al final, al terminar filesystem.
     
+	// prueba asignar bloques
+	FATEntry* fat = abrirFAT(configuracion_filesystem->path_fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+	
+	// Prueba del contenido de cada ENTRADA FAT
+	
+	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
+        printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+    }
+	
+	char* ruta = concatenarRutas(configuracion_filesystem->path_fcb,"Notas1erParcialK9999.fcb");
+	BLOQUE** bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->tam_bloques);
+	
+	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
+    printf("Entrada BLOQUES %zu: %hhd\n", i, *bloques[i]->valorDeBloque);
+}
+	//asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
 
   	// PRUEBA DE TRUNCAR truncar_archivo
 
@@ -257,7 +295,6 @@ void reducir_tamano_archivo(FCB *fcb,t_config *config, int nuevo_tamano) {
 	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
 }
 
-
 int truncar_archivo(char* path, uint32_t nuevo_tamano) {
 	FCB *fcb;
 	t_config *config;
@@ -287,112 +324,3 @@ int truncar_archivo(char* path, uint32_t nuevo_tamano) {
 	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
 }
 
-
-// PETICIONES KERNEL...
-
-/* void abrirArchivo(char* ruta_archivo){
-Abrir archivo:
-La operación de abrir archivo consistirá en verificar que exista el
-FCB correspondiente al archivo.
-
-En caso de que exista deberá devolver el tamaño del archivo.
-En caso de que no exista, deberá informar que el archivo no existe.
-
-// Abrir FCB con nombre ruta_archivo
-// Si no existe DEVOLVER ARCHIVO NO EXISTE
-// Si existe DEVOLVER TAMAÑO DEL ARCHIVO
-} */
-
-/*int crearArchivo(){
-Crear Archivo
-En la operación crear archivo, se deberá crear un archivo FCB con tamaño 0 y sin bloque inicial.
-Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK.
-
-return EXIT_SUCCESS;
-}*/
-
-/* void truncarArchivo(char* ruta_archivo){
-	Truncar Archivo:
-Al momento de truncar un archivo, pueden ocurrir 2 situaciones:
-1) Ampliar el tamaño del archivo: Al momento de ampliar el tamaño del archivo deberá
-actualizar el tamaño del archivo en el FCB y se le deberán asignar tantos
-bloques como sea necesario para poder direccionar el nuevo tamaño.
-
-2) Reducir el tamaño del archivo: Se deberá asignar el nuevo tamaño del archivo en el FCB y
-se deberán marcar como libres todos los bloques que ya no sean necesarios para direccionar
-el tamaño del archivo (descartando desde el final del archivo hacia el principio).
-Siempre se van a poder truncar archivos para ampliarlos, no se realizará la prueba de llenar el FS.
-}*/
-
-/* void leerArchivo(char* ruta_archivo){
-
-}
-
-void escribirArchivo(char* ruta_archivo){
-
-} */
-
-// Peticiones MEMORIA:
-
-/* int inicarProceso(){
-return EXIT_SUCCESS;
-}
-
-int finalizarProceso(){
-return EXIT_SUCCESS;
-} */
-
-// PETICIONES KERNEL
-
-/* void abrirArchivo(char* ruta_archivo){
-Abrir archivo:
-La operación de abrir archivo consistirá en verificar que exista el
-FCB correspondiente al archivo.
-
-En caso de que exista deberá devolver el tamaño del archivo.
-En caso de que no exista, deberá informar que el archivo no existe.
-
-// Abrir FCB con nombre ruta_archivo
-// Si no existe DEVOLVER ARCHIVO NO EXISTE
-// Si existe DEVOLVER TAMAÑO DEL ARCHIVO
-}*/
-
-/* int crearArchivo(){
- Crear Archivo
-En la operación crear archivo, se deberá crear un archivo FCB con tamaño 0 y sin bloque inicial.
-Siempre será posible crear un archivo y por lo tanto esta operación deberá devolver OK.
-
-return EXIT_SUCCESS;
-} */
-
-/*void truncarArchivo(char* ruta_archivo){
-		Truncar Archivo:
-Al momento de truncar un archivo, pueden ocurrir 2 situaciones:
-1) Ampliar el tamaño del archivo: Al momento de ampliar el tamaño del archivo deberá
-actualizar el tamaño del archivo en el FCB y se le deberán asignar tantos
-bloques como sea necesario para poder direccionar el nuevo tamaño.
-
-2) Reducir el tamaño del archivo: Se deberá asignar el nuevo tamaño del archivo en el FCB y
-se deberán marcar como libres todos los bloques que ya no sean necesarios para direccionar
-el tamaño del archivo (descartando desde el final del archivo hacia el principio).
-Siempre se van a poder truncar archivos para ampliarlos, no se realizará la prueba de llenar el FS.
-
-}*/
-
-/* void leerArchivo(char* ruta_archivo){
-
-}
-
-void escribirArchivo(char* ruta_archivo){
-
-} */
-
-// Peticiones MEMORIA:
-
-/* int inicarProceso(){
-return EXIT_SUCCESS;
-}
-
-int finalizarProceso(){
-return EXIT_SUCCESS;
-} */
