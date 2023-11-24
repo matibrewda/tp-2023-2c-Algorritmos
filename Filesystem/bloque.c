@@ -12,11 +12,13 @@ int crearArchivoDeBloques(char* blocksFilePath, uint32_t cantDeBloquesTotales, u
 
     for (uint32_t i = 0; i < cantDeBloquesTotales; i++) {
         BLOQUE* bloque = asignarTamanioBloque(tamanioBloque);
-        fwrite(bloque->valorDeBloque, tamanioBloque, 1, archivoDeBloques);
+        fwrite(bloque, sizeof(BLOQUE), 1, archivoDeBloques);
         //fwrite(bloque, sizeof(BLOQUE), 1, archivoDeBloques);
         free(bloque->valorDeBloque);
         free(bloque);
     }
+
+
 
     fclose(archivoDeBloques);
     return 0;
