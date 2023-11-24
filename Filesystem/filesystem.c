@@ -140,8 +140,12 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
     printf("Entrada BLOQUES %zu: %hhd\n", i, *bloques[i]->valorDeBloque);
 }
-	//asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+ 
 
+
+
+	// liberar memoria!
   	// PRUEBA DE TRUNCAR truncar_archivo
 
 	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",10); 

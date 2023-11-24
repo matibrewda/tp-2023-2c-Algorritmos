@@ -3,6 +3,29 @@
 #include "bloque.h"
 #include "directorio.h"
 
+
+int32_t contarBloqueDisponibles(FATEntry fat[], size_t cantBloquesFAT) {
+    int32_t bloquesDisponibles = 0;
+
+    for (size_t i = 0; i < cantBloquesFAT; ++i) {
+        if (fat[i].block_value == 0) {
+            bloquesDisponibles++;
+        }
+    }
+
+    return bloquesDisponibles;
+}
+
+
+int32_t validarEspacioDisponible (int32_t tamanioArchivo,FATEntry fat[],size_t cantBloquesFAT){
+    
+    if (tamanioArchivo > contarBloqueDisponibles(fat,cantBloquesFAT)){
+        return -1;
+    } else return 0;
+}
+
+
+
 void modificarFATenArchivoFAT(const char* pathFAT, uint32_t numeroBloque, FATEntry *nuevaEntrada);
 
 // Implementacion de funciones
@@ -45,14 +68,14 @@ int iniciarFAT(t_log *logger, char *fat_path, uint32_t cant_bloques_total, uint3
                 arreglo[i].block_value = 0;
             }
 
-            arreglo[0].block_value = UINT32_MAX;
+            arreglo[0].block_value = INT32_MAX;
 
             // EScribimos el contenido del array en LOS archivos
 
             for (size_t j = 0; j < total_blocks; j++)
             {
 
-                fwrite(&arreglo[j], sizeof(u_int32_t), 1, fat_file);
+                fwrite(&arreglo[j], sizeof(int32_t), 1, fat_file);
             }
 
             log_debug(logger, "FS FAT: La tabla FAT se ha creado y inicializado con %ld entradas (bloques), todos ellos con direccion 0.\n", total_blocks);
@@ -78,7 +101,7 @@ FATEntry* abrirFAT(char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bl
     size_t total_blocks = cant_bloques_total - cant_bloques_swap;
 
     // Abro archivo FAT para lectura
-    FILE *fat_file = fopen(fat_path, "r");
+    FILE *fat_file = fopen(fat_path, "rb");
     if (fat_file == NULL) {
         // No se pudo abrir el archivo, retorna NULL
         return NULL;
@@ -94,7 +117,7 @@ FATEntry* abrirFAT(char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bl
     }
 
     // Leo el contenido del archivo y almaceno en el array
-    size_t read_blocks = fread(arreglo, sizeof(FATEntry), total_blocks, fat_file);
+    size_t read_blocks = fread(arreglo, sizeof(uint32_t), total_blocks, fat_file);
 
     if (read_blocks != total_blocks) {
         // Error al leer la FAT, retorna NULL
@@ -113,9 +136,18 @@ void cerrarFAT(FATEntry *arreglo) {
     // Liberar la memoria asignada para el array
     free(arreglo);
 }
-
+/* 
 int buscarBloqueLibre(FATEntry fat[], size_t total_blocks) {
-    for (size_t i = 0; i < total_blocks; ++i) {
+    for (size_t i = 0; i < total_blocks; i++) {
+        if (fat[i].block_value == 0) {
+            return i;  // Devuelve el índice del bloque libre
+        }
+    }
+    return -1;  // No hay bloques libres
+} */
+
+u_int32_t buscarBloqueLibre(FATEntry fat[], size_t total_blocks) {
+    for (size_t i = 0; i < total_blocks; i++) {
         if (fat[i].block_value == 0) {
             return i;  // Devuelve el índice del bloque libre
         }
@@ -123,17 +155,22 @@ int buscarBloqueLibre(FATEntry fat[], size_t total_blocks) {
     return -1;  // No hay bloques libres
 }
 
+
 void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *bloques[],FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP){
     
-    
+    size_t cantBloquesTotalesFAT = cantBloquesTotales - cantBLoquesSWAP;
     FCB *fcb = crear_fcb(pathFCB);
 
-    if (fcb->tamanio_archivo != INT32_MAX) {
+    int32_t espacioChecker = validarEspacioDisponible (fcb->tamanio_archivo,fat,cantBloquesTotalesFAT);
+
+    if (fcb->bloque_inicial == INT32_MAX && espacioChecker == 0) {
     int32_t cantBloquesAAsignar = fcb->tamanio_archivo;
-    int32_t ultBloqueAsignado = 0;
+    int32_t ultBloqueAsignado;
+
+    
 
     while (0 <  cantBloquesAAsignar) {
-        size_t cantBloquesTotalesFAT = cantBloquesTotales - cantBLoquesSWAP;
+        
         int8_t bloqueLibre = buscarBloqueLibre(fat,cantBloquesTotalesFAT);
         int8_t bloqueLibreAnt;
 
@@ -143,20 +180,25 @@ void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *blo
         bloqueLibre = buscarBloqueLibre(fat,cantBloquesTotalesFAT);
         fat[bloqueLibreAnt].block_value = bloqueLibre;
         bloques[bloqueLibreAnt + cantBLoquesSWAP]->valorDeBloque = &bloqueLibre;
-        ultBloqueAsignado = bloqueLibre;
+        ultBloqueAsignado = bloqueLibreAnt;
         modificarFATenArchivoFAT(pathFAT, bloqueLibreAnt, &fat[bloqueLibreAnt]);
         modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,bloqueLibre + cantBLoquesSWAP,bloques[bloqueLibre + cantBLoquesSWAP]);
-        }
+        } else printf("NO hay espacio");
 
-    if (cantBloquesAAsignar == fcb->tamanio_archivo) {
-        fcb->bloque_inicial = bloqueLibre;
+    if (cantBloquesAAsignar ==  fcb->tamanio_archivo) {
+        fcb->bloque_inicial = bloqueLibreAnt;
         guardar_fcb_en_archivo(fcb,pathFCB);
 } 
 
-cantBloquesAAsignar --;
+cantBloquesAAsignar--;
+}
 
-fat[ultBloqueAsignado].block_value = INT32_MAX;}}
-else printf("Archivo ya asignado.");
+fat[ultBloqueAsignado+1].block_value = INT32_MAX;
+modificarFATenArchivoFAT(pathFAT, ultBloqueAsignado+1, &fat[ultBloqueAsignado+1]);
+//modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,bloqueLibre + cantBLoquesSWAP,bloques[bloqueLibre + cantBLoquesSWAP]);
+        
+}
+else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");
 }
 
 void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry *fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP){
@@ -203,10 +245,10 @@ void modificarFATenArchivoFAT(const char* pathFAT, uint32_t numeroBloque, FATEnt
     }
 
     // Mover el puntero de archivo a la posición de la entrada deseada
-    fseek(archivoFAT, (numeroBloque) * sizeof(FATEntry), SEEK_SET);
+    fseek(archivoFAT, (numeroBloque) * sizeof(int32_t), SEEK_SET);
 
     // Escribir la nueva entrada en el archivo
-    fwrite(&nuevaEntrada, sizeof(FATEntry), 1, archivoFAT);
+    fwrite(nuevaEntrada, sizeof(int32_t), 1, archivoFAT);
 
     // Cerrar el archivo
     fclose(archivoFAT);
