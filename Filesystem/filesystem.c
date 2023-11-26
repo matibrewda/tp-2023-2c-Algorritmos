@@ -138,9 +138,11 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	BLOQUE** bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->tam_bloques);
 	
 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
-    printf("Entrada BLOQUES %zu: %hhd\n", i, *bloques[i]->valorDeBloque);
-}
-	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+    printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+} 
+
+	modificarBloque (configuracion_filesystem->path_bloques);
+	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
  
 
 

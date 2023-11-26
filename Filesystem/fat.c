@@ -156,7 +156,7 @@ u_int32_t buscarBloqueLibre(FATEntry fat[], size_t total_blocks) {
 }
 
 
-void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *bloques[],FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP){
+void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *bloques[],FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP, size_t tamanioBloque){
     
     size_t cantBloquesTotalesFAT = cantBloquesTotales - cantBLoquesSWAP;
     FCB *fcb = crear_fcb(pathFCB);
@@ -179,10 +179,11 @@ void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *blo
         fat[bloqueLibre].block_value  = -1;
         bloqueLibre = buscarBloqueLibre(fat,cantBloquesTotalesFAT);
         fat[bloqueLibreAnt].block_value = bloqueLibre;
-        bloques[bloqueLibreAnt + cantBLoquesSWAP]->valorDeBloque = &bloqueLibre;
+        memset(bloques[bloqueLibreAnt + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
+        printf("%s",bloques[bloqueLibreAnt + cantBLoquesSWAP]->valorDeBloque);
         ultBloqueAsignado = bloqueLibreAnt;
         modificarFATenArchivoFAT(pathFAT, bloqueLibreAnt, &fat[bloqueLibreAnt]);
-        modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,bloqueLibre + cantBLoquesSWAP,bloques[bloqueLibre + cantBLoquesSWAP]);
+        modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,(bloqueLibreAnt + cantBLoquesSWAP),bloques[bloqueLibreAnt + cantBLoquesSWAP],tamanioBloque);
         } else printf("NO hay espacio");
 
     if (cantBloquesAAsignar ==  fcb->tamanio_archivo) {
@@ -195,7 +196,8 @@ cantBloquesAAsignar--;
 
 fat[ultBloqueAsignado+1].block_value = INT32_MAX;
 modificarFATenArchivoFAT(pathFAT, ultBloqueAsignado+1, &fat[ultBloqueAsignado+1]);
-//modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,bloqueLibre + cantBLoquesSWAP,bloques[bloqueLibre + cantBLoquesSWAP]);
+memset(bloques[ultBloqueAsignado+1 + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
+modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,ultBloqueAsignado + 1 + cantBLoquesSWAP,bloques[ultBloqueAsignado+1 + cantBLoquesSWAP],tamanioBloque);
         
 }
 else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");

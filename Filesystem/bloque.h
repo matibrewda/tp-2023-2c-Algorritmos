@@ -20,5 +20,6 @@
 int crearArchivoDeBloques(char* blocksFilePath, uint32_t cantDeBloquesTotales, uint32_t tamanioBloque);
 BLOQUE* asignarTamanioBloque(uint32_t tamanioBloqueEnArchivoConfig);
 BLOQUE** leerBloquesDesdeArchivo(char* pathBLOQUES, uint32_t cantDeBloquesTotales, uint32_t tamanioBloque);
-void modificarBLOQUEenArchivoBLOQUE(char* pathBLOQUES,uint32_t numeroBloque, BLOQUE* nuevaEntrada);
+int modificarBLOQUEenArchivoBLOQUE(char* pathBLOQUES, uint32_t numeroBloque, BLOQUE* nuevaEntrada, u_int32_t tamanioBloque);
+void modificarBloque (char* path);
 #endif /* BLOQUE_H_ */
