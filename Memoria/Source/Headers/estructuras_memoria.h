@@ -9,8 +9,14 @@ typedef struct
 
 typedef struct
 {
-    int tam_pagina;
-} t_tabla_paginas_memoria;
+    int numero_de_pagina;
+    int pid;
+    int marco;
+    int presencia;
+    int modificado;
+    int posicion_en_swap;
+    // TODO agregar timestamp para LRU
+} t_entrada_de_tabla_de_pagina;
 
 typedef struct
 {
