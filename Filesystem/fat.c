@@ -225,7 +225,7 @@ else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");
 
  */
 
-void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry fat[], size_t cantBloquesTotales, size_t cantBLoquesSWAP) {
+void eliminarBloques(char* pathFAT, char* pathFCB, char* pathBLOQUES, FATEntry fat[], BLOQUE *bloques[],size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque) {
     FCB *fcb = crear_fcb(pathFCB);
     int32_t numBloqueActual;
     int32_t numBloqueSiguiente;
@@ -252,6 +252,9 @@ if (numBloqueActual != INT32_MAX){
         printf("%i\n", numBloqueActual);
     
         modificarFATenArchivoFAT(pathFAT, numBloqueActual, &fat[numBloqueActual]);
+        memset(bloques[numBloqueActual + cantBLoquesSWAP]->valorDeBloque, 'N', tamanioBloque);
+        modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,(numBloqueActual + cantBLoquesSWAP),bloques[numBloqueActual + cantBLoquesSWAP],tamanioBloque);
+        
         numBloqueActual = numBloqueSiguiente;
     }
 

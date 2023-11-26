@@ -157,12 +157,17 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
     printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 } 
 
-
-	printf("Mostrando tabla BLOQUES post eliminacion de bloques\n");
-	eliminarBloques(configuracion_filesystem->path_fat,ruta,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+	eliminarBloques(configuracion_filesystem->path_fat,ruta,configuracion_filesystem->path_bloques,fat,bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
+	
+	printf("Mostrando tabla FAT post eliminacion de bloques\n");
 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
         printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
     }
+
+	printf("Mostrando tabla BLOQUES post eliminacion de bloques\n");
+	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
+    printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+} 
 
 	// liberar memoria!
   	// PRUEBA DE TRUNCAR truncar_archivo

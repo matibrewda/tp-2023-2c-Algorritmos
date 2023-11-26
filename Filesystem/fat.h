@@ -22,6 +22,6 @@ FATEntry* abrirFAT(char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bl
 void cerrarFAT(FATEntry *arreglo);
 uint32_t buscarBloqueLibre(FATEntry *fat, size_t total_blocks);
 void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *bloques[],FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP,size_t tamanioBloque);
-void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP);
+void eliminarBloques(char* pathFAT, char* pathFCB, char* pathBLOQUES, FATEntry fat[], BLOQUE *bloques[],size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque);
 #endif /* FAT_H_ */
 
