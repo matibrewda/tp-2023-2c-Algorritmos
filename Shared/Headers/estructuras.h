@@ -94,4 +94,11 @@ typedef struct
     int tiempo_sleep;
 } t_bloqueo_sleep;
 
+typedef struct
+{
+    char* contenido;
+    int largo; // TODO ver si es necesario
+}t_contenido_pagina;
+
+
 #endif /* ESTRUCTURAS_H_ */

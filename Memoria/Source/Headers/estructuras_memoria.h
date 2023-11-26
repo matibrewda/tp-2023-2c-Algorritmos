@@ -20,6 +20,13 @@ typedef struct
 
 typedef struct
 {
+    int numero_de_marco;
+    int ocupado; // Ocupado = 1; Desocupado = 0
+} t_entrada_de_tabla_de_marco;
+
+
+typedef struct
+{
     FILE *archivo;
     int pid;
 } t_archivo_proceso;

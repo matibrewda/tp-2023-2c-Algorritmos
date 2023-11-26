@@ -6,6 +6,7 @@ t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
 t_list *tabla_de_paginas = NULL;
+t_list *tabla_de_marcos = NULL; // TODO implementar una lista propia de tamaño fijo? t_list no tiene tamaño fijo, es enlazada
 void *memoria_real;
 
 // Conexiones
@@ -94,6 +95,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Listas
 	procesos_iniciados = list_create();
 	tabla_de_paginas = list_create();
+	tabla_de_marcos = list_create();
 
 	// Creacion de Estructuras
 	inicializar_espacio_contiguo_de_memoria();
@@ -294,7 +296,6 @@ void finalizar_proceso_en_memoria(int pid)
 	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
-	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 	if (archivo_proceso == NULL)
 	{
@@ -391,6 +392,10 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
 	{
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		if (es_pagina_presente(entrada_tabla_de_paginas))
+		{
+			// TODO vaciar contenido del marco
+		}
 		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
 		list_remove_element(tabla_de_paginas, entrada_tabla_de_paginas);
 		free(entrada_tabla_de_paginas);
@@ -424,18 +429,18 @@ void escribir_pagina_en_swap()
 	// TODO IMPLEMENTAME PAA
 }
 
-int es_pagina_presente(t_entrada_de_tabla_de_pagina *victima)
+int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
 {
-	if (victima->presencia == 1)
+	if (pagina->presencia == 1)
 	{
 		return 1;
 	}
 	return 0;
 }
 
-int es_pagina_modificada(t_entrada_de_tabla_de_pagina *victima)
+int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina)
 {
-	if (victima->modificado == 1)
+	if (pagina->modificado == 1)
 	{
 		return 1;
 	}
@@ -486,7 +491,7 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	return entradas_tabla_de_pagina;
 }
 
-char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
+t_contenido_pagina *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
 	// TODO ver que retorna esta funcion
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
@@ -494,7 +499,7 @@ char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 
 	// TODO hace falta sincronizar
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	char *contenido_del_bloque;
+	t_contenido_pagina *contenido_del_bloque;
 	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
 	{
 		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem);
@@ -506,7 +511,14 @@ char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
-	char *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
+	if (es_pagina_presente(pagina))
+	{
+		// Retornar el contenido del marco en el que esta esa pagina
+		t_contenido_pagina *contenido_pagina = buscar_contenido_marco(pagina->marco);
+		// TODO crear paquete y devolver contenido a kernel
+		return;
+	}
+	t_contenido_pagina *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
 
 	/*
 	TODO Listas de marcos? Posible solucion
@@ -526,6 +538,20 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 
 	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger);
 	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+}
+
+t_contenido_pagina *buscar_contenido_marco(int numero_de_marco)
+{
+	/* TODO implementar
+	Va a hacer un memcpy(ver q params se le pasa) desde el numero de marco por el tamaño de pagina y eso me va a traer la primer
+	posicion del marco
+	*/
+	return NULL;
+}
+
+bool existe_un_marco_vacio()
+{
+	//
 }
 
 void reemplazar_pagina(int pid, int numero_de_pagina)
@@ -571,7 +597,7 @@ t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_nume
 	if (pagina == NULL)
 	{
 		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
-		// TODO ver que notificar aca, es Page Fault? Es un error?
+		// TODO ver que notificar aca, es Page Fault? Es un error de pagina INVALIDA?
 		return;
 	}
 
