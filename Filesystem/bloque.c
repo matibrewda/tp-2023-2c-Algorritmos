@@ -225,10 +225,10 @@ BLOQUE** leerBloquesDesdeArchivo(char* pathBLOQUES, uint32_t cantDeBloquesTotale
 }
 
 
-void modificarBloque (char* path){
+void modificarBloque (char* path,int32_t tamanioBloque){
     FILE* archivoBloques = fopen(path,"r+b");
 
-    fwrite("UUUU",sizeof(u_int8_t)*4,1,archivoBloques);
+    fwrite("UUUU",sizeof(u_int8_t)*tamanioBloque,1,archivoBloques);
 
 }
 

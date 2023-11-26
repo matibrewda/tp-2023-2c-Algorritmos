@@ -203,25 +203,62 @@ modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,ultBloqueAsignado + 1 + cantBLoquesSW
 else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");
 }
 
-void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry *fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP){
+/* void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP){
     FCB *fcb = crear_fcb(pathFCB);
 
     // validar que no sea max uint
-    int32_t numBloqueSiguiente = fat [fcb->bloque_inicial]->block_value;
+    int32_t numBloqueSiguiente = fat [fcb->bloque_inicial].block_value;
 
-    fat [fcb->bloque_inicial]->block_value = 0;
-    modificarFATenArchivoFAT(pathFAT,fcb->bloque_inicial, fat[fcb->bloque_inicial]);
+    fat [fcb->bloque_inicial].block_value = 0;
+    modificarFATenArchivoFAT(pathFAT,fcb->bloque_inicial, &fat[fcb->bloque_inicial]);
 
-    while (fat[numBloqueSiguiente]->block_value != UINT32_MAX){
-        int32_t numBloqueSiguienteAux = fat[numBloqueSiguiente]->block_value;
-        fat [numBloqueSiguiente]->block_value = 0;
-        modificarFATenArchivoFAT(pathFAT,fcb->bloque_inicial, fat[numBloqueSiguiente]);
+    while (fat[numBloqueSiguiente].block_value != UINT32_MAX){
+        int32_t numBloqueSiguienteAux = fat[numBloqueSiguiente].block_value;
+        fat [numBloqueSiguiente].block_value = 0;
+        modificarFATenArchivoFAT(pathFAT,fcb->bloque_inicial, &fat[numBloqueSiguiente]);
         numBloqueSiguiente = numBloqueSiguienteAux;
         
     }
-    fat[numBloqueSiguiente]->block_value = 0;
+    fat[numBloqueSiguiente].block_value = 0;
 }
 
+
+ */
+
+void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry fat[], size_t cantBloquesTotales, size_t cantBLoquesSWAP) {
+    FCB *fcb = crear_fcb(pathFCB);
+    int32_t numBloqueActual;
+    int32_t numBloqueSiguiente;
+    int32_t cantBLoquesUsadosPorArchivo;
+    if (fcb != NULL) {
+    numBloqueActual = fcb->bloque_inicial;
+    cantBLoquesUsadosPorArchivo = fcb->tamanio_archivo;
+    
+
+    printf("%i\n", numBloqueActual);
+
+} else {
+    printf("Error: No se pudo crear el FCB\n");
+    return;
+}
+
+if (numBloqueActual != INT32_MAX){
+
+      for (int i = 0; i <= cantBLoquesUsadosPorArchivo; i++) {
+
+        numBloqueSiguiente = fat[numBloqueActual].block_value;
+        fat[numBloqueActual].block_value = 0;
+
+        printf("%i\n", numBloqueActual);
+    
+        modificarFATenArchivoFAT(pathFAT, numBloqueActual, &fat[numBloqueActual]);
+        numBloqueActual = numBloqueSiguiente;
+    }
+
+    //Actualizar el bloque inicial en el FCB
+    fcb->bloque_inicial = INT32_MAX;
+    guardar_fcb_en_archivo(fcb, pathFCB);
+}}
 
 
 /* 

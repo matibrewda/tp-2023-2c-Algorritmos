@@ -130,6 +130,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	
 	// Prueba del contenido de cada ENTRADA FAT
 	
+	printf("Mostrando tabla FAT inicial"); // Luego borrar esta linea!
 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
         printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
     }
@@ -137,15 +138,31 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	char* ruta = concatenarRutas(configuracion_filesystem->path_fcb,"Notas1erParcialK9999.fcb");
 	BLOQUE** bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->tam_bloques);
 	
+	printf("Mostrando tabla BLOQUES inicial"); // Luego borrar esta linea!
 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
     printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 } 
 
-	modificarBloque (configuracion_filesystem->path_bloques);
+	//modificarBloque (configuracion_filesystem->path_bloques,configuracion_filesystem->tam_bloques);
 	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
- 
+	
+	printf("Mostrando tabla FAT post modificacion\n"); // Luego borrar esta linea!
+
+	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
+        printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+    }
+
+	printf("Mostrando tabla BLOQUES post modificacion\n"); // Luego borrar esta linea!
+	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
+    printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+} 
 
 
+	printf("Mostrando tabla BLOQUES post eliminacion de bloques\n");
+	eliminarBloques(configuracion_filesystem->path_fat,ruta,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
+        printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+    }
 
 	// liberar memoria!
   	// PRUEBA DE TRUNCAR truncar_archivo
