@@ -56,7 +56,7 @@ int main()
 // TODO: chequear frees!
 // free(recursos_disponibles);
 // list_destroy(procesos_a_analizar);
-bool hay_deadlock()
+void analisis_deadlock()
 {
 	int *recursos_totales = instancias_recursos;
 	int *recursos_disponibles = obtener_vector_recursos_disponibles();

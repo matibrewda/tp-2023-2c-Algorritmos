@@ -1263,3 +1263,193 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 		}
 	}
 }
+
+t_list *obtener_procesos_analisis_deadlock()
+{
+	t_list *resultado = list_create();
+	t_pcb *pcb;
+	t_pcb_analisis_deadlock *pcb_a_analizar_existente;
+	t_pcb_analisis_deadlock *pcb_a_analizar_nuevo;
+	t_recurso *recurso;
+	t_list_iterator *iterador_pcbs_asignados;
+	t_list_iterator *iterador_pcbs_bloqueados;
+	int i, j;
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+
+	bool _filtro_pcb_por_id(t_pcb * unpcb)
+	{
+		return unpcb->pid == pcb->pid;
+	};
+
+	for (i = 0; i < cantidad_de_recursos; i++)
+	{
+		recurso = list_get(recursos, i);
+		iterador_pcbs_asignados = list_iterator_create(recurso->pcbs_asignados);
+
+		while (list_iterator_has_next(iterador_pcbs_asignados))
+		{
+			pcb = list_iterator_next(iterador_pcbs_asignados);
+			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
+
+			if (pcb_a_analizar_existente == NULL)
+			{
+				pcb_a_analizar_nuevo = malloc(sizeof(t_pcb_analisis_deadlock));
+
+				pcb_a_analizar_nuevo->finalizado = false;
+				pcb_a_analizar_nuevo->pid = pcb->pid;
+				pcb_a_analizar_nuevo->recursos_asignados = malloc(cantidad_de_recursos * sizeof(int));
+				pcb_a_analizar_nuevo->solicitudes_actuales = malloc(cantidad_de_recursos * sizeof(int));
+
+				for (j = 0; j < cantidad_de_recursos; j++)
+				{
+					pcb_a_analizar_nuevo->recursos_asignados[j] = 0;
+					pcb_a_analizar_nuevo->solicitudes_actuales[j] = 0;
+				}
+
+				pcb_a_analizar_nuevo->recursos_asignados[i]++;
+
+				list_add(resultado, pcb_a_analizar_nuevo);
+			}
+			else
+			{
+				pcb_a_analizar_existente->recursos_asignados[i]++;
+			}
+		}
+		list_iterator_destroy(iterador_pcbs_asignados);
+	}
+
+	for (i = 0; i < cantidad_de_recursos; i++)
+	{
+		recurso = list_get(recursos, i);
+		iterador_pcbs_bloqueados = list_iterator_create(recurso->pcbs_bloqueados->elements);
+		while (list_iterator_has_next(iterador_pcbs_bloqueados))
+		{
+			pcb = list_iterator_next(iterador_pcbs_bloqueados);
+			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
+
+			if (pcb_a_analizar_existente != NULL)
+			{
+				pcb_a_analizar_existente->solicitudes_actuales[i]++;
+			}
+		}
+		list_iterator_destroy(iterador_pcbs_bloqueados);
+	}
+
+	return resultado;
+}
+
+int *obtener_vector_recursos_disponibles()
+{
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+	int *recursos_disponibles = (int *)malloc(cantidad_de_recursos * sizeof(int));
+
+	for (int i = 0; i < cantidad_de_recursos; i++)
+	{
+		t_recurso *recurso = list_get(recursos, i);
+		recursos_disponibles[i] = recurso->instancias_disponibles;
+	}
+
+	return recursos_disponibles;
+}
+
+// TODO: chequear frees!
+// free(recursos_disponibles);
+// list_destroy(procesos_a_analizar);
+void analisis_deadlock()
+{
+	int *recursos_totales = configuracion_kernel->instancias_recursos;
+	int *recursos_disponibles = obtener_vector_recursos_disponibles();
+	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
+	bool finalice_alguno = true;
+	t_list_iterator *iterador_procesos_a_analizar;
+	t_pcb_analisis_deadlock *pcb_analisis_deadlock;
+	int cantidad_procesos_a_analizar = list_size(procesos_a_analizar);
+	int cantidad_iteraciones_realizadas = 0;
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+
+	// INICIO LOGUEO
+	loguear_vector(recursos_totales, cantidad_de_recursos, "RECURSOS TOTALES", -1);
+	loguear_vector(recursos_disponibles, cantidad_de_recursos, "RECURSOS DISPONIBLES", -1);
+	iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
+	while (list_iterator_has_next(iterador_procesos_a_analizar))
+	{
+		pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+		loguear_vector(pcb_analisis_deadlock->recursos_asignados, cantidad_de_recursos, "RECURSOS DISPONIBLES", pcb_analisis_deadlock->pid);
+		loguear_vector(pcb_analisis_deadlock->solicitudes_actuales, cantidad_de_recursos, "SOLICITUDES ACTUALES", pcb_analisis_deadlock->pid);
+	}
+	list_iterator_destroy(iterador_procesos_a_analizar);
+	// FIN LOGUEO
+
+	// INICIO ALGORITMO
+	if (list_is_empty(procesos_a_analizar))
+	{
+		return false;
+	}
+
+	while (finalice_alguno && cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar)
+	{
+		finalice_alguno = false;
+
+		log_info(logger, "ITERACION %d", cantidad_iteraciones_realizadas);
+		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
+		while (list_iterator_has_next(iterador_procesos_a_analizar) && !finalice_alguno)
+		{
+			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+
+			if (!pcb_analisis_deadlock->finalizado)
+			{
+				log_info(logger, "SE PUEDEN SATISFACER LAS SOLICITUDES DE PID %d?", pcb_analisis_deadlock->pid);
+
+				bool se_puede_satisfacer_solicitudes = true;
+				for (int i = 0; i < cantidad_de_recursos; i++)
+				{
+					se_puede_satisfacer_solicitudes = se_puede_satisfacer_solicitudes && recursos_disponibles[i] >= pcb_analisis_deadlock->solicitudes_actuales[i];
+				}
+
+				if (se_puede_satisfacer_solicitudes)
+				{
+					finalice_alguno = true;
+					log_info(logger, "SI!");
+
+					pcb_analisis_deadlock->finalizado = true;
+
+					for (int i = 0; i < cantidad_de_recursos; i++)
+					{
+						recursos_disponibles[i] = recursos_disponibles[i] + pcb_analisis_deadlock->recursos_asignados[i];
+					}
+				}
+				else
+				{
+					log_info(logger, "NO!");
+				}
+			}
+		}
+		list_iterator_destroy(iterador_procesos_a_analizar);
+
+		loguear_vector(recursos_disponibles, cantidad_de_recursos, "RECURSOS DISPONIBLES", -1);
+		cantidad_iteraciones_realizadas++;
+	}
+
+	bool hay_deadlock = cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar;
+
+	if (hay_deadlock)
+	{
+		log_info(logger, "HAY DEADLOCK");
+
+		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
+		while (list_iterator_has_next(iterador_procesos_a_analizar))
+		{
+			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+			if (!pcb_analisis_deadlock->finalizado)
+			{
+				log_info(logger, "PID %d ESTA EN DEADLOCK", pcb_analisis_deadlock->pid);
+			}
+		}
+	}
+	else
+	{
+		log_info(logger, "NO HAY DEADLOCK");
+	}
+
+	return hay_deadlock;
+}

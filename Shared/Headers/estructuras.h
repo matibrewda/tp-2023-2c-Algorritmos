@@ -87,6 +87,14 @@ typedef struct
 
 typedef struct
 {
+	int pid;
+	bool finalizado;
+	int* recursos_asignados;
+	int* solicitudes_actuales;
+} t_pcb_analisis_deadlock;
+
+typedef struct
+{
 	t_pcb* pcb;
     int tiempo_sleep;
 } t_bloqueo_sleep;
