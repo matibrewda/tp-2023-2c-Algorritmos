@@ -12,6 +12,9 @@
 #include <semaphore.h>
 #include <math.h>
 #include <stdint.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <string.h>
 
 #include <commons/collections/list.h>
 #include <commons/collections/queue.h>

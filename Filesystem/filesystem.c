@@ -379,25 +379,43 @@ int truncar_archivo(char* path, uint32_t nuevo_tamano) {
     // Si el nuevo tamaño es igual al actual, no se requiere acción.
 	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
 }
-/*
+
 void inicializar_fat(){
 	FILE* fat ;
 	log_debug(logger,"Inicializando Tabla FAT");
 	fat = fopen(configuracion_filesystem->path_fat,"rb");
 	if(!fat){
-		fat = fopen(configuracion_filesystem->path_fat,"rb");
+		fat = fopen(configuracion_filesystem->path_fat,"wb");
 		if (fat)
 		{
 			int tamanio_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap)* sizeof(uint32_t);
-			ftruncate(fat,tamanio_fat);
-			char *buffer
+			for (uint32_t i = 0; i < tamanio_fat ; i++)
+			{
+				fputc(0,fat);
+			}
+			
 
-		}
-		
+		}else
+	{
+		log_debug(logger,"No se pudo crear el archivo FAT");
 	}
+
+	} else
+	{
+		log_debug(logger,"ya existe el archivo FAT");
+	}
+	
 }
 
 void inicializar_archivo_de_bloques(){
-	int fd = open(configuracion_filesystem->path_bloques, O_RDWR | O_CREATE, S_IRUSR | S_IWUSR);
-	void *ptrblq = mmap(NULL, configuracion_filesystem->cant_bloques_total*configuracion_filesystem->tam_bloques,PROT_READ | PROT_WRITE, fd, 0);
-}*/
+	int fd = open(configuracion_filesystem->path_bloques, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+	int tamanio_bloques = configuracion_filesystem->cant_bloques_total*configuracion_filesystem->tam_bloques;
+	ftruncate(fd,tamanio_bloques);
+	void *ptrblq = mmap(NULL, tamanio_bloques,PROT_READ | PROT_WRITE, MAP_SHARED ,fd, 0);
+	void *bloques = malloc(bloques);
+	memcpy(ptrblq,bloques,tamanio_bloques);
+	msync(ptrblq,tamanio_bloques,MS_SYNC);
+	munmap(ptrblq,tamanio_bloques);
+	free(bloques);
+	close(fd);
+}
