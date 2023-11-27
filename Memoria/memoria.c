@@ -515,9 +515,11 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	{
 		// Retornar el contenido del marco en el que esta esa pagina
 		t_contenido_pagina *contenido_pagina = buscar_contenido_marco(pagina->marco);
-		// TODO crear paquete y devolver contenido a kernel
+		t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger, contenido_pagina);
+		enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 		return;
 	}
+	
 	t_contenido_pagina *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
 
 	/*
@@ -536,7 +538,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	pagina->presencia = 1;
 	// pagina->marco = ?;
 
-	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger);
+	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger, NULL); // TODOO mandar contenido pagina
 	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 }
 
