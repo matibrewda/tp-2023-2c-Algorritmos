@@ -249,10 +249,37 @@ void *comunicacion_memoria()
 
 void *comunicacion_kernel()
 {
+	uint32_t puntero;
+	uint32_t tamanio; 
+	double direccion_fisica;
+	char* nombre;
 	while (true)
 	{
-		int operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
+		op_code operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+		void* buffer = recibir_paquete(logger,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_KERNEL,sizeof(t_buffer),conexion_con_kernel,operacion_recibida_kernel);
+		
 		log_debug(logger, "se recibio la operacion %s de %s", nombre_opcode(operacion_recibida_kernel), NOMBRE_MODULO_KERNEL);
+		deserializar_paquete_filesystem(buffer,puntero,tamanio,direccion_fisica,nombre);
+		switch (operacion_recibida_kernel)
+		{
+		case F_OPEN:
+			
+			break;
+		case F_CREATE:
+			
+			break;
+		case F_READ:
+			
+			break;
+		case F_WRITE:
+			
+			break;
+		case F_TRUNCATE:
+			
+			break;
+		default:
+			break;
+		}
 		
 		/*
 		t_paquete *paquete_para_cpu = crear_paquete(logger, operacion_recibida_kernel);
@@ -263,7 +290,7 @@ void *comunicacion_kernel()
 }
 
 
- int crear_archivo (char* path,char* nombreNuevoArchivo) {
+int crear_archivo (char* path,char* nombreNuevoArchivo) {
 	char nombreFormateado[256]; // Asegúrate de que este array es lo suficientemente grande
     sprintf(nombreFormateado, "%s.fcb", nombreNuevoArchivo);
 	//Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
@@ -352,4 +379,25 @@ int truncar_archivo(char* path, uint32_t nuevo_tamano) {
     // Si el nuevo tamaño es igual al actual, no se requiere acción.
 	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
 }
+/*
+void inicializar_fat(){
+	FILE* fat ;
+	log_debug(logger,"Inicializando Tabla FAT");
+	fat = fopen(configuracion_filesystem->path_fat,"rb");
+	if(!fat){
+		fat = fopen(configuracion_filesystem->path_fat,"rb");
+		if (fat)
+		{
+			int tamanio_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap)* sizeof(uint32_t);
+			ftruncate(fat,tamanio_fat);
+			char *buffer
 
+		}
+		
+	}
+}
+
+void inicializar_archivo_de_bloques(){
+	int fd = open(configuracion_filesystem->path_bloques, O_RDWR | O_CREATE, S_IRUSR | S_IWUSR);
+	void *ptrblq = mmap(NULL, configuracion_filesystem->cant_bloques_total*configuracion_filesystem->tam_bloques,PROT_READ | PROT_WRITE, fd, 0);
+}*/
