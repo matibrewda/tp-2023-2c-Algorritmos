@@ -37,21 +37,37 @@
 // Handshake con CPU
 void enviar_info_de_memoria_inicial_para_cpu();
 
+// Inicializacion de estructuras
+void inicializar_espacio_contiguo_de_memoria();
 
-//Iniciar proceso
-void iniciar_proceso_memoria(char* path, int size, int prioridad, int pid);
+// Iniciar proceso
+void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
 t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques);
+t_list *recibir_paquete_pedir_bloques_a_filesystem();
+void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid);
+
+// Finalizar proceso
 void finalizar_proceso_en_memoria(int pid);
 void pedir_liberacion_de_bloques_a_filesystem();
+void limpiar_entradas_tabla_de_paginas(int pid);
 
-//Notificacion filesystem
+// Notificacion filesystem
 void notificar_lectura_a_filesystem();
 void notificar_escritura_a_filesystem();
+
+// Notificacion CPU
+void notificar_page_fault_a_cpu();
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
 void cerrar_archivo_con_pid(int pid);
+void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina);
+t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid);
+t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
+
+// Manejo de Paginas
+void cargar_pagina_en_memoria(int pid, int numero_de_pagina);
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);
@@ -62,8 +78,8 @@ void destruir_listas();
 void terminar_memoria();
 
 // Hilos
-void* atender_kernel();
-void* atender_cpu();
-void* atender_filesystem();
+void *atender_kernel();
+void *atender_cpu();
+void *atender_filesystem();
 
 #endif /* MEMORIA_H_ */
