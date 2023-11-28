@@ -387,13 +387,14 @@ void inicializar_fat(){
 	if(!fat){
 		fat = fopen(configuracion_filesystem->path_fat,"wb");
 		if (fat)
-		{
+		{	
+			uint32_t a = 0;
 			uint32_t tamanio_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap);
 			for (uint32_t i = 0; i < tamanio_fat ; i++)
 			{
-				fputc(0,fat);
+				fwrite(&a,sizeof(uint32_t),1,fat);
 			}
-			
+			free(a);
 
 		}else
 	{
