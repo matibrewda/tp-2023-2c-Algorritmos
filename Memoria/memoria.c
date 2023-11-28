@@ -165,6 +165,19 @@ void *atender_cpu()
 			enviar_numero_de_marco_a_cpu(pedido_numero_de_marco->pid, pedido_numero_de_marco->numero_de_pagina);
 			free(pedido_numero_de_marco);
 		}
+		else if (operacion_recibida_de_cpu == SOLICITUD_LEER_VALOR_EN_MEMORIA)
+		{
+			int direccion_fisica = leer_paquete_solicitud_leer_valor_en_memoria(logger, conexion_con_cpu);
+			uint32_t valor_leido = leer_valor_en_memoria(direccion_fisica);
+			enviar_valor_leido_a_cpu(valor_leido);
+		}
+		else if (operacion_recibida_de_cpu == SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA)
+		{
+			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = leer_paquete_solicitud_escribir_valor_en_memoria(logger, conexion_con_cpu);
+			escribir_valor_en_memoria(pedido_escribir_valor_en_memoria->direccion_fisica,pedido_escribir_valor_en_memoria->valor_a_escribir);
+			notificar_escritura_a_cpu();
+			free(pedido_escribir_valor_en_memoria);
+		}
 	}
 }
 
@@ -188,6 +201,36 @@ void *atender_filesystem()
 			free(pedido_escribir_archivo);
 		}
 	}
+}
+
+void enviar_valor_leido_a_cpu(uint32_t valor_leido)
+{
+	log_debug(logger, "Comenzando la creacion de paquete para enviar valor leido en memoria a la CPU");
+
+	t_valor_leido_en_memoria *valor_leido_en_memoria = malloc(sizeof(t_valor_leido_en_memoria));
+	valor_leido_en_memoria->valor_leido = valor_leido;
+
+	t_paquete *paquete = crear_paquete_respuesta_leer_valor_en_memoria(logger, valor_leido_en_memoria);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+	free(valor_leido_en_memoria);
+}
+
+void notificar_escritura_a_cpu()
+{
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+}
+
+void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
+{
+	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
+}
+
+uint32_t leer_valor_en_memoria(int direccion_fisica)
+{
+	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego leer el valor usando el puntero "memoria_real"
+	return 3; // XD
 }
 
 void enviar_info_de_memoria_inicial_para_cpu()
@@ -347,13 +390,6 @@ void notificar_lectura_a_filesystem()
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
-void notificar_page_fault_a_cpu()
-{
-	log_debug(logger, "Notificando Page Fault a CPU");
-	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_PAGE_FAULT_A_CPU, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-}
-
 void notificar_escritura_a_filesystem()
 {
 	log_debug(logger, "Notificando a File System de lectura exitosa en memoria");
@@ -392,7 +428,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	{
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
 		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
-		list_remove_element(tabla_de_paginas, entrada_tabla_de_paginas);
+		//list_remove(tabla_de_paginas, entrada_tabla_de_paginas); // TODO: no compila
 		free(entrada_tabla_de_paginas);
 	}
 	log_trace(logger, "Se limpian correctamente las entradas de tabla de paginas para el pid %d", pid);
@@ -572,7 +608,7 @@ t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_nume
 	{
 		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
 		// TODO ver que notificar aca, es Page Fault? Es un error?
-		return;
+		return NULL;
 	}
 
 	return pagina;
@@ -581,15 +617,18 @@ t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_nume
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	int numero_marco = -1;
 
 	if (pagina->presencia == 0)
 	{
 		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
-		notificar_page_fault_a_cpu();
-		return;
+	}
+	else
+	{
+		numero_marco = pagina->marco;
 	}
 
-	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, pagina->marco);
+	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
 

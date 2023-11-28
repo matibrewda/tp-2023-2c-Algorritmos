@@ -34,6 +34,15 @@
 #define RUTA_ARCHIVO_DE_LOGS "Logs/memoria.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
+// ?????
+void cargar_datos_de_pagina_en_memoria_real(t_entrada_de_tabla_de_pagina *pagina);
+void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco);
+void reemplazar_pagina(int pid, int numero_de_pagina);
+void enviar_valor_leido_a_cpu(uint32_t valor_leido);
+void notificar_escritura_a_cpu();
+void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor);
+uint32_t leer_valor_en_memoria(int direccion_fisica);
+
 // Handshake con CPU
 void enviar_info_de_memoria_inicial_para_cpu();
 
@@ -55,9 +64,6 @@ void limpiar_entradas_tabla_de_paginas(int pid);
 // Notificacion filesystem
 void notificar_lectura_a_filesystem();
 void notificar_escritura_a_filesystem();
-
-// Notificacion CPU
-void notificar_page_fault_a_cpu();
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
