@@ -5,6 +5,8 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
+#include "fat.h"
+#include "bloque.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -35,8 +37,8 @@
 
 void *comunicacion_kernel();
 void *comunicacion_memoria();
-bool crear_archivo(char* path);
-
+int32_t crear_archivo (char* path,char* nombreNuevoArchivo);
+int32_t truncar_archivo(char* path, uint32_t nuevo_tamano,t_config_filesystem *configuracion_filesystem,FATEntry fat[], BLOQUE *bloques[]);
 
 // Terminar
 void terminar_filesystem();
