@@ -350,6 +350,7 @@ void finalizar_proceso_en_memoria(int pid)
 	}
 	cerrar_archivo_con_pid(pid);
 
+	// TODO: liberar bloques en swap (CONEXION CON FILESYSTEM)
 	limpiar_entradas_tabla_de_paginas(pid);
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 	free(archivo_proceso);
@@ -421,6 +422,8 @@ t_list *recibir_paquete_pedir_bloques_a_filesystem()
 		void *buffer_con_offset = buffer;
 
 		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+
+		// TO DO: si posiciones_swap is empty, entonces devolver error al kernel
 	}
 
 	return posiciones_swap;
