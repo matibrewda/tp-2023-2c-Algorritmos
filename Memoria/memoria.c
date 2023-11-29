@@ -225,11 +225,16 @@ void notificar_escritura_a_cpu()
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
 	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
+
+	// Retardo de respuesta!
+	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 }
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
 	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego leer el valor usando el puntero "memoria_real"
+	// Retardo de respuesta!
+	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return 3; // XD
 }
 

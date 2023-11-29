@@ -750,6 +750,7 @@ void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica)
 {
 	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
 
+	// MMU
 	int numero_de_pagina = obtener_numero_de_pagina_desde_direccion_logica(direccion_logica);
 	int numero_de_marco = pedir_numero_de_marco_a_memoria(numero_de_pagina);
 	bool page_fault = numero_de_marco == -1;
@@ -759,16 +760,16 @@ void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica)
 	{
 		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
 		se_ejecuto_instruccion_bloqueante = true;
-
-		//devolver_contexto_por_page_fault(); // TO DO
+		devolver_contexto_por_page_fault(numero_de_pagina);
 	}
 	else
 	{
 		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
 		
+		u_int32_t valor_leido_en_memoria = leer_valor_en_memoria(direccion_fisica);
+		escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
 
-
-		//log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: ", pid_ejecutando, numero_de_pagina);
+		log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
 	}
 
 	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
@@ -778,7 +779,27 @@ void ejecutar_instruccion_mov_out(int direccion_logica, char *nombre_registro)
 {
 	log_info(logger, "PID: %d - Ejecutando: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 
-	// TO DO
+	// MMU
+	int numero_de_pagina = obtener_numero_de_pagina_desde_direccion_logica(direccion_logica);
+	int numero_de_marco = pedir_numero_de_marco_a_memoria(numero_de_pagina);
+	bool page_fault = numero_de_marco == -1;
+	int direccion_fisica = numero_de_marco * tamanio_pagina + obtener_desplazamiento_desde_direccion_logica(direccion_logica);
+
+	if (page_fault)
+	{
+		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
+		se_ejecuto_instruccion_bloqueante = true;
+		devolver_contexto_por_page_fault(numero_de_pagina);
+	}
+	else
+	{
+		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
+		
+		u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
+		escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
+
+		log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
+	}
 
 	log_trace(logger, "PID: %d - Ejecutada: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 }
