@@ -213,7 +213,7 @@ void deserializar_paquete_filesystem(t_buffer* buffer, uint32_t* puntero , uint3
     memcpy(puntero,stream,sizeof(uint32_t));
     memcpy(tamanio,stream+sizeof(uint32_t),sizeof(uint32_t));
     memcpy(direccion_fisica,stream+sizeof(uint32_t)+sizeof(uint32_t),sizeof(double));
-    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double),tamaniochar,sizeof(uint32_t));
+    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double),&tamaniochar,sizeof(uint32_t));
     memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double)+sizeof(uint32_t),nombre,tamaniochar);
 }
 
