@@ -16,8 +16,10 @@ typedef struct {
     int32_t block_value;  // Valor de la entrada de la FAT
 } FATEntry;
 
+void restarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat[], BLOQUE *bloques[], size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque, uint32_t bloquesARestar);
+void sumarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat[], BLOQUE *bloques[], size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque, uint32_t bloquesASumar);
 void modificarFATenArchivoFAT(const char* pathFAT, uint32_t numeroBloque, FATEntry *nuevaEntrada);
-int iniciarFAT(t_log *logger, char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bloques_swap, uint32_t tamanio_bloque);
+int32_t iniciarFAT(t_log *logger, char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bloques_swap, uint32_t tamanio_bloque);
 FATEntry* abrirFAT(char *fat_path, uint32_t cant_bloques_total, uint32_t cant_bloques_swap);
 void cerrarFAT(FATEntry *arreglo);
 uint32_t buscarBloqueLibre(FATEntry *fat, size_t total_blocks);

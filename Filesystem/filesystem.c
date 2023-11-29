@@ -172,7 +172,20 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// liberar memoria!
   	// PRUEBA DE TRUNCAR truncar_archivo
 
-	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",5); 
+	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin","/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
+	
+	
+	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",6,configuracion_filesystem,fat,bloques); 
+
+	printf("Mostrando tabla FAT post truncamiento\n");
+	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
+        printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+    }
+
+	printf("Mostrando tabla BLOQUES post truncamiento\n");
+	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
+    printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+} 
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
@@ -301,55 +314,26 @@ void *comunicacion_kernel()
 } */
 
 
-void ampliar_tamano_archivo(FCB *fcb, t_config *config, int nuevo_tamano) {
-    // Actualizar tamaño en la estructura FCB
-    fcb->tamanio_archivo = nuevo_tamano;
+int32_t truncar_archivo(char* path, uint32_t nuevo_tamano,t_config_filesystem *configuracion_filesystem,FATEntry fat[], BLOQUE *bloques[]) {
 
-    // Actualizar tamaño en la configuración
-    char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
-    int result = snprintf(nuevo_tamano_str, sizeof(nuevo_tamano_str), "%u", fcb->tamanio_archivo);
-
-    if (result >= 0 && result < sizeof(nuevo_tamano_str)) {
-        config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
-		config_save(config);
-    } else {
-        // Manejar el error (puede ser útil devolver un código de error o imprimir un mensaje de error)
-    }
-}
-
-void reducir_tamano_archivo(FCB *fcb,t_config *config, int nuevo_tamano) {
-	fcb->tamanio_archivo = nuevo_tamano;
-	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
-    sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
-	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
-}
-
-int32_t truncar_archivo(char* path, uint32_t nuevo_tamano) {
-	FCB *fcb;
-	t_config *config;
-	log_debug(logger,"Truncar Archivo: Iniciado.");
-	//Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
-	if (path!= NULL) {
-		// creo la estructura para manejarlo.
-		log_debug(logger,"Truncar Archivo: Creo estructuras.");
-		fcb = crear_fcb(path);
-		config = config_create(path);
-	} else {return -1;}
+	// validar que haya espacio en FAT
+	FCB *fcb = crear_fcb(path);
 
 	printf("%d",fcb->tamanio_archivo);
 
-		//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
-    if (nuevo_tamano > fcb->tamanio_archivo) {
-		log_debug(logger,"Truncar Archivo: Nuevo tamaño mas grande.");
-        // Ampliar el tamaño del archivo
-        ampliar_tamano_archivo(fcb,config, nuevo_tamano);
-		return 0;
-    } else if (nuevo_tamano < fcb->tamanio_archivo) {
-		log_debug(logger,"truncar Archivo: nuevo tamaño mas chico.");
-        // Reducir el tamaño del archivo
-        reducir_tamano_archivo(fcb, config, nuevo_tamano);
-    }
-    // Si el nuevo tamaño es igual al actual, no se requiere acción.
+	if (nuevo_tamano > fcb->tamanio_archivo){
+		uint32_t aSumar = nuevo_tamano - fcb->tamanio_archivo;
+		sumarBloques(configuracion_filesystem->path_fat,configuracion_filesystem->path_bloques,path,fat,bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques,aSumar);
+		fcb->tamanio_archivo = nuevo_tamano;
+	}
+
+	if ( fcb->tamanio_archivo >  nuevo_tamano){
+		uint32_t aRestar = fcb->tamanio_archivo - nuevo_tamano;
+		restarBloques(configuracion_filesystem->path_fat,configuracion_filesystem->path_bloques,path,fat,bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques,aRestar);
+		fcb->tamanio_archivo = nuevo_tamano;
+	}
+
+	guardar_fcb_en_archivo(fcb,path);
 	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
 }
 

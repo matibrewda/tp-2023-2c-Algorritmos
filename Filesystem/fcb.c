@@ -65,3 +65,4 @@ void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo){
     // Destruye la configuración
     config_destroy(config);
 }
+
