@@ -168,37 +168,42 @@ void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *blo
     int32_t ultBloqueAsignado;
 
     
-
-    while (0 <  cantBloquesAAsignar) {
+for (cantBloquesAAsignar = fcb->tamanio_archivo; 0 <  cantBloquesAAsignar; cantBloquesAAsignar--) {
         
         int8_t bloqueLibre = buscarBloqueLibre(fat,cantBloquesTotalesFAT);
         int8_t bloqueLibreAnt;
 
-    if (bloqueLibre != -1){
+        if (bloqueLibre != -1){
+
         bloqueLibreAnt = bloqueLibre;
-        fat[bloqueLibre].block_value  = -1;
+       
+        if (1 < cantBloquesAAsignar ){
+	    fat[bloqueLibre].block_value  = -1;
         bloqueLibre = buscarBloqueLibre(fat,cantBloquesTotalesFAT);
         fat[bloqueLibreAnt].block_value = bloqueLibre;
         memset(bloques[bloqueLibreAnt + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
-        printf("%s",bloques[bloqueLibreAnt + cantBLoquesSWAP]->valorDeBloque);
         ultBloqueAsignado = bloqueLibreAnt;
         modificarFATenArchivoFAT(pathFAT, bloqueLibreAnt, &fat[bloqueLibreAnt]);
         modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,(bloqueLibreAnt + cantBLoquesSWAP),bloques[bloqueLibreAnt + cantBLoquesSWAP],tamanioBloque);
+        } else {
+        fat[bloqueLibre].block_value = INT32_MAX;
+        modificarFATenArchivoFAT(pathFAT, bloqueLibre, &fat[bloqueLibre]);
+        memset(bloques[bloqueLibre + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
+        modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,bloqueLibre + cantBLoquesSWAP,bloques[bloqueLibre + cantBLoquesSWAP],tamanioBloque);
+   }
         } else printf("NO hay espacio");
 
     if (cantBloquesAAsignar ==  fcb->tamanio_archivo) {
         fcb->bloque_inicial = bloqueLibreAnt;
         guardar_fcb_en_archivo(fcb,pathFCB);
 } 
-
-cantBloquesAAsignar--;
 }
 
-fat[ultBloqueAsignado+1].block_value = INT32_MAX;
-modificarFATenArchivoFAT(pathFAT, ultBloqueAsignado+1, &fat[ultBloqueAsignado+1]);
-memset(bloques[ultBloqueAsignado+1 + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
-modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,ultBloqueAsignado + 1 + cantBLoquesSWAP,bloques[ultBloqueAsignado+1 + cantBLoquesSWAP],tamanioBloque);
-        
+/* fat[ultBloqueAsignado].block_value = INT32_MAX;
+modificarFATenArchivoFAT(pathFAT, ultBloqueAsignado, &fat[ultBloqueAsignado]);
+memset(bloques[ultBloqueAsignado + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
+modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,ultBloqueAsignado + cantBLoquesSWAP,bloques[ultBloqueAsignado + cantBLoquesSWAP],tamanioBloque);
+   */      
 }
 else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");
 }
@@ -244,7 +249,7 @@ void eliminarBloques(char* pathFAT, char* pathFCB, char* pathBLOQUES, FATEntry f
 
 if (numBloqueActual != INT32_MAX){
 
-      for (int i = 0; i <= cantBLoquesUsadosPorArchivo; i++) {
+      for (int i = 0; i < cantBLoquesUsadosPorArchivo; i++) {
 
         numBloqueSiguiente = fat[numBloqueActual].block_value;
         fat[numBloqueActual].block_value = 0;

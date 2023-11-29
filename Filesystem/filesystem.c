@@ -172,7 +172,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// liberar memoria!
   	// PRUEBA DE TRUNCAR truncar_archivo
 
-	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",10); 
+	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",5); 
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
@@ -263,7 +263,7 @@ void *comunicacion_kernel()
 }
 
 
- int crear_archivo (char* path,char* nombreNuevoArchivo) {
+ int32_t crear_archivo (char* path,char* nombreNuevoArchivo) {
 	char nombreFormateado[256]; // Asegúrate de que este array es lo suficientemente grande
     sprintf(nombreFormateado, "%s.fcb", nombreNuevoArchivo);
 	//Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
@@ -324,7 +324,7 @@ void reducir_tamano_archivo(FCB *fcb,t_config *config, int nuevo_tamano) {
 	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
 }
 
-int truncar_archivo(char* path, uint32_t nuevo_tamano) {
+int32_t truncar_archivo(char* path, uint32_t nuevo_tamano) {
 	FCB *fcb;
 	t_config *config;
 	log_debug(logger,"Truncar Archivo: Iniciado.");
