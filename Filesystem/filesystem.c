@@ -17,6 +17,8 @@ int socket_kernel = -1;
 int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
+int32_t abrirArchivo (char* pathFCBFolder, char* nombreDeArchivo);
+
 char* concatenarRutas(const char* rutaFat, const char* nombreFCB) {
     // Asegúrate de tener suficiente espacio para ambas cadenas más el carácter nulo
     size_t longitudTotal = strlen(rutaFat) + strlen(nombreFCB) + 1;
@@ -104,10 +106,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
 	if (fat_checker == 0)
 	{
-		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.");
+		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.\n");
 	}
 	else
-		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.");
+		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.\n");
 
    
 	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
@@ -130,7 +132,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	
 	// Prueba del contenido de cada ENTRADA FAT
 	
-	printf("Mostrando tabla FAT inicial"); // Luego borrar esta linea!
+	printf("Mostrando tabla FAT inicial\n"); // Luego borrar esta linea!
 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
         printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
     }
@@ -138,10 +140,16 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	char* ruta = concatenarRutas(configuracion_filesystem->path_fcb,"Notas1erParcialK9999.fcb");
 	BLOQUE** bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->tam_bloques);
 	
-	printf("Mostrando tabla BLOQUES inicial"); // Luego borrar esta linea!
+	printf("Mostrando tabla BLOQUES inicial\n"); // Luego borrar esta linea!
 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
     printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 } 
+
+	//Prueba de CREAR ARCHIVO
+    //Caso 1) No existe:
+	abrirArchivo (configuracion_filesystem->path_fcb,"ArchivoPepito");
+	//Caso 2) Existe:
+	abrirArchivo (configuracion_filesystem->path_fcb,"estadisticas");
 
 	//modificarBloque (configuracion_filesystem->path_bloques,configuracion_filesystem->tam_bloques);
 	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin",ruta,bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
@@ -186,6 +194,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i) {
     printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 } 
+
+
+	
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
@@ -337,3 +348,19 @@ int32_t truncar_archivo(char* path, uint32_t nuevo_tamano,t_config_filesystem *c
 	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
 }
 
+
+int32_t abrirArchivo (char* pathFCBFolder, char* nombreDeArchivo){
+	 // Concatenar pathFCBFolder, nombreDeArchivo y la extensión ".fcb"
+    char rutaCompleta[256];  // Asegúrate de que este array sea lo suficientemente grande
+    snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s.fcb", pathFCBFolder, nombreDeArchivo);
+	int32_t checker = verificarSiExisteFCBdeArchivo(rutaCompleta);
+
+	if (checker == 0){
+		FCB *fcb = crear_fcb(rutaCompleta);
+		printf("tamanio_archivo: %i",fcb->tamanio_archivo);
+		return fcb->tamanio_archivo;
+	} else {
+		printf("No existe el archivo.");
+		return -1;
+		}
+}

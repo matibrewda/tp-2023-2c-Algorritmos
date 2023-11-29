@@ -66,3 +66,17 @@ void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo){
     config_destroy(config);
 }
 
+uint32_t verificarSiExisteFCBdeArchivo(char* rutaCompleta) {
+   
+    // Intentar abrir el archivo
+    FILE* archivo = fopen(rutaCompleta, "r");
+
+    if (archivo != NULL) {
+        // El archivo se abrió correctamente, cerramos el archivo y devolvemos 0
+        fclose(archivo);
+        return 0;
+    } else {
+        // El archivo no se pudo abrir, devolvemos -1
+        return -1;
+    }
+}
