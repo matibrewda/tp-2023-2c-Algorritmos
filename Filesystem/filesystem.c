@@ -316,13 +316,28 @@ void *comunicacion_kernel()
 } 
 
 
+int32_t abrirArchivo (char* pathFCBFolder, char* nombreDeArchivo){
+	 // Concatenar pathFCBFolder, nombreDeArchivo y la extensión ".fcb"
+    char rutaCompleta[256];  // Asegúrate de que este array sea lo suficientemente grande
+    snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s.fcb", pathFCBFolder, nombreDeArchivo);
+	int32_t checker = verificarSiExisteFCBdeArchivo(rutaCompleta);
 
-/* void ampliar_tamano_archivo(FCB *fcb , t_config *config,int nuevo_tamano) {
- 	fcb->tamanio_archivo = nuevo_tamano;
-	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
-    sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
-	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
-} */
+	if (checker == 0){
+		FCB *fcb = crear_fcb(rutaCompleta);
+		printf("tamanio_archivo: %i",fcb->tamanio_archivo);
+		return fcb->tamanio_archivo;
+
+		log_info(logger,"Abrir Archivo: <%s>",fcb->nombre_archivo);
+
+	} else {
+		log_info(logger,"Abrir Archivo: NO EXISTE <%s>",nombreDeArchivo);
+		printf("No existe el archivo.");
+		return -1;
+		}
+
+	
+}
+
 
 
 int32_t truncar_archivo(char* path, uint32_t nuevo_tamano,t_config_filesystem *configuracion_filesystem,FATEntry fat[], BLOQUE *bloques[]) {
@@ -349,18 +364,3 @@ int32_t truncar_archivo(char* path, uint32_t nuevo_tamano,t_config_filesystem *c
 }
 
 
-int32_t abrirArchivo (char* pathFCBFolder, char* nombreDeArchivo){
-	 // Concatenar pathFCBFolder, nombreDeArchivo y la extensión ".fcb"
-    char rutaCompleta[256];  // Asegúrate de que este array sea lo suficientemente grande
-    snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s.fcb", pathFCBFolder, nombreDeArchivo);
-	int32_t checker = verificarSiExisteFCBdeArchivo(rutaCompleta);
-
-	if (checker == 0){
-		FCB *fcb = crear_fcb(rutaCompleta);
-		printf("tamanio_archivo: %i",fcb->tamanio_archivo);
-		return fcb->tamanio_archivo;
-	} else {
-		printf("No existe el archivo.");
-		return -1;
-		}
-}
