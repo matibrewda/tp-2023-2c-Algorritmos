@@ -243,9 +243,25 @@ void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion()
 
 void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep)
 {
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion(motivo_interrupcion, segundos_sleep);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+}
+
+void enviar_paquete_solicitud_devolver_proceso_por_wait(char* nombre_recurso)
+{
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_wait = crear_paquete_solicitud_devolver_proceso_por_wait(logger, contexto_de_ejecucion, nombre_recurso);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+}
+
+void enviar_paquete_solicitud_devolver_proceso_por_signal(char* nombre_recurso)
+{
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_signal(logger, contexto_de_ejecucion, nombre_recurso);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 }
 
@@ -279,6 +295,22 @@ void devolver_contexto_por_sleep(int segundos_sleep)
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
+void devolver_contexto_por_wait(char* nombre_recurso)
+{
+	sem_wait(&semaforo_devuelvo_proceso);
+	enviar_paquete_solicitud_devolver_proceso_por_wait(nombre_recurso);
+	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_WAIT);
+	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
+void devolver_contexto_por_signal(char* nombre_recurso)
+{
+	sem_wait(&semaforo_devuelvo_proceso);
+	enviar_paquete_solicitud_devolver_proceso_por_signal(nombre_recurso);
+	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL);
+	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* MEMORIA *///////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -295,6 +327,16 @@ void enviar_paquete_solicitud_pedir_instruccion_a_memoria()
 	pedido_instruccion->pid = pid_ejecutando;
 	t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+}
+
+void enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(int numero_de_pagina)
+{
+	t_pedido_pagina_en_memoria *pedido_numero_de_marco = malloc(sizeof(t_pedido_pagina_en_memoria));
+	pedido_numero_de_marco->numero_de_pagina = numero_de_pagina;
+	pedido_numero_de_marco->pid = pid_ejecutando;
+
+	t_paquete *paquete_solicitud_pedido_numero_de_marco = crear_paquete_solicitud_pedido_numero_de_marco(logger, pedido_numero_de_marco);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedido_numero_de_marco, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 }
 
 void solicitar_info_inicial_a_memoria()
@@ -318,6 +360,17 @@ char *pedir_instruccion_a_memoria()
 	char *instruccion_string = leer_paquete_respuesta_pedir_instruccion_a_memoria(logger, conexion_con_memoria);
 
 	return instruccion_string;
+}
+
+int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
+{
+	enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(numero_de_pagina);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	int numero_de_marco = leer_paquete_respuesta_pedir_numero_de_marco_a_memoria(logger, conexion_con_memoria);
+
+	return numero_de_marco;
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -561,13 +614,13 @@ void execute(t_instruccion *instruccion)
 
 	if (instruccion->opcode == MOV_IN_OPCODE_INSTRUCCION)
 	{
-		ejecutar_instruccion_mov_in(instruccion->parametro_1, instruccion->parametro_2);
+		ejecutar_instruccion_mov_in(instruccion->parametro_1, atoi(instruccion->parametro_2));
 		return;
 	}
 
 	if (instruccion->opcode == MOV_OUT_OPCODE_INSTRUCCION)
 	{
-		ejecutar_instruccion_mov_out(instruccion->parametro_1, instruccion->parametro_2);
+		ejecutar_instruccion_mov_out(atoi(instruccion->parametro_1), instruccion->parametro_2);
 		return;
 	}
 
@@ -675,7 +728,9 @@ void ejecutar_instruccion_wait(char *nombre_recurso)
 {
 	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
 
-	// TO DO
+	se_ejecuto_instruccion_bloqueante = true;
+	program_counter++;
+	devolver_contexto_por_wait(nombre_recurso);
 
 	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
 }
@@ -684,27 +739,69 @@ void ejecutar_instruccion_signal(char *nombre_recurso)
 {
 	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
 
-	// TO DO
+	se_ejecuto_instruccion_bloqueante = true;
+	program_counter++;
+	devolver_contexto_por_signal(nombre_recurso);
 
 	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
 }
 
-void ejecutar_instruccion_mov_in(char *nombre_registro, char *direccion_logica)
+void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica)
 {
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
+	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
 
-	// TO DO
+	// MMU
+	int numero_de_pagina = obtener_numero_de_pagina_desde_direccion_logica(direccion_logica);
+	int numero_de_marco = pedir_numero_de_marco_a_memoria(numero_de_pagina);
+	bool page_fault = numero_de_marco == -1;
+	int direccion_fisica = numero_de_marco * tamanio_pagina + obtener_desplazamiento_desde_direccion_logica(direccion_logica);
 
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
+	if (page_fault)
+	{
+		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
+		se_ejecuto_instruccion_bloqueante = true;
+		devolver_contexto_por_page_fault(numero_de_pagina);
+	}
+	else
+	{
+		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
+		
+		u_int32_t valor_leido_en_memoria = leer_valor_en_memoria(direccion_fisica);
+		escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
+
+		log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
+	}
+
+	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
 }
 
-void ejecutar_instruccion_mov_out(char *direccion_logica, char *nombre_registro)
+void ejecutar_instruccion_mov_out(int direccion_logica, char *nombre_registro)
 {
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
+	log_info(logger, "PID: %d - Ejecutando: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 
-	// TO DO
+	// MMU
+	int numero_de_pagina = obtener_numero_de_pagina_desde_direccion_logica(direccion_logica);
+	int numero_de_marco = pedir_numero_de_marco_a_memoria(numero_de_pagina);
+	bool page_fault = numero_de_marco == -1;
+	int direccion_fisica = numero_de_marco * tamanio_pagina + obtener_desplazamiento_desde_direccion_logica(direccion_logica);
 
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
+	if (page_fault)
+	{
+		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
+		se_ejecuto_instruccion_bloqueante = true;
+		devolver_contexto_por_page_fault(numero_de_pagina);
+	}
+	else
+	{
+		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
+		
+		u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
+		escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
+
+		log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
+	}
+
+	log_trace(logger, "PID: %d - Ejecutada: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 }
 
 void ejecutar_instruccion_fopen(char *nombre_archivo, char *modo_apertura)
@@ -871,4 +968,14 @@ void escribir_valor_a_registro(char *nombre_registro, uint32_t valor)
 	{
 		log_error(logger, "No se asigno el valor %d al registro '%s' porque es un registro no conocido.", valor, nombre_registro);
 	}
+}
+
+int obtener_numero_de_pagina_desde_direccion_logica(int direccion_logica)
+{
+	return floor(direccion_logica / tamanio_pagina);
+}
+
+int obtener_desplazamiento_desde_direccion_logica(int direccion_logica)
+{
+	return direccion_logica - obtener_numero_de_pagina_desde_direccion_logica(direccion_logica) * tamanio_pagina;
 }

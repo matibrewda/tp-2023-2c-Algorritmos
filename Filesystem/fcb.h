@@ -16,6 +16,7 @@
     uint32_t bloque_inicial;   // Número de bloque inicial
 } FCB;
 
+uint32_t verificarSiExisteFCBdeArchivo(char* rutaCompleta);
 FCB* iniciar_fcb(char* nombre_archivo, uint32_t tamanio_archivo, uint32_t bloque_inicial);
 FCB* crear_fcb(char* ruta_archivo);
 void guardar_fcb_en_archivo(FCB* fcb, char* ruta_archivo);

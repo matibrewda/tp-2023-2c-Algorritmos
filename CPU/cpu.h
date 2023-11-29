@@ -47,6 +47,7 @@ void devolver_contexto_por_sleep(int segundos_sleep);
 // Comunicacion con Memoria
 void enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
 void enviar_paquete_solicitud_pedir_instruccion_a_memoria();
+void enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(int numero_de_pagina);
 void solicitar_info_inicial_a_memoria();
 char *pedir_instruccion_a_memoria();
 
@@ -64,8 +65,8 @@ void ejecutar_instruccion_jnz(char *nombre_registro, uint32_t nuevo_program_coun
 void ejecutar_instruccion_sleep(int tiempo);
 void ejecutar_instruccion_wait(char *nombre_recurso);
 void ejecutar_instruccion_signal(char *nombre_recurso);
-void ejecutar_instruccion_mov_in(char *nombre_registro, char *direccion_logica);
-void ejecutar_instruccion_mov_out(char *direccion_logica, char *nombre_registro);
+void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica);
+void ejecutar_instruccion_mov_out(int direccion_logica, char *nombre_registro);
 void ejecutar_instruccion_fopen(char *nombre_archivo, char *modo_apertura);
 void ejecutar_instruccion_fclose(char *nombre_archivo);
 void ejecutar_instruccion_fseek(char *nombre_archivo, char *posicion);
@@ -79,5 +80,7 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
 void destruir_instruccion(t_instruccion *instruccion);
 uint32_t obtener_valor_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
+int obtener_numero_de_pagina_desde_direccion_logica(int direccion_logica);
+int obtener_desplazamiento_desde_direccion_logica(int direccion_logica);
 
 #endif /* CPU_H_ */

@@ -24,6 +24,8 @@ bool leer_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, int conexi
 // Kernel recibe de CPU
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, int conexion_con_cpu_dispatch, int* motivo_interrupcion);
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_sleep(t_log *logger, int conexion_con_cpu_dispatch, int* tiempo_sleep);
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_wait(t_log *logger, int conexion_con_cpu_dispatch, char** nombre_recurso);
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_signal(t_log *logger, int conexion_con_cpu_dispatch, char** nombre_recurso);
 
 // CPU recibe de Kernel
 t_contexto_de_ejecucion *leer_paquete_solicitud_ejecutar_proceso(t_log *logger, int conexion_con_kernel_dispatch);
@@ -36,9 +38,12 @@ t_proceso_memoria *leer_paquete_solicitud_finalizar_proceso_en_memoria(t_log *lo
 // CPU recibe de Memoria
 t_info_memoria* leer_paquete_respuesta_pedir_info_de_memoria_inicial_para_cpu(t_log *logger, int conexion_con_memoria);
 char* leer_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, int conexion_con_memoria);
+int leer_paquete_respuesta_pedir_numero_de_marco_a_memoria(t_log *logger, int conexion_con_memoria);
 
 // Memoria recibe de CPU
 t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, int conexion_con_cpu);
+int leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con_cpu);
+t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, int conexion_con_cpu);
 
 // Memoria recibe de FileSystem
 t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem);
