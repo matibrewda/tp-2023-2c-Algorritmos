@@ -330,7 +330,9 @@ void sumarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat
 void restarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat[], BLOQUE *bloques[], size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque, uint32_t bloquesARestar){
     FCB *fcb = crear_fcb(pathFCB);
     int32_t vecesAIterarAlUltBloque = fcb->tamanio_archivo - bloquesARestar;
+    printf("vecesAIterarAlUltBloque: %i\n",vecesAIterarAlUltBloque);
     int32_t bloqueEvaluado = fat[fcb->bloque_inicial].block_value;
+    printf("bloqueEvaluado: %i\n",bloqueEvaluado);
     int32_t bloqueAnt;
 
     for (int32_t i = 1;vecesAIterarAlUltBloque > i;i++) {
@@ -339,19 +341,24 @@ void restarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fa
     }
 
     fat[bloqueAnt].block_value = INT32_MAX;
-    memset(bloques[bloqueAnt + cantBLoquesSWAP]->valorDeBloque, 'N', tamanioBloque);
+    printf("INT32_MAX: %i\n",fat[bloqueAnt].block_value);
+    memset(bloques[bloqueAnt + cantBLoquesSWAP]->valorDeBloque, 'U', tamanioBloque);
     modificarFATenArchivoFAT(pathFAT, bloqueAnt, &fat[bloqueAnt]);
     modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,(bloqueAnt + cantBLoquesSWAP),bloques[bloqueAnt + cantBLoquesSWAP],tamanioBloque);
 
+    int32_t bloqueSiguiente;
 
-    while (fat[bloqueEvaluado].block_value = INT32_MAX){
+    while (fat[bloqueEvaluado].block_value != INT32_MAX){
+        bloqueSiguiente = fat[bloqueEvaluado].block_value;
         fat[bloqueEvaluado].block_value = 0;
         memset(bloques[bloqueEvaluado + cantBLoquesSWAP]->valorDeBloque, 'N', tamanioBloque);
         modificarFATenArchivoFAT(pathFAT, bloqueEvaluado, &fat[bloqueEvaluado]);
         modificarBLOQUEenArchivoBLOQUE(pathBLOQUES,(bloqueEvaluado + cantBLoquesSWAP),bloques[bloqueEvaluado + cantBLoquesSWAP],tamanioBloque);
 
-        bloqueEvaluado = fat[bloqueEvaluado].block_value;
+        bloqueEvaluado = bloqueSiguiente;
     }
+
+    printf("bloqueEvaluado: %i\n",bloqueEvaluado);
 
     fat[bloqueEvaluado].block_value = 0;
     memset(bloques[bloqueEvaluado + cantBLoquesSWAP]->valorDeBloque, 'N', tamanioBloque);

@@ -175,7 +175,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	asignarBloques(configuracion_filesystem->path_fat,"/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin","/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",bloques,fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap,configuracion_filesystem->tam_bloques);
 	
 	
-	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",6,configuracion_filesystem,fat,bloques); 
+	truncar_archivo ("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb",2,configuracion_filesystem,fat,bloques); 
 
 	printf("Mostrando tabla FAT post truncamiento\n");
 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total- configuracion_filesystem->cant_bloques_swap); ++i) {
