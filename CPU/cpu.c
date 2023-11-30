@@ -4,10 +4,9 @@
 t_log *logger = NULL;
 t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
+bool dejar_de_ejecutar = false;
 bool ocurrio_interrupcion = false;
-bool se_ejecuto_instruccion_bloqueante = false;
-bool se_leyo_instruccion_exit = false;
-int pid_ejecutando = 0;
+int pid_ejecutando = -1;
 int tamanio_pagina = -1;
 int tamanio_memoria = -1;
 
@@ -29,11 +28,11 @@ sem_t semaforo_espero_ejecutar_proceso;
 sem_t semaforo_devuelvo_proceso;
 
 // Registros
-uint32_t program_counter = 0;
-uint32_t registro_ax = 0;
-uint32_t registro_bx = 0;
-uint32_t registro_cx = 0;
-uint32_t registro_dx = 0;
+uint32_t program_counter = -1;
+uint32_t registro_ax = -1;
+uint32_t registro_bx = -1;
+uint32_t registro_cx = -1;
+uint32_t registro_dx = -1;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -96,7 +95,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	solicitar_info_inicial_a_memoria();
+	pedir_info_inicial_a_memoria();
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente la CPU NO ejecuta (IDLE)
@@ -149,9 +148,6 @@ void terminar_cpu()
 	}
 }
 
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* KERNEL *////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 void *interrupt()
 {
 	while (true)
@@ -164,7 +160,8 @@ void *interrupt()
 			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 			motivo_interrupcion = leer_paquete_solicitud_interrumpir_proceso(logger, conexion_con_kernel_interrupt);
 			ocurrio_interrupcion = true;
-			enviar_paquete_respuesta_interrumpir_ejecucion();
+			t_paquete *paquete_respuesta_interrumpir_proceso = crear_paquete_respuesta_interrumpir_proceso(logger);
+			enviar_paquete(logger, conexion_con_kernel_interrupt, paquete_respuesta_interrumpir_proceso, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL);
 		}
 		else
 		{
@@ -195,14 +192,15 @@ void *dispatch()
 			registro_cx = contexto_de_ejecucion->registro_cx;
 			registro_dx = contexto_de_ejecucion->registro_dx;
 
+			dejar_de_ejecutar = false;
 			ocurrio_interrupcion = false;
-			se_ejecuto_instruccion_bloqueante = false;
-			se_leyo_instruccion_exit = false;
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
 
-			enviar_paquete_respuesta_ejecutar_proceso();
+			// Aviso al kernel que recibi el paquete
+			t_paquete *paquete_respuesta_ejecutar_proceso = crear_paquete_respuesta_ejecutar_proceso(logger);
+			enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_respuesta_ejecutar_proceso, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 		}
 		else
 		{
@@ -213,135 +211,101 @@ void *dispatch()
 	}
 }
 
-void enviar_paquete_respuesta_ejecutar_proceso()
+void devolver_contexto_por_ser_interrumpido()
 {
-	t_paquete *paquete_respuesta_ejecutar_proceso = crear_paquete_respuesta_ejecutar_proceso(logger);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_respuesta_ejecutar_proceso, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-}
-
-void enviar_paquete_respuesta_interrumpir_ejecucion()
-{
-	t_paquete *paquete_respuesta_interrumpir_proceso = crear_paquete_respuesta_interrumpir_proceso(logger);
-	enviar_paquete(logger, conexion_con_kernel_interrupt, paquete_respuesta_interrumpir_proceso, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido()
-{
+	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion, motivo_interrupcion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion()
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_wait(char* nombre_recurso)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_wait = crear_paquete_solicitud_devolver_proceso_por_wait(logger, contexto_de_ejecucion, nombre_recurso);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_signal(char* nombre_recurso)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_signal(logger, contexto_de_ejecucion, nombre_recurso);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado)
-{
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
-	return codigo_operacion_recibido == codigo_operacion_esperado;
-}
-
-void devolver_contexto_por_ser_interrumpido()
-{
-	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_correcta_finalizacion()
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_sleep(int segundos_sleep)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_sleep(segundos_sleep);
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_wait(char* nombre_recurso)
+void devolver_contexto_por_wait(char *nombre_recurso)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_wait(nombre_recurso);
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_WAIT);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_wait = crear_paquete_solicitud_devolver_proceso_por_wait(logger, contexto_de_ejecucion, nombre_recurso);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_WAIT
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_signal(char* nombre_recurso)
+void devolver_contexto_por_signal(char *nombre_recurso)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_signal(nombre_recurso);
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_signal(logger, contexto_de_ejecucion, nombre_recurso);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* MEMORIA *///////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-void enviar_paquete_solicitud_pedir_info_de_memoria_inicial()
+void devolver_contexto_por_error(int codigo_error)
 {
+	sem_wait(&semaforo_devuelvo_proceso);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_error = crear_paquete_solicitud_devolver_proceso_por_error(logger, contexto_de_ejecucion, codigo_error);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_error, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_ERROR
+	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
+void devolver_contexto_por_page_fault(int numero_de_pagina)
+{
+	sem_wait(&semaforo_devuelvo_proceso);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_pagefault = crear_paquete_solicitud_devolver_proceso_por_pagefault(logger, contexto_de_ejecucion, numero_de_pagina);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_pagefault, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_PAGEFAULT
+	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
+void devolver_contexto_por_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio)
+{
+	sem_wait(&semaforo_devuelvo_proceso);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_operacion_filesystem *operacion_filesystem = crear_objeto_operacion_filesystem(nombre_archivo, modo_apertura, posicion, direccion_fisica, tamanio);
+	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, contexto_de_ejecucion, operacion_filesystem);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	free(operacion_filesystem);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM
+	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
+void pedir_info_inicial_a_memoria()
+{
+	// Enviar
 	t_paquete *paquete_solicitar_info_de_memoria_inicial_para_cpu = crear_paquete_solicitud_pedir_info_de_memoria_inicial_para_cpu(logger);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitar_info_de_memoria_inicial_para_cpu, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-}
-
-void enviar_paquete_solicitud_pedir_instruccion_a_memoria()
-{
-	t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
-	pedido_instruccion->pc = program_counter;
-	pedido_instruccion->pid = pid_ejecutando;
-	t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
-	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-}
-
-void enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(int numero_de_pagina)
-{
-	t_pedido_pagina_en_memoria *pedido_numero_de_marco = malloc(sizeof(t_pedido_pagina_en_memoria));
-	pedido_numero_de_marco->numero_de_pagina = numero_de_pagina;
-	pedido_numero_de_marco->pid = pid_ejecutando;
-
-	t_paquete *paquete_solicitud_pedido_numero_de_marco = crear_paquete_solicitud_pedido_numero_de_marco(logger, pedido_numero_de_marco);
-	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedido_numero_de_marco, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-}
-
-void solicitar_info_inicial_a_memoria()
-{
-	enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
 
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
@@ -353,7 +317,12 @@ void solicitar_info_inicial_a_memoria()
 
 char *pedir_instruccion_a_memoria()
 {
-	enviar_paquete_solicitud_pedir_instruccion_a_memoria();
+	// Enviar
+	t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
+	pedido_instruccion->pc = program_counter;
+	pedido_instruccion->pid = pid_ejecutando;
+	t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
@@ -364,7 +333,13 @@ char *pedir_instruccion_a_memoria()
 
 int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 {
-	enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(numero_de_pagina);
+	// Enviar
+	t_pedido_pagina_en_memoria *pedido_numero_de_marco = malloc(sizeof(t_pedido_pagina_en_memoria));
+	pedido_numero_de_marco->numero_de_pagina = numero_de_pagina;
+	pedido_numero_de_marco->pid = pid_ejecutando;
+
+	t_paquete *paquete_solicitud_pedido_numero_de_marco = crear_paquete_solicitud_pedido_numero_de_marco(logger, pedido_numero_de_marco);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedido_numero_de_marco, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
@@ -373,504 +348,247 @@ int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 	return numero_de_marco;
 }
 
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* CICLO DE EJECUCION *////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+void escribir_valor_en_memoria(int direccion_fisica, u_int32_t valor_a_escribir)
+{
+	// Enviar
+	t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = malloc(sizeof(t_pedido_escribir_valor_en_memoria));
+	pedido_escribir_valor_en_memoria->valor_a_escribir = valor_a_escribir;
+	pedido_escribir_valor_en_memoria->direccion_fisica = direccion_fisica;
+
+	t_paquete *paquete_solicitud_escribir_valor_en_memoria = crear_paquete_solicitud_escribir_valor_en_memoria(logger, pedido_escribir_valor_en_memoria);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_escribir_valor_en_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria); // RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA
+}
+
+u_int32_t leer_valor_de_memoria(int direccion_fisica)
+{
+	// Enviar
+	t_paquete *paquete_solicitud_leer_valor_en_memoria = crear_paquete_solicitud_leer_valor_en_memoria(logger, direccion_fisica);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_valor_en_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	u_int32_t valor = leer_paquete_respuesta_leer_valor_en_memoria(logger, conexion_con_memoria);
+
+	return valor;
+}
 
 void ciclo_de_ejecucion()
 {
-	char *instruccion_string;
-	t_instruccion *instruccion;
-	int opcode;
-
 	while (true)
 	{
 		// Espero a que haya algo para ejecutar
-		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); 
+		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion);
 
-		instruccion_string = fetch();
-		instruccion = decode(instruccion_string);
-		execute(instruccion);
+		// FETCH
+		log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
+		t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
+		pedido_instruccion->pc = program_counter;
+		pedido_instruccion->pid = pid_ejecutando;
+		t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
+		free(pedido_instruccion);
+		enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+		char *instruccion_con_parametros = leer_paquete_respuesta_pedir_instruccion_a_memoria(logger, conexion_con_memoria);
 
-		if (instruccion->opcode != JNZ_OPCODE_INSTRUCCION)
+		// DECODE & EXECUTE
+		char *saveptr = instruccion_con_parametros;
+		char *nombre_instruccion = strtok_r(saveptr, " ", &saveptr);
+
+		if (strcmp(nombre_instruccion, SET_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_registro = strtok_r(saveptr, " ", &saveptr);
+			int valor = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
+			escribir_valor_a_registro(nombre_registro, valor);
 			program_counter++;
 		}
+		else if (strcmp(nombre_instruccion, SUM_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_registro_destino = strtok_r(saveptr, " ", &saveptr);
+			char *nombre_registro_origen = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
+			escribir_valor_a_registro(nombre_registro_destino, leer_valor_de_registro(nombre_registro_destino) + leer_valor_de_registro(nombre_registro_origen));
+			program_counter++;
+		}
+		else if (strcmp(nombre_instruccion, SUB_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_registro_destino = strtok_r(saveptr, " ", &saveptr);
+			char *nombre_registro_origen = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
+			escribir_valor_a_registro(nombre_registro_destino, leer_valor_de_registro(nombre_registro_destino) - leer_valor_de_registro(nombre_registro_origen));
+			program_counter++;
+		}
+		else if (strcmp(nombre_instruccion, JNZ_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_registro = strtok_r(saveptr, " ", &saveptr);
+			u_int32_t nuevo_program_counter = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
+			if (leer_valor_de_registro(nombre_registro) == 0)
+			{
+				escribir_valor_a_registro(PC_NOMBRE_REGISTRO, nuevo_program_counter);
+			}
+		}
+		else if (strcmp(nombre_instruccion, SLEEP_NOMBRE_INSTRUCCION) == 0)
+		{
+			int tiempo_sleep = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo_sleep);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_sleep(tiempo_sleep);
+		}
+		else if (strcmp(nombre_instruccion, WAIT_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_recurso = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_wait(nombre_recurso);
+		}
+		else if (strcmp(nombre_instruccion, SIGNAL_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_recurso = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_signal(nombre_recurso);
+		}
+		else if (strcmp(nombre_instruccion, MOV_IN_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_registro = strtok_r(saveptr, " ", &saveptr);
+			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
+			int direccion_fisica = mmu(direccion_logica);
+			if (direccion_fisica != -1)
+			{
+				u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(direccion_fisica);
+				escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
+				log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
+				program_counter++;
+			}
+		}
+		else if (strcmp(nombre_instruccion, MOV_OUT_NOMBRE_INSTRUCCION) == 0)
+		{
+			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
+			char *nombre_registro = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
+			int direccion_fisica = mmu(direccion_logica);
+			if (direccion_fisica != -1)
+			{
+				u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
+				escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
+				log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
+				program_counter++;
+			}
+		}
+		else if (strcmp(nombre_instruccion, FOPEN_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			char *modo_apertura = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, modo_apertura, -1, -1, -1);
+		}
+		else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, -1, -1);
+		}
+		else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int posicion = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", posicion, -1, -1);
+		}
+		else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+			int direccion_fisica = mmu(direccion_logica);
+			if (direccion_fisica != -1)
+			{
+				program_counter++;
+				dejar_de_ejecutar = true;
+				devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, direccion_fisica, -1);
+			}
+		}
+		else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+			int direccion_fisica = mmu(direccion_logica);
+			if (direccion_fisica != -1)
+			{
+				program_counter++;
+				dejar_de_ejecutar = true;
+				devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, direccion_fisica, -1);
+			}
+		}
+		else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
+		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int tamanio = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
+			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, -1, tamanio);
+		}
+		else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
+		{
+			log_info(logger, "PID: %d - Ejecutando: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_correcta_finalizacion();
+		}
 
+		free(instruccion_con_parametros);
+
+		// CHECK INTERRUPT
 		if (ocurrio_interrupcion)
 		{
 			devolver_contexto_por_ser_interrumpido();
+			dejar_de_ejecutar = true;
 		}
 
-		if (!se_ejecuto_instruccion_bloqueante && !ocurrio_interrupcion && !se_leyo_instruccion_exit)
+		if (!dejar_de_ejecutar)
 		{
 			// Sigo ejecutando
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
 		}
-
-		destruir_instruccion(instruccion);
 	}
 }
 
-char *fetch()
+int mmu(int direccion_logica)
 {
-	log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
-	return pedir_instruccion_a_memoria();
-}
-
-t_instruccion *decode(char *instruccion_string)
-{
-	char *saveptr = instruccion_string;
-	char *nombre_instruccion = strtok_r(saveptr, " ", &saveptr);
-	t_instruccion *instruccion = malloc(sizeof(t_instruccion));
-	instruccion->parametro_1 = NULL;
-	instruccion->parametro_2 = NULL;
-	bool tengo_que_leer_parametro_1 = false;
-	bool tengo_que_leer_parametro_2 = false;
-
-	if (strcmp(nombre_instruccion, SET_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = SET_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, SUM_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = SUM_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, SUB_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = SUB_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, JNZ_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = JNZ_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, SLEEP_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = SLEEP_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = false;
-	}
-	else if (strcmp(nombre_instruccion, WAIT_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = WAIT_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = false;
-	}
-	else if (strcmp(nombre_instruccion, SIGNAL_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = SIGNAL_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = false;
-	}
-	else if (strcmp(nombre_instruccion, MOV_IN_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = MOV_IN_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, MOV_OUT_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = MOV_OUT_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, FOPEN_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = FOPEN_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = FCLOSE_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = false;
-	}
-	else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = FSEEK_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = FREAD_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = FWRITE_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = FTRUNCATE_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = true;
-		tengo_que_leer_parametro_2 = true;
-	}
-	else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
-	{
-		instruccion->opcode = EXIT_OPCODE_INSTRUCCION;
-		tengo_que_leer_parametro_1 = false;
-		tengo_que_leer_parametro_2 = false;
-	}
-	else
-	{
-		log_error(logger, "Instrucción '%s' a decodificar no reconocida.", nombre_instruccion);
-		free(instruccion_string);
-		destruir_instruccion(instruccion);
-		return NULL;
-	}
-
-	if (tengo_que_leer_parametro_1)
-	{
-		char *parametro_1 = strtok_r(saveptr, " ", &saveptr);
-
-		if (parametro_1 == NULL)
-		{
-			log_error(logger, "Parametro 1 para instrucción '%s' no reconocido.", nombre_instruccion);
-			free(instruccion_string);
-			destruir_instruccion(instruccion);
-			return NULL;
-		}
-
-		instruccion->parametro_1 = malloc(strlen(parametro_1));
-		strcpy(instruccion->parametro_1, parametro_1);
-	}
-
-	if (tengo_que_leer_parametro_2)
-	{
-		char *parametro_2 = strtok_r(saveptr, " ", &saveptr);
-
-		if (parametro_2 == NULL)
-		{
-			log_error(logger, "Parametro 2 para instrucción '%s' no reconocido.", nombre_instruccion);
-			free(instruccion_string);
-			destruir_instruccion(instruccion);
-			return NULL;
-		}
-
-		instruccion->parametro_2 = malloc(strlen(parametro_2));
-		strcpy(instruccion->parametro_2, parametro_2);
-	}
-
-	free(instruccion_string);
-	return instruccion;
-}
-
-void execute(t_instruccion *instruccion)
-{
-	if (instruccion->opcode == SET_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_set(instruccion->parametro_1, atoi(instruccion->parametro_2));
-		return;
-	}
-
-	if (instruccion->opcode == SUM_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_sum(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == SUB_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_sub(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == JNZ_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_jnz(instruccion->parametro_1, atoi(instruccion->parametro_2));
-		return;
-	}
-
-	if (instruccion->opcode == SLEEP_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_sleep(atoi(instruccion->parametro_1));
-		return;
-	}
-
-	if (instruccion->opcode == WAIT_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_wait(instruccion->parametro_1);
-		return;
-	}
-
-	if (instruccion->opcode == SIGNAL_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_signal(instruccion->parametro_1);
-		return;
-	}
-
-	if (instruccion->opcode == MOV_IN_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_mov_in(instruccion->parametro_1, atoi(instruccion->parametro_2));
-		return;
-	}
-
-	if (instruccion->opcode == MOV_OUT_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_mov_out(atoi(instruccion->parametro_1), instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == FOPEN_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_fopen(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == FCLOSE_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_fclose(instruccion->parametro_1);
-		return;
-	}
-
-	if (instruccion->opcode == FSEEK_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_fseek(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == FREAD_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_fread(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == FWRITE_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_fwrite(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == FTRUNCATE_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_ftruncate(instruccion->parametro_1, instruccion->parametro_2);
-		return;
-	}
-
-	if (instruccion->opcode == EXIT_OPCODE_INSTRUCCION)
-	{
-		ejecutar_instruccion_exit();
-		return;
-	}
-
-	log_error(logger, "Instrucción a ejecutar no reconocida.");
-	return;
-}
-
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* INSTRUCCIONES */////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-
-void ejecutar_instruccion_set(char *nombre_registro, uint32_t valor)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
-
-	escribir_valor_a_registro(nombre_registro, valor);
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, SET_NOMBRE_INSTRUCCION, nombre_registro, valor);
-}
-
-void ejecutar_instruccion_sum(char *nombre_registro_destino, char *nombre_registro_origen)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
-
-	escribir_valor_a_registro(nombre_registro_destino, obtener_valor_registro(nombre_registro_destino) + obtener_valor_registro(nombre_registro_origen));
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, SUM_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
-}
-
-void ejecutar_instruccion_sub(char *nombre_registro_destino, char *nombre_registro_origen)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
-
-	escribir_valor_a_registro(nombre_registro_destino, obtener_valor_registro(nombre_registro_destino) - obtener_valor_registro(nombre_registro_origen));
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, SUB_NOMBRE_INSTRUCCION, nombre_registro_destino, nombre_registro_origen);
-}
-
-void ejecutar_instruccion_jnz(char *nombre_registro, uint32_t nuevo_program_counter)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
-
-	if (obtener_valor_registro(nombre_registro) == 0)
-	{
-		escribir_valor_a_registro(PC_NOMBRE_REGISTRO, nuevo_program_counter);
-	}
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
-}
-
-void ejecutar_instruccion_sleep(int tiempo)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo);
-
-	se_ejecuto_instruccion_bloqueante = true;
-	program_counter++;
-	devolver_contexto_por_sleep(tiempo);
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo);
-}
-
-void ejecutar_instruccion_wait(char *nombre_recurso)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
-
-	se_ejecuto_instruccion_bloqueante = true;
-	program_counter++;
-	devolver_contexto_por_wait(nombre_recurso);
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
-}
-
-void ejecutar_instruccion_signal(char *nombre_recurso)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
-
-	se_ejecuto_instruccion_bloqueante = true;
-	program_counter++;
-	devolver_contexto_por_signal(nombre_recurso);
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
-}
-
-void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
-
-	// MMU
-	int numero_de_pagina = obtener_numero_de_pagina_desde_direccion_logica(direccion_logica);
+	int numero_de_pagina = floor(direccion_logica / tamanio_pagina);
 	int numero_de_marco = pedir_numero_de_marco_a_memoria(numero_de_pagina);
 	bool page_fault = numero_de_marco == -1;
-	int direccion_fisica = numero_de_marco * tamanio_pagina + obtener_desplazamiento_desde_direccion_logica(direccion_logica);
 
 	if (page_fault)
 	{
 		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
-		se_ejecuto_instruccion_bloqueante = true;
+		dejar_de_ejecutar = true;
 		devolver_contexto_por_page_fault(numero_de_pagina);
-	}
-	else
-	{
-		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
-		
-		u_int32_t valor_leido_en_memoria = leer_valor_en_memoria(direccion_fisica);
-		escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
-
-		log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
+		return -1;
 	}
 
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %d", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
+	log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
+	int desplazamiento = direccion_logica - numero_de_pagina * tamanio_pagina;
+	int direccion_fisica = numero_de_marco * tamanio_pagina + desplazamiento;
+
+	return direccion_fisica;
 }
 
-void ejecutar_instruccion_mov_out(int direccion_logica, char *nombre_registro)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
-
-	// MMU
-	int numero_de_pagina = obtener_numero_de_pagina_desde_direccion_logica(direccion_logica);
-	int numero_de_marco = pedir_numero_de_marco_a_memoria(numero_de_pagina);
-	bool page_fault = numero_de_marco == -1;
-	int direccion_fisica = numero_de_marco * tamanio_pagina + obtener_desplazamiento_desde_direccion_logica(direccion_logica);
-
-	if (page_fault)
-	{
-		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
-		se_ejecuto_instruccion_bloqueante = true;
-		devolver_contexto_por_page_fault(numero_de_pagina);
-	}
-	else
-	{
-		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
-		
-		u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
-		escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
-
-		log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
-	}
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
-}
-
-void ejecutar_instruccion_fopen(char *nombre_archivo, char *modo_apertura)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
-
-	// TO DO
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
-}
-
-void ejecutar_instruccion_fclose(char *nombre_archivo)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
-
-	// TO DO
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
-}
-
-void ejecutar_instruccion_fseek(char *nombre_archivo, char *posicion)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
-
-	// TO DO
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
-}
-
-void ejecutar_instruccion_fread(char *nombre_archivo, char *direccion_logica)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
-
-	// TO DO
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
-}
-
-void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
-
-	// TO DO
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
-}
-
-void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio)
-{
-	log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
-
-	// TO DO
-
-	log_trace(logger, "PID: %d - Ejecutada: %s - %s - %s", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
-}
-
-void ejecutar_instruccion_exit()
-{
-	log_info(logger, "PID: %d - Ejecutando: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
-
-	se_leyo_instruccion_exit = true;
-	devolver_contexto_por_correcta_finalizacion();
-
-	log_trace(logger, "PID: %d - Ejecutada: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
-}
-
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* UTILIDADES *////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 {
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
@@ -885,27 +603,20 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	return contexto_de_ejecucion;
 }
 
-void destruir_instruccion(t_instruccion *instruccion)
+t_operacion_filesystem *crear_objeto_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
-	if (instruccion == NULL)
-	{
-		return;
-	}
+	t_operacion_filesystem *operacion_filesystem = malloc(sizeof(t_operacion_filesystem));
 
-	if (instruccion->parametro_1 != NULL)
-	{
-		free(instruccion->parametro_1);
-	}
+	operacion_filesystem->nombre_archivo = nombre_archivo;
+	operacion_filesystem->modo_apertura = modo_apertura;
+	operacion_filesystem->posicion = posicion;
+	operacion_filesystem->direccion_fisica = direccion_fisica;
+	operacion_filesystem->tamanio = tamanio;
 
-	if (instruccion->parametro_2 != NULL)
-	{
-		free(instruccion->parametro_2);
-	}
-
-	free(instruccion);
+	return operacion_filesystem;
 }
 
-uint32_t obtener_valor_registro(char *nombre_registro)
+uint32_t leer_valor_de_registro(char *nombre_registro)
 {
 	if (strcmp(nombre_registro, AX_NOMBRE_REGISTRO) == 0)
 	{
@@ -968,14 +679,4 @@ void escribir_valor_a_registro(char *nombre_registro, uint32_t valor)
 	{
 		log_error(logger, "No se asigno el valor %d al registro '%s' porque es un registro no conocido.", valor, nombre_registro);
 	}
-}
-
-int obtener_numero_de_pagina_desde_direccion_logica(int direccion_logica)
-{
-	return floor(direccion_logica / tamanio_pagina);
-}
-
-int obtener_desplazamiento_desde_direccion_logica(int direccion_logica)
-{
-	return direccion_logica - obtener_numero_de_pagina_desde_direccion_logica(direccion_logica) * tamanio_pagina;
 }
