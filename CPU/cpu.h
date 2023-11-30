@@ -34,26 +34,21 @@ void terminar_cpu();
 // Comunicacion con Kernel
 void *interrupt();
 void *dispatch();
-void enviar_paquete_respuesta_ejecutar_proceso();
-void enviar_paquete_respuesta_interrumpir_ejecucion();
-void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
-void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
-void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep);
-bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado);
 void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
 void devolver_contexto_por_sleep(int segundos_sleep);
+void devolver_contexto_por_wait(char *nombre_recurso);
+void devolver_contexto_por_signal(char *nombre_recurso);
+
 
 // Comunicacion con Memoria
 void enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
-void enviar_paquete_solicitud_pedir_instruccion_a_memoria();
 void enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(int numero_de_pagina);
 void solicitar_info_inicial_a_memoria();
 char *pedir_instruccion_a_memoria();
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();
-char *fetch();
 t_instruccion *decode(char *instruccion_string);
 void execute(t_instruccion *instruccion);
 

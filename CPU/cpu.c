@@ -164,7 +164,8 @@ void *interrupt()
 			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 			motivo_interrupcion = leer_paquete_solicitud_interrumpir_proceso(logger, conexion_con_kernel_interrupt);
 			ocurrio_interrupcion = true;
-			enviar_paquete_respuesta_interrumpir_ejecucion();
+			t_paquete *paquete_respuesta_interrumpir_proceso = crear_paquete_respuesta_interrumpir_proceso(logger);
+			enviar_paquete(logger, conexion_con_kernel_interrupt, paquete_respuesta_interrumpir_proceso, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL);
 		}
 		else
 		{
@@ -202,7 +203,9 @@ void *dispatch()
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
 
-			enviar_paquete_respuesta_ejecutar_proceso();
+			// Aviso al kernel que recibi el paquete
+			t_paquete *paquete_respuesta_ejecutar_proceso = crear_paquete_respuesta_ejecutar_proceso(logger);
+			enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_respuesta_ejecutar_proceso, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 		}
 		else
 		{
@@ -213,101 +216,58 @@ void *dispatch()
 	}
 }
 
-void enviar_paquete_respuesta_ejecutar_proceso()
+void devolver_contexto_por_ser_interrumpido()
 {
-	t_paquete *paquete_respuesta_ejecutar_proceso = crear_paquete_respuesta_ejecutar_proceso(logger);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_respuesta_ejecutar_proceso, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-}
-
-void enviar_paquete_respuesta_interrumpir_ejecucion()
-{
-	t_paquete *paquete_respuesta_interrumpir_proceso = crear_paquete_respuesta_interrumpir_proceso(logger);
-	enviar_paquete(logger, conexion_con_kernel_interrupt, paquete_respuesta_interrumpir_proceso, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido()
-{
+	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion, motivo_interrupcion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion()
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_wait(char* nombre_recurso)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_wait = crear_paquete_solicitud_devolver_proceso_por_wait(logger, contexto_de_ejecucion, nombre_recurso);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_devolver_proceso_por_signal(char* nombre_recurso)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_signal(logger, contexto_de_ejecucion, nombre_recurso);
-	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-	free(contexto_de_ejecucion);
-}
-
-bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado)
-{
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
-	return codigo_operacion_recibido == codigo_operacion_esperado;
-}
-
-void devolver_contexto_por_ser_interrumpido()
-{
-	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_correcta_finalizacion()
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_sleep(int segundos_sleep)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_sleep(segundos_sleep);
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_wait(char* nombre_recurso)
+void devolver_contexto_por_wait(char *nombre_recurso)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_wait(nombre_recurso);
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_WAIT);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_wait = crear_paquete_solicitud_devolver_proceso_por_wait(logger, contexto_de_ejecucion, nombre_recurso);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_WAIT
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_signal(char* nombre_recurso)
+void devolver_contexto_por_signal(char *nombre_recurso)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
-	enviar_paquete_solicitud_devolver_proceso_por_signal(nombre_recurso);
-	recibir_operacion_de_kernel_dispatch(RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_signal(logger, contexto_de_ejecucion, nombre_recurso);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
@@ -379,17 +339,28 @@ int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 
 void ciclo_de_ejecucion()
 {
-	char *instruccion_string;
 	t_instruccion *instruccion;
-	int opcode;
 
 	while (true)
 	{
 		// Espero a que haya algo para ejecutar
-		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion); 
+		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion);
 
-		instruccion_string = fetch();
-		instruccion = decode(instruccion_string);
+		// FETCH
+		log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
+		t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
+		pedido_instruccion->pc = program_counter;
+		pedido_instruccion->pid = pid_ejecutando;
+		t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
+		free(pedido_instruccion);
+		enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+		char *instruccion_con_parametros = leer_paquete_respuesta_pedir_instruccion_a_memoria(logger, conexion_con_memoria);
+
+		// DECODE
+		instruccion = decode(instruccion_con_parametros);
+
+		// EXECUTE
 		execute(instruccion);
 
 		if (instruccion->opcode != JNZ_OPCODE_INSTRUCCION)
@@ -410,12 +381,6 @@ void ciclo_de_ejecucion()
 
 		destruir_instruccion(instruccion);
 	}
-}
-
-char *fetch()
-{
-	log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
-	return pedir_instruccion_a_memoria();
 }
 
 t_instruccion *decode(char *instruccion_string)
@@ -765,7 +730,7 @@ void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica)
 	else
 	{
 		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
-		
+
 		u_int32_t valor_leido_en_memoria = leer_valor_en_memoria(direccion_fisica);
 		escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
 
@@ -794,7 +759,7 @@ void ejecutar_instruccion_mov_out(int direccion_logica, char *nombre_registro)
 	else
 	{
 		log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
-		
+
 		u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
 		escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
 
