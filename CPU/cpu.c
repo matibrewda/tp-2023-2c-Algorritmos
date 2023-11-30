@@ -4,9 +4,8 @@
 t_log *logger = NULL;
 t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
+bool dejar_de_ejecutar = false;
 bool ocurrio_interrupcion = false;
-bool se_ejecuto_instruccion_bloqueante = false;
-bool se_leyo_instruccion_exit = false;
 int pid_ejecutando = 0;
 int tamanio_pagina = -1;
 int tamanio_memoria = -1;
@@ -193,9 +192,8 @@ void *dispatch()
 			registro_cx = contexto_de_ejecucion->registro_cx;
 			registro_dx = contexto_de_ejecucion->registro_dx;
 
+			dejar_de_ejecutar = false;
 			ocurrio_interrupcion = false;
-			se_ejecuto_instruccion_bloqueante = false;
-			se_leyo_instruccion_exit = false;
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -266,6 +264,11 @@ void devolver_contexto_por_signal(char *nombre_recurso)
 	free(contexto_de_ejecucion);
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL
 	sem_post(&semaforo_espero_ejecutar_proceso);
+}
+
+void devolver_contexto_por_error()
+{
+	// TODO
 }
 
 void devolver_contexto_por_page_fault(int numero_de_pagina)
@@ -390,24 +393,24 @@ void ciclo_de_ejecucion()
 		{
 			int tiempo_sleep = atoi(strtok_r(saveptr, " ", &saveptr));
 			log_info(logger, "PID: %d - Ejecutando: %s - %d", pid_ejecutando, SLEEP_NOMBRE_INSTRUCCION, tiempo_sleep);
-			se_ejecuto_instruccion_bloqueante = true;
 			program_counter++;
+			dejar_de_ejecutar = true;
 			devolver_contexto_por_sleep(tiempo_sleep);
 		}
 		else if (strcmp(nombre_instruccion, WAIT_NOMBRE_INSTRUCCION) == 0)
 		{
 			char *nombre_recurso = strtok_r(saveptr, " ", &saveptr);
 			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, WAIT_NOMBRE_INSTRUCCION, nombre_recurso);
-			se_ejecuto_instruccion_bloqueante = true;
 			program_counter++;
+			dejar_de_ejecutar = true;
 			devolver_contexto_por_wait(nombre_recurso);
 		}
 		else if (strcmp(nombre_instruccion, SIGNAL_NOMBRE_INSTRUCCION) == 0)
 		{
 			char *nombre_recurso = strtok_r(saveptr, " ", &saveptr);
 			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, SIGNAL_NOMBRE_INSTRUCCION, nombre_recurso);
-			se_ejecuto_instruccion_bloqueante = true;
 			program_counter++;
+			dejar_de_ejecutar = true;
 			devolver_contexto_por_signal(nombre_recurso);
 		}
 		else if (strcmp(nombre_instruccion, MOV_IN_NOMBRE_INSTRUCCION) == 0)
@@ -416,10 +419,13 @@ void ciclo_de_ejecucion()
 			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, MOV_IN_NOMBRE_INSTRUCCION, nombre_registro, direccion_logica);
 			int direccion_fisica = mmu(direccion_logica);
-			u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(direccion_fisica);
-			escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
-			log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
-			program_counter++;
+			if (direccion_fisica != -1)
+			{
+				u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(direccion_fisica);
+				escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
+				log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
+				program_counter++;
+			}
 		}
 		else if (strcmp(nombre_instruccion, MOV_OUT_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -427,33 +433,69 @@ void ciclo_de_ejecucion()
 			char *nombre_registro = strtok_r(saveptr, " ", &saveptr);
 			log_info(logger, "PID: %d - Ejecutando: %s - %d - %s", pid_ejecutando, MOV_OUT_NOMBRE_INSTRUCCION, direccion_logica, nombre_registro);
 			int direccion_fisica = mmu(direccion_logica);
-			u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
-			escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
-			log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
-			program_counter++;
+			if (direccion_fisica != -1)
+			{
+				u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
+				escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
+				log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
+				program_counter++;
+			}
 		}
 		else if (strcmp(nombre_instruccion, FOPEN_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			char* modo_apertura = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
+			program_counter++;
 		}
 		else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
+			program_counter++;
 		}
 		else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int posicion = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
+			program_counter++;
 		}
 		else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FREAD_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+			int direccion_fisica = mmu(direccion_logica);
+			if (direccion_fisica != -1)
+			{
+				// TODO
+				program_counter++;
+			}
 		}
 		else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int direccion_logica = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FWRITE_NOMBRE_INSTRUCCION, nombre_archivo, direccion_logica);
+			int direccion_fisica = mmu(direccion_logica);
+			if (direccion_fisica != -1)
+			{
+				// TODO
+				program_counter++;
+			}
 		}
 		else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
 		{
+			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
+			int tamanio = atoi(strtok_r(saveptr, " ", &saveptr));
+			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
+			program_counter++;
 		}
 		else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
 		{
 			log_info(logger, "PID: %d - Ejecutando: %s", pid_ejecutando, EXIT_NOMBRE_INSTRUCCION);
-			se_leyo_instruccion_exit = true;
+			dejar_de_ejecutar = true;
 			devolver_contexto_por_correcta_finalizacion();
 		}
 
@@ -463,9 +505,10 @@ void ciclo_de_ejecucion()
 		if (ocurrio_interrupcion)
 		{
 			devolver_contexto_por_ser_interrumpido();
+			dejar_de_ejecutar = true;
 		}
 
-		if (!se_ejecuto_instruccion_bloqueante && !ocurrio_interrupcion && !se_leyo_instruccion_exit)
+		if (!dejar_de_ejecutar)
 		{
 			// Sigo ejecutando
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -482,8 +525,9 @@ int mmu(int direccion_logica)
 	if (page_fault)
 	{
 		log_info(logger, "Page Fault PID: %d - Pagina: %d", pid_ejecutando, numero_de_pagina);
-		se_ejecuto_instruccion_bloqueante = true;
+		dejar_de_ejecutar = true;
 		devolver_contexto_por_page_fault(numero_de_pagina);
+		return -1;
 	}
 
 	log_info(logger, "PID: %d - OBTENER MARCO - Pagina: %d - Marco: %d", pid_ejecutando, numero_de_pagina, numero_de_marco);
