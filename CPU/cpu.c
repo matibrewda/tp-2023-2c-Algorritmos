@@ -288,7 +288,7 @@ void devolver_contexto_por_page_fault(int numero_de_pagina)
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio)
+void devolver_contexto_por_operacion_filesystem(char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
@@ -603,7 +603,7 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	return contexto_de_ejecucion;
 }
 
-t_operacion_filesystem *crear_objeto_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio)
+t_operacion_filesystem *crear_objeto_operacion_filesystem(char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
 	t_operacion_filesystem *operacion_filesystem = malloc(sizeof(t_operacion_filesystem));
 
