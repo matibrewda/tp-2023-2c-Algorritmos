@@ -251,9 +251,21 @@ t_paquete *crear_paquete_respuesta_finalizar_proceso_en_memoria(t_log *logger)
 }
 
 // Memoria a Kernel
-t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger)
+t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, t_contenido_pagina *contenido_pagina)
 {
-    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+    op_code codigo_operacion = RESPUESTA_CARGAR_PAGINA_EN_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_string_a_paquete(logger, paquete, contenido_pagina->contenido, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, contenido_pagina->largo, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+
+    return paquete;
 }
 
 // Memoria a CPU

@@ -53,7 +53,7 @@ t_paquete *crear_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, t_pe
 // Memoria a Kernel
 t_paquete *crear_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, bool resultado_iniciar_proceso);
 t_paquete *crear_paquete_respuesta_finalizar_proceso_en_memoria(t_log *logger);
-t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger);
+t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, t_contenido_pagina *contenido_pagina);
 
 // Memoria a CPU
 t_paquete *crear_paquete_respuesta_pedir_instruccion_a_memoria(t_log *logger, char *linea_instruccion);
