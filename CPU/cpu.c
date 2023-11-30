@@ -266,19 +266,39 @@ void devolver_contexto_por_signal(char *nombre_recurso)
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_error()
+void devolver_contexto_por_error(int codigo_error)
 {
-	// TODO
+	sem_wait(&semaforo_devuelvo_proceso);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_error = crear_paquete_solicitud_devolver_proceso_por_error(logger, contexto_de_ejecucion, codigo_error);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_error, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_ERROR
+	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_page_fault(int numero_de_pagina)
 {
-	// TODO
+	sem_wait(&semaforo_devuelvo_proceso);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_paquete *paquete_devuelvo_proceso_por_pagefault = crear_paquete_solicitud_devolver_proceso_por_pagefault(logger, contexto_de_ejecucion, numero_de_pagina);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_pagefault, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_PAGEFAULT
+	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_operacion_filesystem()
+void devolver_contexto_por_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
-	// TODO
+	sem_wait(&semaforo_devuelvo_proceso);
+	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
+	t_operacion_filesystem *operacion_filesystem = crear_objeto_operacion_filesystem(nombre_archivo, modo_apertura, posicion, direccion_fisica, tamanio);
+	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, contexto_de_ejecucion, operacion_filesystem);
+	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+	free(operacion_filesystem);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM
+	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void pedir_info_inicial_a_memoria()
@@ -470,7 +490,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem();
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, modo_apertura, -1, -1, -1);
 		}
 		else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -478,7 +498,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem();
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, -1, -1);
 		}
 		else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -487,7 +507,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem();
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", posicion, -1, -1);
 		}
 		else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -499,7 +519,7 @@ void ciclo_de_ejecucion()
 			{
 				program_counter++;
 				dejar_de_ejecutar = true;
-				devolver_contexto_por_operacion_filesystem();
+				devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, direccion_fisica, -1);
 			}
 		}
 		else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
@@ -512,7 +532,7 @@ void ciclo_de_ejecucion()
 			{
 				program_counter++;
 				dejar_de_ejecutar = true;
-				devolver_contexto_por_operacion_filesystem();
+				devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, direccion_fisica, -1);
 			}
 		}
 		else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
@@ -522,7 +542,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem();
+			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, -1, tamanio);
 		}
 		else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -581,6 +601,19 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	contexto_de_ejecucion->registro_dx = registro_dx;
 
 	return contexto_de_ejecucion;
+}
+
+t_operacion_filesystem *crear_objeto_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio)
+{
+	t_operacion_filesystem *operacion_filesystem = malloc(sizeof(t_operacion_filesystem));
+
+	operacion_filesystem->nombre_archivo = nombre_archivo;
+	operacion_filesystem->modo_apertura = modo_apertura;
+	operacion_filesystem->posicion = posicion;
+	operacion_filesystem->direccion_fisica = direccion_fisica;
+	operacion_filesystem->tamanio = tamanio;
+
+	return operacion_filesystem;
 }
 
 uint32_t leer_valor_de_registro(char *nombre_registro)

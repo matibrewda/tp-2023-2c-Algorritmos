@@ -150,6 +150,61 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_signal(t_log *logger, t_
     return paquete;
 }
 
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_error(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int codigo_error)
+{
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_ERROR;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + CODIGO ERROR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_int_a_paquete(logger, paquete, codigo_error, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + CODIGO ERROR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_pagefault(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int numero_pagina)
+{
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_ERROR;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NUMERO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_int_a_paquete(logger, paquete, numero_pagina, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NUMERO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log* logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_operacion_filesystem *operacion_filesystem)
+{
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + OPERACION FILESYSTEM' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_string_a_paquete(logger, paquete, operacion_filesystem->nombre_archivo, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+    agregar_string_a_paquete(logger, paquete, operacion_filesystem->modo_apertura, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, operacion_filesystem->posicion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, operacion_filesystem->direccion_fisica, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, operacion_filesystem->tamanio, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + OPERACION FILESYSTEM' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
 // CPU a Memoria
 t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_pedido_instruccion *pedido_instruccion)
 {

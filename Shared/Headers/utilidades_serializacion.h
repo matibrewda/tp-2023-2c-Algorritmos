@@ -39,6 +39,9 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(t_
 t_paquete *crear_paquete_solicitud_devolver_proceso_por_sleep(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int tiempo_sleep);
 t_paquete *crear_paquete_solicitud_devolver_proceso_por_wait(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, char *nombre_recurso);
 t_paquete *crear_paquete_solicitud_devolver_proceso_por_signal(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, char *nombre_recurso);
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_error(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int codigo_error);
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_pagefault(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int numero_pagina);
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log* logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_operacion_filesystem *operacion_filesystem);
 
 // CPU a Memoria
 t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_pedido_instruccion *pedido_instruccion);
