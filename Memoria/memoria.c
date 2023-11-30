@@ -9,6 +9,9 @@ t_list *tabla_de_paginas = NULL;
 t_list *tabla_de_marcos = NULL; // TODO implementar una lista propia de tamaño fijo? t_list no tiene tamaño fijo, es enlazada
 void *memoria_real;
 
+
+
+
 // Conexiones
 int socket_kernel = -1;
 int socket_cpu = -1;
@@ -98,6 +101,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	tabla_de_marcos = list_create();
 
 	// Creacion de Estructuras
+	uint32_t espacio_memoria[configuracion_memoria->tam_memoria];
+	memoria_real = espacio_memoria;
+
 	inicializar_espacio_contiguo_de_memoria();
 
 	// Hilos
@@ -227,7 +233,7 @@ void notificar_escritura_a_cpu()
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
 	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
-
+	*(uint32_t*)(memoria_real + direccion_fisica) = valor_a_escribir;
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 }
@@ -238,6 +244,16 @@ uint32_t leer_valor_en_memoria(int direccion_fisica)
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return 3; // XD
+}
+
+int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
+{
+	return floor(direccion_fisica / configuracion_memoria->tam_pagina);
+}
+
+int obtener_desplazamiento_desde_direccion_fisica(int direccion_fisica)
+{
+	return direccion_fisica - obtener_numero_de_marco_desde_direccion_fisica(direccion_fisica) * (configuracion_memoria->tam_pagina);
 }
 
 void enviar_info_de_memoria_inicial_para_cpu()
