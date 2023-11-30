@@ -153,7 +153,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 	}
 
-	// Prueba de CREAR ARCHIVO
+	// Prueba de ABRIR ARCHIVO
 	// Caso 1) No existe:
 	abrirArchivo(configuracion_filesystem->path_fcb, "ArchivoPepito");
 	// Caso 2) Existe:
@@ -358,8 +358,10 @@ void *comunicacion_kernel()
 
 			// t_solicitud_crear_archivo_fs* solicitud_crear_archivo_fs = leer_paquete_solicitud_crear_archivo_fs(logger, conexion_con_kernel); // TODO: (LUCAS)
 			// solicitud_crear_archivo_fs -> nombre_archivo // TODO: (LUCAS)
-
-			// TO DO: crear FCB para archivo de "nombre_archivo" (LUCIANO)
+			
+			// TO DO: crear FCB para archivo de "nombre_archivo" (LUCIANO - LISTO!)
+			char* nombreNuevoArchivo = "nuevoArchivo";
+			crear_archivo(configuracion_filesystem->path_fcb, nombreNuevoArchivo);
 			
 			// SIEMPRE DEVOLVER OK AL KERNEL
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
