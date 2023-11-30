@@ -43,6 +43,8 @@ const char* nombre_opcode(op_code opcode)
         // Filesystem a Memoria
         case SOLICITUD_LEER_ARCHIVO_MEMORIA: return "'SOLICITUD_LEER_ARCHIVO_MEMORIA'";
 	    case SOLICITUD_ESCRIBIR_ARCHIVO_MEMORIA: return "'SOLICITUD_ESCRIBIR_ARCHIVO_MEMORIA'";
+
+        // 
         
         // ERROR
         default: return "NOMBRE DE OPCODE DESCONOCIDO";

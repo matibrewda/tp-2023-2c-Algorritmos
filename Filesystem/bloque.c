@@ -10,7 +10,7 @@ BLOQUE* asignarTamanioBloque(uint32_t tamanioBloqueEnArchivoConfig);
         return 1;
     }
 
-    for (uint32_t i = 0; i < cantDeBloquesTotales; i++) {
+    for (uint32_t ai = 0; i < cantDeBloquesTotales; i++) {
         BLOQUE* bloque = asignarTamanioBloque(tamanioBloque);
         fwrite(bloque, sizeof(BLOQUE), 1, archivoDeBloques);
         //fwrite(bloque, sizeof(BLOQUE), 1, archivoDeBloques);

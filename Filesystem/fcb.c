@@ -80,3 +80,4 @@ uint32_t verificarSiExisteFCBdeArchivo(char* rutaCompleta) {
         return -1;
     }
 }
+
