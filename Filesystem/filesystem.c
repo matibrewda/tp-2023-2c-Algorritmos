@@ -17,6 +17,8 @@ int socket_kernel = -1;
 int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
+
+
 char* concatenarRutas(const char* rutaFat, const char* nombreFCB) {
     // Asegúrate de tener suficiente espacio para ambas cadenas más el carácter nulo
     size_t longitudTotal = strlen(rutaFat) + strlen(nombreFCB) + 1;
@@ -328,56 +330,96 @@ int crear_archivo (char* path,char* nombreNuevoArchivo) {
 } */
 
 
+
+
 void ampliar_tamano_archivo(FCB *fcb, t_config *config, int nuevo_tamano) {
     // Actualizar tamaño en la estructura FCB
+	int bloques_a_agregar = (nuevo_tamano-(fcb->tamanio_archivo))/configuracion_filesystem->tam_bloques;
     fcb->tamanio_archivo = nuevo_tamano;
+	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total-configuracion_filesystem->cant_bloques_swap)*sizeof(uint32_t);
+	uint32_t bloque_a_leer = fcb->bloque_inicial;
+	int fatfd = open(configuracion_filesystem->path_fat,O_RDWR);
+	uint32_t *entrada_fat = mmap(NULL,tamanio_FAT,PROT_READ | PROT_WRITE,MAP_SHARED,fatfd,0);
 
+	//busco el ultimo bloque del archivo
+	while (entrada_fat[bloque_a_leer]!=UINT32_MAX)
+	{
+		bloque_a_leer=entrada_fat[bloque_a_leer];
+	}
+
+	uint32_t ultimo_bloque = bloque_a_leer;
+	bloque_a_leer = 1;
+
+	while (bloques_a_agregar != 0)
+	{
+		if (entrada_fat[bloque_a_leer]==0)
+		{
+			entrada_fat[ultimo_bloque]= bloque_a_leer;
+			ultimo_bloque = bloque_a_leer;
+			bloques_a_agregar--;
+		}
+		bloque_a_leer++;
+	}
+	entrada_fat[ultimo_bloque]=UINT32_MAX;
+	munmap(entrada_fat,tamanio_FAT);
+	close(fatfd);
     // Actualizar tamaño en la configuración
-    char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
-    int result = snprintf(nuevo_tamano_str, sizeof(nuevo_tamano_str), "%u", fcb->tamanio_archivo);
-
-    if (result >= 0 && result < sizeof(nuevo_tamano_str)) {
-        config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
-		config_save(config);
-    } else {
-        // Manejar el error (puede ser útil devolver un código de error o imprimir un mensaje de error)
-    }
+    /*char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
+    int result = snprintf(nuevo_tamano_str, sizeof(nuevo_tamano_str), "%u", fcb->tamanio_archivo);*/
 }
 
 void reducir_tamano_archivo(FCB *fcb,t_config *config, int nuevo_tamano) {
-	fcb->tamanio_archivo = nuevo_tamano;
-	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
-    sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
-	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
+	int bloques_a_quitar = ((fcb->tamanio_archivo)-nuevo_tamano)/configuracion_filesystem->tam_bloques;
+    fcb->tamanio_archivo = nuevo_tamano;
+	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total-configuracion_filesystem->cant_bloques_swap)*sizeof(uint32_t);
+	uint32_t bloque_a_leer = fcb->bloque_inicial;
+	int fatfd = open(configuracion_filesystem->path_fat,O_RDWR);
+	uint32_t *entrada_fat = mmap(NULL,tamanio_FAT,PROT_READ | PROT_WRITE,MAP_SHARED,fatfd,0);
+
+	//busco el ultimo bloque del archivo
+	while (entrada_fat[bloque_a_leer]!=UINT32_MAX)
+	{
+		bloque_a_leer=entrada_fat[bloque_a_leer];
+	}
+	uint32_t ultimo_bloque = bloque_a_leer;
+	while (bloques_a_quitar!=0)
+	{
+		bloque_a_leer=1;
+		while (entrada_fat[bloque_a_leer]!=ultimo_bloque);{
+			bloque_a_leer++;
+		} 
+		entrada_fat[ultimo_bloque]=0; //Libero el ultimo bloque
+		ultimo_bloque = bloque_a_leer;
+		bloques_a_quitar--;
+	}
+	entrada_fat[ultimo_bloque]=UINT32_MAX;
+	munmap(entrada_fat,tamanio_FAT);
+	close(fatfd);
+	
 }
 
-int truncar_archivo(char* path, uint32_t nuevo_tamano) {
-	FCB *fcb;
+int truncar_archivo(char* nombre, uint32_t nuevo_tamano) {
+	FCB *fcb; // FUNCION QUE ME TRAIGA EL FCB DANDO LE EL NOMBRE COMPLETAR!!!
 	t_config *config;
 	log_debug(logger,"Truncar Archivo: Iniciado.");
+	//BUSCAR RUTA DEL ARCHIVO COMLETAR!!!
 	//Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
-	if (path!= NULL) {
-		// creo la estructura para manejarlo.
-		log_debug(logger,"Truncar Archivo: Creo estructuras.");
-		fcb = crear_fcb(path);
-		config = config_create(path);
-	} else {return -1;}
-
-	printf("%d",fcb->tamanio_archivo);
-
-		//Pueden pasar dos cosas, 1) Que se trate de ampliar o 2) que se trate de reducir.
+	if (fcb	== NULL) {
+		log_debug(logger,"Truncar Archivo: No existe el archivo: <%s>.",nombre);
+		return;
+	}
     if (nuevo_tamano > fcb->tamanio_archivo) {
-		log_debug(logger,"Truncar Archivo: Nuevo tamaño mas grande.");
+		log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
         // Ampliar el tamaño del archivo
         ampliar_tamano_archivo(fcb,config, nuevo_tamano);
 		return 0;
     } else if (nuevo_tamano < fcb->tamanio_archivo) {
-		log_debug(logger,"truncar Archivo: nuevo tamaño mas chico.");
+		log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
         // Reducir el tamaño del archivo
         reducir_tamano_archivo(fcb, config, nuevo_tamano);
     }
     // Si el nuevo tamaño es igual al actual, no se requiere acción.
-	log_info(logger,"Truncar Archivo: <%s> - Tamaño: <%d>",fcb->nombre_archivo,nuevo_tamano);
+	
 }
 
 void inicializar_fat(){
