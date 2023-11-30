@@ -6,7 +6,7 @@ t_argumentos_cpu *argumentos_cpu = NULL;
 t_config_cpu *configuracion_cpu = NULL;
 bool dejar_de_ejecutar = false;
 bool ocurrio_interrupcion = false;
-int pid_ejecutando = 0;
+int pid_ejecutando = -1;
 int tamanio_pagina = -1;
 int tamanio_memoria = -1;
 
@@ -28,11 +28,11 @@ sem_t semaforo_espero_ejecutar_proceso;
 sem_t semaforo_devuelvo_proceso;
 
 // Registros
-uint32_t program_counter = 0;
-uint32_t registro_ax = 0;
-uint32_t registro_bx = 0;
-uint32_t registro_cx = 0;
-uint32_t registro_dx = 0;
+uint32_t program_counter = -1;
+uint32_t registro_ax = -1;
+uint32_t registro_bx = -1;
+uint32_t registro_cx = -1;
+uint32_t registro_dx = -1;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -276,6 +276,11 @@ void devolver_contexto_por_page_fault(int numero_de_pagina)
 	// TODO
 }
 
+void devolver_contexto_por_operacion_filesystem()
+{
+	// TODO
+}
+
 void pedir_info_inicial_a_memoria()
 {
 	// Enviar
@@ -444,15 +449,19 @@ void ciclo_de_ejecucion()
 		else if (strcmp(nombre_instruccion, FOPEN_NOMBRE_INSTRUCCION) == 0)
 		{
 			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
-			char* modo_apertura = strtok_r(saveptr, " ", &saveptr);
+			char *modo_apertura = strtok_r(saveptr, " ", &saveptr);
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
 			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem();
 		}
 		else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
 		{
 			char *nombre_archivo = strtok_r(saveptr, " ", &saveptr);
 			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
 			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem();
 		}
 		else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -460,6 +469,8 @@ void ciclo_de_ejecucion()
 			int posicion = atoi(strtok_r(saveptr, " ", &saveptr));
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
 			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem();
 		}
 		else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -469,8 +480,9 @@ void ciclo_de_ejecucion()
 			int direccion_fisica = mmu(direccion_logica);
 			if (direccion_fisica != -1)
 			{
-				// TODO
 				program_counter++;
+				dejar_de_ejecutar = true;
+				devolver_contexto_por_operacion_filesystem();
 			}
 		}
 		else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
@@ -481,8 +493,9 @@ void ciclo_de_ejecucion()
 			int direccion_fisica = mmu(direccion_logica);
 			if (direccion_fisica != -1)
 			{
-				// TODO
 				program_counter++;
+				dejar_de_ejecutar = true;
+				devolver_contexto_por_operacion_filesystem();
 			}
 		}
 		else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
@@ -491,6 +504,8 @@ void ciclo_de_ejecucion()
 			int tamanio = atoi(strtok_r(saveptr, " ", &saveptr));
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
 			program_counter++;
+			dejar_de_ejecutar = true;
+			devolver_contexto_por_operacion_filesystem();
 		}
 		else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
 		{
