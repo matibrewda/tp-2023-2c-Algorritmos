@@ -34,53 +34,31 @@ void terminar_cpu();
 // Comunicacion con Kernel
 void *interrupt();
 void *dispatch();
-void enviar_paquete_respuesta_ejecutar_proceso();
-void enviar_paquete_respuesta_interrumpir_ejecucion();
-void enviar_paquete_solicitud_devolver_proceso_por_ser_interrumpido();
-void enviar_paquete_solicitud_devolver_proceso_por_correcta_finalizacion();
-void enviar_paquete_solicitud_devolver_proceso_por_sleep(int segundos_sleep);
-bool recibir_operacion_de_kernel_dispatch(op_code codigo_operacion_esperado);
+
 void devolver_contexto_por_ser_interrumpido();
 void devolver_contexto_por_correcta_finalizacion();
 void devolver_contexto_por_sleep(int segundos_sleep);
+void devolver_contexto_por_wait(char *nombre_recurso);
+void devolver_contexto_por_signal(char *nombre_recurso);
+void devolver_contexto_por_error(int codigo_error);
+void devolver_contexto_por_page_fault(int numero_de_pagina);
+void devolver_contexto_por_operacion_filesystem(char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio);
 
 // Comunicacion con Memoria
-void enviar_paquete_solicitud_pedir_info_de_memoria_inicial();
-void enviar_paquete_solicitud_pedir_instruccion_a_memoria();
-void enviar_paquete_solicitud_pedir_numero_de_marco_a_memoria(int numero_de_pagina);
-void solicitar_info_inicial_a_memoria();
+void pedir_info_inicial_a_memoria();
 char *pedir_instruccion_a_memoria();
+int pedir_numero_de_marco_a_memoria(int numero_de_pagina);
 
 // Ciclo de ejecucion
 void ciclo_de_ejecucion();
-char *fetch();
-t_instruccion *decode(char *instruccion_string);
-void execute(t_instruccion *instruccion);
 
-// Instrucciones
-void ejecutar_instruccion_set(char *nombre_registro, uint32_t valor);
-void ejecutar_instruccion_sum(char *nombre_registro_destino, char *nombre_registro_origen);
-void ejecutar_instruccion_sub(char *nombre_registro_destino, char *nombre_registro_origen);
-void ejecutar_instruccion_jnz(char *nombre_registro, uint32_t nuevo_program_counter);
-void ejecutar_instruccion_sleep(int tiempo);
-void ejecutar_instruccion_wait(char *nombre_recurso);
-void ejecutar_instruccion_signal(char *nombre_recurso);
-void ejecutar_instruccion_mov_in(char *nombre_registro, int direccion_logica);
-void ejecutar_instruccion_mov_out(int direccion_logica, char *nombre_registro);
-void ejecutar_instruccion_fopen(char *nombre_archivo, char *modo_apertura);
-void ejecutar_instruccion_fclose(char *nombre_archivo);
-void ejecutar_instruccion_fseek(char *nombre_archivo, char *posicion);
-void ejecutar_instruccion_fread(char *nombre_archivo, char *direccion_logica);
-void ejecutar_instruccion_fwrite(char *nombre_archivo, char *direccion_logica);
-void ejecutar_instruccion_ftruncate(char *nombre_archivo, char *tamanio);
-void ejecutar_instruccion_exit();
+// MMU
+int mmu(int direccion_logica);
 
 // Utilidades
 t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
-void destruir_instruccion(t_instruccion *instruccion);
-uint32_t obtener_valor_registro(char *nombre_registro);
+t_operacion_filesystem *crear_objeto_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio);
+uint32_t leer_valor_de_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
-int obtener_numero_de_pagina_desde_direccion_logica(int direccion_logica);
-int obtener_desplazamiento_desde_direccion_logica(int direccion_logica);
 
 #endif /* CPU_H_ */
