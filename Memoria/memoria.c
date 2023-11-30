@@ -5,6 +5,8 @@ t_log *logger = NULL;
 t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
+t_list *tabla_de_paginas = NULL;
+void *memoria_real;
 
 // Conexiones
 int socket_kernel = -1;
@@ -21,6 +23,8 @@ pthread_t hilo_atiendo_filesystem;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
+	atexit(terminar_memoria);
+
 	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_MEMORIA, LOG_LEVEL);
 	if (logger == NULL)
@@ -89,6 +93,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Listas
 	procesos_iniciados = list_create();
+	tabla_de_paginas = list_create();
+
+	// Creacion de Estructuras
+	inicializar_espacio_contiguo_de_memoria();
 
 	// Hilos
 	pthread_create(&hilo_atiendo_cpu, NULL, atender_cpu, NULL);
@@ -125,6 +133,12 @@ void *atender_kernel()
 			free(proceso_memoria->path);
 			free(proceso_memoria);
 		}
+		else if (operacion_recibida_de_kernel == SOLICITUD_CARGAR_PAGINA_EN_MEMORIA)
+		{
+			t_pedido_pagina_en_memoria *pedido_cargar_pagina = leer_paquete_solicitud_pedido_pagina_en_memoria(logger, conexion_con_cpu, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+			cargar_pagina_en_memoria(pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
+			free(pedido_cargar_pagina);
+		}
 	}
 }
 
@@ -145,6 +159,25 @@ void *atender_cpu()
 			enviar_instruccion_a_cpu(pedido_instruccion->pid, pedido_instruccion->pc);
 			free(pedido_instruccion);
 		}
+		else if (operacion_recibida_de_cpu == SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA)
+		{
+			t_pedido_pagina_en_memoria *pedido_numero_de_marco = leer_paquete_solicitud_pedido_pagina_en_memoria(logger, conexion_con_cpu, SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+			enviar_numero_de_marco_a_cpu(pedido_numero_de_marco->pid, pedido_numero_de_marco->numero_de_pagina);
+			free(pedido_numero_de_marco);
+		}
+		else if (operacion_recibida_de_cpu == SOLICITUD_LEER_VALOR_EN_MEMORIA)
+		{
+			int direccion_fisica = leer_paquete_solicitud_leer_valor_en_memoria(logger, conexion_con_cpu);
+			uint32_t valor_leido = leer_valor_en_memoria(direccion_fisica);
+			enviar_valor_leido_a_cpu(valor_leido);
+		}
+		else if (operacion_recibida_de_cpu == SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA)
+		{
+			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = leer_paquete_solicitud_escribir_valor_en_memoria(logger, conexion_con_cpu);
+			escribir_valor_en_memoria(pedido_escribir_valor_en_memoria->direccion_fisica,pedido_escribir_valor_en_memoria->valor_a_escribir);
+			notificar_escritura_a_cpu();
+			free(pedido_escribir_valor_en_memoria);
+		}
 	}
 }
 
@@ -157,17 +190,52 @@ void *atender_filesystem()
 
 		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_ARCHIVO_MEMORIA)
 		{
-			t_pedido_leer_archivo *pedido_leer_archivo = leer_paquete_pedido_leer_archivo(logger,conexion_con_filesystem);
+			t_pedido_leer_archivo *pedido_leer_archivo = leer_paquete_pedido_leer_archivo(logger, conexion_con_filesystem);
 			notificar_lectura_a_filesystem();
 			free(pedido_leer_archivo);
 		}
 		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_ARCHIVO_MEMORIA)
 		{
-			t_pedido_escribir_archivo *pedido_escribir_archivo = leer_paquete_pedido_escribir_archivo(logger,conexion_con_filesystem);
+			t_pedido_escribir_archivo *pedido_escribir_archivo = leer_paquete_pedido_escribir_archivo(logger, conexion_con_filesystem);
 			notificar_escritura_a_filesystem();
 			free(pedido_escribir_archivo);
 		}
 	}
+}
+
+void enviar_valor_leido_a_cpu(uint32_t valor_leido)
+{
+	log_debug(logger, "Comenzando la creacion de paquete para enviar valor leido en memoria a la CPU");
+
+	t_valor_leido_en_memoria *valor_leido_en_memoria = malloc(sizeof(t_valor_leido_en_memoria));
+	valor_leido_en_memoria->valor_leido = valor_leido;
+
+	t_paquete *paquete = crear_paquete_respuesta_leer_valor_en_memoria(logger, valor_leido_en_memoria);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+	free(valor_leido_en_memoria);
+}
+
+void notificar_escritura_a_cpu()
+{
+	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+}
+
+void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
+{
+	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
+
+	// Retardo de respuesta!
+	usleep((configuracion_memoria->retardo_respuesta) * 1000);
+}
+
+uint32_t leer_valor_en_memoria(int direccion_fisica)
+{
+	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego leer el valor usando el puntero "memoria_real"
+	// Retardo de respuesta!
+	usleep((configuracion_memoria->retardo_respuesta) * 1000);
+	return 3; // XD
 }
 
 void enviar_info_de_memoria_inicial_para_cpu()
@@ -182,6 +250,11 @@ void enviar_info_de_memoria_inicial_para_cpu()
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 
 	free(info_memoria);
+}
+
+void inicializar_espacio_contiguo_de_memoria()
+{
+	memoria_real = malloc(configuracion_memoria->tam_memoria);
 }
 
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
@@ -218,8 +291,14 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	list_add(procesos_iniciados, iniciar_proceso);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
-	int cantidad_de_bloques_mock = 1; // TODO MOCK
-	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques_mock); // TODO pasar cantidad de bloques correspondiente
+	int cantidad_de_bloques = size / configuracion_memoria->tam_pagina;
+	if (size % configuracion_memoria->tam_pagina != 0)
+	{
+		cantidad_de_bloques++;
+	}
+
+	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques);
+	crear_entrada_de_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap, pid);
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 }
 
@@ -252,7 +331,7 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 	t_paquete *paquete = crear_paquete_respuesta_pedir_instruccion_a_memoria(logger, linea_instruccion);
 
 	// Retardo de respuesta!
-	sleep(configuracion_memoria->retardo_respuesta);
+	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);
@@ -271,7 +350,8 @@ void finalizar_proceso_en_memoria(int pid)
 	}
 	cerrar_archivo_con_pid(pid);
 
-	pedir_liberacion_de_bloques_a_filesystem();//todo pasar lista de bloques
+	// TODO: liberar bloques en swap (CONEXION CON FILESYSTEM)
+	limpiar_entradas_tabla_de_paginas(pid);
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 	free(archivo_proceso);
 }
@@ -283,7 +363,7 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid)
 		return archivo_proceso->pid == pid;
 	};
 
-	t_archivo_proceso* resultado = list_find(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id);
+	t_archivo_proceso *resultado = list_find(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id);
 
 	if (resultado == NULL)
 	{
@@ -295,12 +375,12 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid)
 
 void cerrar_archivo_con_pid(int pid)
 {
-	bool _filtro_archivo_proceso_por_id(t_archivo_proceso *archivo_proceso)
+	bool _filtro_archivo_proceso_por_id(t_archivo_proceso * archivo_proceso)
 	{
 		return archivo_proceso->pid == pid;
 	};
 
-	void _finalizar_archivo_proceso(t_archivo_proceso *archivo_proceso)
+	void _finalizar_archivo_proceso(t_archivo_proceso * archivo_proceso)
 	{
 		cerrar_archivo(logger, archivo_proceso->archivo);
 		free(archivo_proceso);
@@ -309,55 +389,271 @@ void cerrar_archivo_con_pid(int pid)
 	list_remove_and_destroy_by_condition(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso);
 }
 
-
-void notificar_lectura_a_filesystem() 
+void notificar_lectura_a_filesystem()
 {
-	log_debug(logger,"Notificando a File System de lectura exitosa en memoria");
+	log_debug(logger, "Notificando a File System de lectura exitosa en memoria");
 	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LEER_ARCHIVO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
-void notificar_escritura_a_filesystem() 
+void notificar_escritura_a_filesystem()
 {
-	log_debug(logger,"Notificando a File System de lectura exitosa en memoria");
+	log_debug(logger, "Notificando a File System de lectura exitosa en memoria");
 	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_ARCHIVO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
 t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 {
-	t_list *posiciones_swap = list_create();
 	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	// TODO bloquear hilo esperando el paquete de respuesta?
+	return recibir_paquete_pedir_bloques_a_filesystem();
+}
+
+t_list *recibir_paquete_pedir_bloques_a_filesystem()
+{
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+	t_list *posiciones_swap;
+	if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
+	{
+		int tamanio_buffer;
+		void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+		void *buffer_con_offset = buffer;
+
+		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+
+		// TO DO: si posiciones_swap is empty, entonces devolver error al kernel
+	}
+
 	return posiciones_swap;
 }
 
-void pedir_liberacion_de_bloques_a_filesystem()
+void limpiar_entradas_tabla_de_paginas(int pid)
 {
-	t_list *posiciones_swap = list_create(); // TODO MOCK
-	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, posiciones_swap);
+	t_list *entradas_tabla_de_paginas = obtener_entradas_de_tabla_de_pagina_por_pid(pid);
+	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
+	{
+		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
+		//list_remove(tabla_de_paginas, entrada_tabla_de_paginas); // TODO: no compila
+		free(entrada_tabla_de_paginas);
+	}
+	log_trace(logger, "Se limpian correctamente las entradas de tabla de paginas para el pid %d", pid);
+}
+
+void pedir_liberacion_de_bloques_a_filesystem(int posicion_de_swap)
+{
+	t_paquete *paquete = crear_paquete_liberar_bloque_en_filesystem(logger, posicion_de_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 	// TODO esperar respuesta de liberacion de bloques?
+}
+
+// Función para inicializar la tabla de páginas por proceso
+void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid)
+{
+	for (int i = 0; i < cantidad_de_paginas; i++)
+	{
+		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = malloc(sizeof(t_entrada_de_tabla_de_pagina));
+		entrada_tabla_de_paginas->numero_de_pagina = i;
+		entrada_tabla_de_paginas->presencia = 0;
+		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int*)list_get(posiciones_swap, i)));
+		list_add(tabla_de_paginas, entrada_tabla_de_paginas);
+	}
+	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
+}
+
+void escribir_pagina_en_swap()
+{
+	// TODO IMPLEMENTAME PAA
+}
+
+int es_pagina_presente(t_entrada_de_tabla_de_pagina *victima)
+{
+	if (victima->presencia == 1)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+int es_pagina_modificada(t_entrada_de_tabla_de_pagina *victima)
+{
+	if (victima->modificado == 1)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo()
+{
+	// TODO implementame PORFI
+}
+
+t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
+{
+	// TODO implementame PORFI
+}
+
+t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
+{
+	// TODO no va a cambiar dinamicamente, no hace falta chequearlo siempre que se quiera reemplazar una pagina
+	if (configuracion_memoria->algoritmo_reemplazo == "FIFO")
+	{
+		return encontrar_pagina_victima_fifo();
+	}
+	else if (configuracion_memoria->algoritmo_reemplazo == "LRU")
+	{
+		return encontrar_pagina_victima_lru();
+	}
+	log_debug(logger, "No se encontro un algoritmo de reemplazo correcto en la configuracion de la memoria");
+	return NULL;
+}
+
+t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
+{
+	bool _filtro_paginas_de_memoria_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
+	{
+		return pagina_de_memoria->pid == pid;
+	};
+
+	t_list *entradas_tabla_de_pagina = list_filter(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid);
+
+	if (entradas_tabla_de_pagina == NULL)
+	{
+		log_warning(logger, "No se encontraron entradas de tabla de pagina con el PID %d", pid);
+		// TODO ver que hay que retornar en este caso
+		return NULL;
+	}
+
+	return entradas_tabla_de_pagina;
+}
+
+char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
+{
+	// TODO ver que retorna esta funcion
+	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	// TODO hace falta sincronizar
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+	char *contenido_del_bloque;
+	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
+	{
+		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem);
+	}
+
+	return contenido_del_bloque;
+}
+
+void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
+{
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	char *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
+
+	/*
+	TODO Listas de marcos? Posible solucion
+	if (marco_vacio)
+	{
+		cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		return;
+	}
+	*/
+
+	reemplazar_pagina(pid, numero_de_pagina);
+	cargar_datos_de_pagina_en_memoria_real(pagina);
+
+	// Actualizar entrada tabla de paginas de la nueva pagina
+	pagina->presencia = 1;
+	// pagina->marco = ?;
+
+	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger);
+	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+}
+
+void reemplazar_pagina(int pid, int numero_de_pagina)
+{
+	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
+	t_entrada_de_tabla_de_pagina *victima = encontrar_pagina_victima();
+
+	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
+	if (es_pagina_presente(victima) == 1 && es_pagina_modificada(victima) == 1)
+	{
+		escribir_pagina_en_swap(pid, victima);
+	}
+
+	// TODO numero de marco
+	borrar_contenido_de_marco_en_memoria_real(victima->marco);
+
+	// Actualizar entrada tabla de paginas de la victima
+	victima->presencia = 0;
+}
+
+void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
+{
+	// TODO todavia no sabemos lo que devuelve, es lo que ocupa un marco de bytes
+	// obtener_contenido_de_marco_en_memoria_real
+	// TODO implementar el borrado de datos de la victima en memoria real
+}
+
+void cargar_datos_de_pagina_en_memoria_real(t_entrada_de_tabla_de_pagina *pagina)
+{
+	// TODO implementar
+	// Cargar datos de la nueva pagina a reemplazar en memoria real
+}
+
+t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
+{
+	bool _filtro_pagina_de_memoria_por_numero_y_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
+	{
+		return pagina_de_memoria->pid == pid && pagina_de_memoria->numero_de_pagina == numero_de_pagina;
+	};
+
+	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid);
+
+	if (pagina == NULL)
+	{
+		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
+		// TODO ver que notificar aca, es Page Fault? Es un error?
+		return NULL;
+	}
+
+	return pagina;
+}
+
+void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
+{
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	int numero_marco = -1;
+
+	if (pagina->presencia == 0)
+	{
+		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
+	}
+	else
+	{
+		numero_marco = pagina->marco;
+	}
+
+	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
+	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
 
 void destruir_listas()
 {
 	list_destroy(procesos_iniciados);
+	list_destroy(tabla_de_paginas);
+	log_trace(logger, "Se destruyen todas las listas de manera correcta");
 }
 
 void terminar_memoria()
 {
 	if (logger != NULL)
 	{
-		log_debug(logger, "Finalizando %s", NOMBRE_MODULO_MEMORIA);
+		log_warning(logger, "Algo salio mal!");
+		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_MEMORIA);
 	}
-
-	destruir_logger(logger);
-	destruir_argumentos(argumentos_memoria);
-	destruir_configuracion(configuracion_memoria);
-	destruir_listas();
-	// todo revisar si es necesario aca finalizar los procesos iniciados
 
 	if (socket_kernel != -1)
 	{
@@ -388,4 +684,5 @@ void terminar_memoria()
 	{
 		close(conexion_con_filesystem);
 	}
+	destruir_listas();
 }

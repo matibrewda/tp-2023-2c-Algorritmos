@@ -41,7 +41,7 @@ int32_t crear_archivo (char* path,char* nombreNuevoArchivo);
 int32_t truncar_archivo(char* path, uint32_t nuevo_tamano,t_config_filesystem *configuracion_filesystem,FATEntry fat[], BLOQUE *bloques[]);
 
 // Terminar
-void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_filesystem, t_config_filesystem *configuracion_filesystem, int socket_kernel, int conexion_con_kernel, int conexion_con_memoria);
+void terminar_filesystem();
 
 
 #endif /* FILESYSTEM_H_ */

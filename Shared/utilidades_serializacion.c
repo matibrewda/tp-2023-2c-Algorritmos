@@ -40,6 +40,18 @@ t_paquete *crear_paquete_respuesta_devolver_proceso_por_sleep(t_log *logger)
     return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 }
 
+// Kernel a CPU
+t_paquete *crear_paquete_respuesta_devolver_proceso_por_wait(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_WAIT, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
+// Kernel a CPU
+t_paquete *crear_paquete_respuesta_devolver_proceso_por_signal(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+}
+
 // Kernel a Memoria
 t_paquete *crear_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria)
 {
@@ -104,6 +116,40 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_sleep(t_log *logger, t_c
     return paquete;
 }
 
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_wait(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, char *nombre_recurso)
+{
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_WAIT;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NOMBRE RECURSO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_string_a_paquete(logger, paquete, nombre_recurso, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NOMBRE RECURSO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
+// CPU a Kernel
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_signal(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, char *nombre_recurso)
+{
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NOMBRE RECURSO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_string_a_paquete(logger, paquete, nombre_recurso, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NOMBRE RECURSO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+
+    return paquete;
+}
+
 // CPU a Memoria
 t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_pedido_instruccion *pedido_instruccion)
 {
@@ -147,6 +193,12 @@ t_paquete *crear_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, boo
 t_paquete *crear_paquete_respuesta_finalizar_proceso_en_memoria(t_log *logger)
 {
     return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_FINALIZAR_PROCESO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+}
+
+// Memoria a Kernel
+t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger)
+{
+    return crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 }
 
 // Memoria a CPU
@@ -282,31 +334,88 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_
     return paquete;
 }
 
-t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list * posiciones_swap)
+t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicion_swap)
 {
     op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
-    t_list_iterator *iterador = list_iterator_create(posiciones_swap);
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
-	while (list_iterator_has_next(iterador))
-	{
-		int *posicion_en_swap = list_iterator_next(iterador);
-		// RESPETAR EL ORDEN -> SERIALIZACION!
-        log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", *posicion_en_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-        agregar_int_a_paquete(logger, paquete, *posicion_en_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
-	}
-
-	list_iterator_destroy(iterador);
-
-    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     return paquete;
 }
 
-void agregar_contexto_de_ejecucion_a_paquete(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_paquete* paquete, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino)
+// Memoria a Filesystem
+t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posicion_swap)
+{
+    op_code codigo_operacion = SOLICITUD_CONTENIDO_BLOQUE_EN_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+t_paquete *crear_paquete_respuesta_pedido_numero_de_marco(t_log *logger, int numero_de_marco)
+{
+    op_code codigo_operacion = RESPUESTA_NUMERO_DE_MARCO_A_CPU;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NUMERO DE MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego el numero de marco %d a paquete de codigo de operacion %s y contenido 'NUMERO DE MARCO' (Origen: %s - Destino %s).", numero_de_marco, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+    agregar_int_a_paquete(logger, paquete, numero_de_marco, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NUMERO DE MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+    return paquete;
+}
+
+t_paquete *crear_paquete_solicitud_pedido_numero_de_marco(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria)
+{
+    op_code codigo_operacion = SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NUMERO DE PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego el numero de pagina %d y PID %d a paquete de codigo de operacion %s y contenido 'NUMERO DE PAGINA' (Origen: %s - Destino %s).", pedido_pagina_en_memoria->numero_de_pagina, pedido_pagina_en_memoria->pid, nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+    agregar_int_a_paquete(logger, paquete, pedido_pagina_en_memoria->pid, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, pedido_pagina_en_memoria->numero_de_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NUMERO DE PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+    return paquete;
+}
+
+t_paquete *crear_paquete_respuesta_leer_valor_en_memoria(t_log *logger, t_valor_leido_en_memoria *valor_leido_en_memoria)
+{
+    op_code codigo_operacion = RESPUESTA_LEER_VALOR_EN_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'VALOR LEIDO EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int32_a_paquete(logger, paquete, valor_leido_en_memoria->valor_leido, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
+    
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'VALOR LEIDO EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+
+    return paquete;
+}
+
+void agregar_contexto_de_ejecucion_a_paquete(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_paquete *paquete, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino)
 {
     // RESPETAR EL ORDEN -> SERIALIZACION!
     agregar_int_a_paquete(logger, paquete, contexto_de_ejecucion->pid, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
