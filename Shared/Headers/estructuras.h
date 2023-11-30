@@ -29,13 +29,6 @@ typedef struct
 
 typedef struct
 {
-    int opcode;
-	char* parametro_1;
-	char* parametro_2;
-} t_instruccion;
-
-typedef struct
-{
     int pid;
     int program_counter;
     uint32_t registro_ax;
