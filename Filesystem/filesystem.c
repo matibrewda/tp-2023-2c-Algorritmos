@@ -346,9 +346,11 @@ void *comunicacion_kernel()
 			// t_solicitud_abrir_archivo_fs* solicitud_abrir_archivo_fs = leer_paquete_solicitud_abrir_archivo_fs(logger, conexion_con_kernel); // TODO: (LUCAS)
 			// solicitud_abrir_archivo_fs -> nombre_archivo // TODO: (LUCAS)
 
-			bool existe_archivo = false; // TODO: que contenga info posta (LUCIANO)
-			int tamanio_archivo = 32; // TODO: que contenga info posta: si existe, tamanion, si no existe, mandame un -1 (LUCIANO)
-			
+			char *nombreArchivo = "nombreArchivoQueSeAbrira";
+			// TODO: que contenga info posta: si existe, tamanion, si no existe, mandame un -1 (LUCIANO)
+			// TODO: que contenga info posta (LUCIANO - LISTO!)
+			int tamanio_archivo = abrirArchivo(configuracion_filesystem->path_fcb, nombreArchivo);
+
 			// t_paquete *paquete_respuesta_abrir_archivo_fs = crear_paquete_respuesta_abrir_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_abrir_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
 		}
@@ -376,6 +378,7 @@ void *comunicacion_kernel()
 			// solicitud_truncar_archivo_fs -> nuevo_tamanio // TODO: (LUCAS)
 
 			// TO DO: crear FCB para archivo de "nombre_archivo" (LUCIANO)
+			
 			
 			// SIEMPRE DEVOLVER OK AL KERNEL
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
