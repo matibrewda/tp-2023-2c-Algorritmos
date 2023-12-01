@@ -20,6 +20,7 @@
 
 // Kernel recibe de Memoria
 bool leer_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, int conexion_con_memoria);
+bool leer_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, int conexion_con_memoria);
 
 // Kernel recibe de CPU
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, int conexion_con_cpu_dispatch, int* motivo_interrupcion);

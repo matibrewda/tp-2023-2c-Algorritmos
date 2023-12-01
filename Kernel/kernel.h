@@ -75,11 +75,9 @@ void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
 void interrumpir_proceso_en_cpu(int motivo_interrupcion);
 
 // Comunicacion con Memoria
-void enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb);
-void enviar_paquete_destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb);
-bool recibir_operacion_de_memoria(op_code codigo_operacion_esperado);
 bool iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb);
 void destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb);
+bool cargar_pagina_en_memoria(int pid, int numero_pagina);
 
 // Consola
 void consola();

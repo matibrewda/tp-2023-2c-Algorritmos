@@ -568,15 +568,23 @@ void *page_fault(void *argumentos)
 
 	int pid_proceso_page_fault = bloqueo_page_fault->pcb->pid;
 
-	// Pedir a memoria cargar pagina
-	// Esperar respuesta
+	bool exito = cargar_pagina_en_memoria(pid_proceso_page_fault, bloqueo_page_fault->numero_pagina);
 
 	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_page_fault, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
 
 	if (pcb != NULL)
 	{
 		eliminar_pcb_de_cola(pid_proceso_page_fault, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
-		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+
+		if (exito)
+		{
+			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+		}
+		else
+		{
+			log_error(logger, "Error al cargar pagina %d en memoria para PID %d", bloqueo_page_fault->numero_pagina, pid_proceso_page_fault);
+			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+		}
 	}
 }
 
@@ -925,48 +933,22 @@ void interrumpir_proceso_en_cpu(int motivo_interrupcion)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* MEMORIA *///////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-void enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb)
-{
-	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
-	proceso_memoria->path = pcb->path;
-	proceso_memoria->size = pcb->size;
-	proceso_memoria->prioridad = pcb->prioridad;
-	proceso_memoria->pid = pcb->pid;
-
-	t_paquete *paquete_solicitud_iniciar_proceso_en_memoria = crear_paquete_solicitud_iniciar_proceso_en_memoria(logger, proceso_memoria);
-	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_iniciar_proceso_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
-
-	free(proceso_memoria);
-}
-
-void enviar_paquete_destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb)
-{
-	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
-	proceso_memoria->path = pcb->path;
-	proceso_memoria->size = pcb->size;
-	proceso_memoria->prioridad = pcb->prioridad;
-	proceso_memoria->pid = pcb->pid;
-
-	t_paquete *paquete_solicitud_finalizar_proceso_en_memoria = crear_paquete_solicitud_finalizar_proceso_en_memoria(logger, proceso_memoria);
-	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_finalizar_proceso_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
-
-	free(proceso_memoria);
-}
-
-bool recibir_operacion_de_memoria(op_code codigo_operacion_esperado)
-{
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
-	return codigo_operacion_recibido == codigo_operacion_esperado;
-}
-
 bool iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb)
 {
 	pthread_mutex_lock(&mutex_conexion_memoria);
 
-	enviar_paquete_iniciar_estructuras_de_proceso_en_memoria(pcb);
+	// Enviar
+	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
+	proceso_memoria->path = pcb->path;
+	proceso_memoria->size = pcb->size;
+	proceso_memoria->prioridad = pcb->prioridad;
+	proceso_memoria->pid = pcb->pid;
+	t_paquete *paquete_solicitud_iniciar_proceso_en_memoria = crear_paquete_solicitud_iniciar_proceso_en_memoria(logger, proceso_memoria);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_iniciar_proceso_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+	free(proceso_memoria);
 
 	// Recibir
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria); // RESPUESTA_INICIAR_PROCESO_MEMORIA
 	bool resultado_iniciar_proceso_en_memoria = leer_paquete_respuesta_iniciar_proceso_en_memoria(logger, conexion_con_memoria);
 
 	pthread_mutex_unlock(&mutex_conexion_memoria);
@@ -977,9 +959,42 @@ bool iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb)
 void destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb)
 {
 	pthread_mutex_lock(&mutex_conexion_memoria);
-	enviar_paquete_destruir_estructuras_de_proceso_en_memoria(pcb);
-	recibir_operacion_de_memoria(RESPUESTA_FINALIZAR_PROCESO_MEMORIA);
+
+	// Enviar
+	t_proceso_memoria *proceso_memoria = malloc(sizeof(t_proceso_memoria));
+	proceso_memoria->path = pcb->path;
+	proceso_memoria->size = pcb->size;
+	proceso_memoria->prioridad = pcb->prioridad;
+	proceso_memoria->pid = pcb->pid;
+	t_paquete *paquete_solicitud_finalizar_proceso_en_memoria = crear_paquete_solicitud_finalizar_proceso_en_memoria(logger, proceso_memoria);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_finalizar_proceso_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+	free(proceso_memoria);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria); // RESPUESTA_FINALIZAR_PROCESO_MEMORIA
+
 	pthread_mutex_unlock(&mutex_conexion_memoria);
+}
+
+bool cargar_pagina_en_memoria(int pid, int numero_pagina)
+{
+	pthread_mutex_lock(&mutex_conexion_memoria);
+
+	// Enviar
+	t_pedido_pagina_en_memoria *pedido_pagina_en_memoria = malloc(sizeof(t_pedido_pagina_en_memoria));
+	pedido_pagina_en_memoria->pid = pid;
+	pedido_pagina_en_memoria->numero_de_pagina = numero_pagina;
+	t_paquete *paquete_solicitud_cargar_pagina_en_memoria = crear_paquete_solicitud_cargar_pagina_en_memoria(logger, pedido_pagina_en_memoria);
+	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_cargar_pagina_en_memoria, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+	free(pedido_pagina_en_memoria);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, conexion_con_memoria); // RESPUESTA_CARGAR_PAGINA_EN_MEMORIA
+	bool resultado_cargar_pagina_en_memoria = leer_paquete_respuesta_cargar_pagina_en_memoria(logger, conexion_con_memoria);
+
+	pthread_mutex_unlock(&mutex_conexion_memoria);
+
+	return resultado_cargar_pagina_en_memoria;
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////

@@ -22,6 +22,28 @@ bool leer_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, int conexi
 	return respuesta_iniciar_proceso_en_memoria;
 }
 
+// Kernel recibe de Memoria
+bool leer_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, int conexion_con_memoria)
+{
+	op_code codigo_operacion = RESPUESTA_CARGAR_PAGINA_EN_MEMORIA;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	int respuesta_cargar_pagina_en_memoria;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, &buffer_con_offset, &(respuesta_cargar_pagina_en_memoria), codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+
+	return respuesta_cargar_pagina_en_memoria;
+}
+
 // Kernel recibe de CPU
 t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, int conexion_con_cpu_dispatch, int *motivo_interrupcion)
 {
@@ -420,7 +442,7 @@ void* leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_fi
 	return contenido_del_bloque;
 }
 
-//Filesystem recibe de Memoria
+// Filesystem recibe de Memoria
 int leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria) {
 	op_code codigo_operacion = SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM;
 	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);

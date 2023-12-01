@@ -83,14 +83,12 @@ typedef struct
 
 typedef struct
 {
-    /* PEDIIIILLOOOOOOO */
     int pid;
     int numero_de_pagina;
 } t_pedido_pagina_en_memoria;
 
 typedef struct
 {
-    /* ESCRIBIIIILOOOOOOO */
     uint32_t valor_a_escribir;
     int direccion_fisica;
 } t_pedido_escribir_valor_en_memoria;
