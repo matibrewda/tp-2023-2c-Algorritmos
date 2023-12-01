@@ -427,6 +427,23 @@ t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posici
     return paquete;
 }
 
+// Memoria a Filesystem
+t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void* contenido_marco, size_t tamanio_bloque, int posicion_swap)
+{
+    op_code codigo_operacion = SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    log_debug(logger, "Agrego el contenido del marco con tamaño %d a paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", tamanio_bloque, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    agregar_void_a_paquete(logger, paquete, contenido_marco, tamanio_bloque, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
 // Memoria a CPU
 t_paquete *crear_paquete_respuesta_pedido_numero_de_marco(t_log *logger, int numero_de_marco)
 {
@@ -444,6 +461,7 @@ t_paquete *crear_paquete_respuesta_pedido_numero_de_marco(t_log *logger, int num
     return paquete;
 }
 
+// CPU a Memoria
 t_paquete *crear_paquete_solicitud_pedido_numero_de_marco(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria)
 {
     op_code codigo_operacion = SOLICITUD_PEDIR_NUMERO_DE_MARCO_A_MEMORIA;

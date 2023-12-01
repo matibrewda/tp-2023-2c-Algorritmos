@@ -482,12 +482,13 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 
 void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima)
 {
-	/* TODO IMPLEMENTAME PAA
-	- Busco el contenido del marco porque se supone que esta modificado (contenido_marco o nose)
-	- Ese contenido lo tenemos que meter en un paquete
-	- Enviar a Filesystem para que actualice el bloque, pasandole el numero de bloque
+	/*
+	- Busco el contenido del marco porque se supone que esta modificado
+	- Ese contenido lo tenemos que meter en un paquete y enviar a Filesystem para que actualice el bloque
 	*/
 	void* contenido_marco = buscar_contenido_marco(victima->marco);
+	t_paquete *paquete = crear_paquete_solicitud_escribir_pagina_en_swap(logger, contenido_marco, configuracion_memoria->tam_pagina, victima->posicion_en_swap);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
@@ -554,7 +555,6 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 
 void* obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
-	// TODO ver que retorna esta funcion
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
@@ -604,11 +604,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 
 void* buscar_contenido_marco(int numero_de_marco)
 {
-	/* TODO implementar
-	Desde el numero de marco por el tamaño de pagina y eso me va a traer la primer posicion del marco
-	*/
 	void* contenido_marco = malloc(configuracion_memoria->tam_pagina);
-
     void* fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
     memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);

@@ -44,6 +44,7 @@ void agregar_int_a_paquete(t_log *logger, t_paquete *paquete, int entero, const 
 void agregar_int32_a_paquete(t_log *logger, t_paquete *paquete, uint32_t entero, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
 void agregar_string_a_paquete(t_log *logger, t_paquete *paquete, char *string, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
 void agregar_lista_de_enteros_a_paquete(t_log *logger, t_list *lista, t_paquete *paquete, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion);
+void agregar_void_a_paquete(t_log* logger, t_paquete* paquete, void* data, size_t data_length, const char* nombre_proceso_origen, const char* nombre_proceso_destino, op_code codigo_operacion);
 
 // Utilidades para recibir
 op_code esperar_operacion(t_log *logger, const char *nombre_proceso_que_espera, const char *nombre_proceso_que_manda, int conexion);

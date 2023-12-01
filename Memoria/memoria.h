@@ -64,6 +64,7 @@ void limpiar_entradas_tabla_de_paginas(int pid);
 // Notificacion filesystem
 void notificar_lectura_a_filesystem();
 void notificar_escritura_a_filesystem();
+void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima);
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
