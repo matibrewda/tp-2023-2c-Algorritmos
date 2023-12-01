@@ -379,11 +379,24 @@ void *comunicacion_kernel()
 			// solicitud_truncar_archivo_fs -> nuevo_tamanio // TODO: (LUCAS)
 
 			// TO DO: crear FCB para archivo de "nombre_archivo" (LUCIANO)
-			
-			
+			int tamanioNuevo = 2;
+		    char* nombreArchivo = "archivo";
+
+			char* rutaFCBdeArchivo = strcat(configuracion_filesystem->path_fcb,nombreArchivo,".fcb");
+			//3 - Abrir el fcb, FAT, y bloques:
+			FCB* fcb = crear_fcb(rutaFCBdeArchivo);
+			FATEntry* fat = abrirFAT(configuracion_filesystem->retardo_acceso_fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+			BLOQUE** bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->tam_bloques);
+
+			int valorADevolerAKernel = truncar_archivo(rutaFCBdeArchivo,tamanioNuevo,configuracion_filesystem, fat, bloques);
+
 			// SIEMPRE DEVOLVER OK AL KERNEL
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_crear_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
+		
+			liberarESpacioBloqueCreado(bloques);
+			cerrarFAT(fat);
+			free(fcb);
 		}
 		else if (operacion_recibida_kernel == SOLICITUD_LEER_ARCHIVO_FS)
 		{
@@ -422,6 +435,9 @@ void *comunicacion_kernel()
 
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_crear_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
+			liberarESpacioBloqueCreado(bloques);
+			cerrarFAT(fat);
+			free(infoLeida);
 		}
 		else if (operacion_recibida_kernel == SOLICITUD_ESCRIBIR_ARCHIVO_FS)
 		{
