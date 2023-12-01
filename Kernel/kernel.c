@@ -214,133 +214,136 @@ void *planificador_corto_plazo()
 	{
 		sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
 		t_pcb *pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
+		bool mantener_proceso_ejecutando = false;
 
 		if (pcb != NULL)
 		{
-			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
-
-			op_code codigo_operacion_recibido;
-			int tiempo_sleep = -1;
-			int motivo_interrupcion = -1;
-			int codigo_error = -1;
-			int numero_pagina = -1;
-			int posicion_puntero_archivo = -1;
-			int direccion_fisica = -1;
-			int nuevo_tamanio_archivo = -1;
-			int fs_opcode = -1;
-			char *nombre_recurso = NULL;
-			char *nombre_archivo = NULL;
-			char *modo_apertura = NULL;
-
-			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
-			actualizar_pcb(pcb, contexto_de_ejecucion);
-
-			sem_wait(&semaforo_planificador_corto_plazo);
-
-			if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
+			while (mantener_proceso_ejecutando)
 			{
-				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_ERROR)
-			{
-				log_error(logger, "Ocurrio un error de codigo %d en el proceso PID %d.", codigo_error, pcb->pid);
-				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
-			{
-				if (motivo_interrupcion == INTERRUPCION_POR_DESALOJO)
-				{
-					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
-				}
-				else if (motivo_interrupcion == INTERRUPCION_POR_KILL)
+				mantener_proceso_ejecutando = false;
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
+
+				op_code codigo_operacion_recibido;
+				int tiempo_sleep = -1;
+				int motivo_interrupcion = -1;
+				int codigo_error = -1;
+				int numero_pagina = -1;
+				int posicion_puntero_archivo = -1;
+				int direccion_fisica = -1;
+				int nuevo_tamanio_archivo = -1;
+				int fs_opcode = -1;
+				char *nombre_recurso = NULL;
+				char *nombre_archivo = NULL;
+				char *modo_apertura = NULL;
+
+				t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
+				actualizar_pcb(pcb, contexto_de_ejecucion);
+
+				sem_wait(&semaforo_planificador_corto_plazo);
+
+				if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 				{
 					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 				}
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
-			{
-				if (fs_opcode == FOPEN_OPCODE)
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_ERROR)
 				{
-					// TODO
+					log_error(logger, "Ocurrio un error de codigo %d en el proceso PID %d.", codigo_error, pcb->pid);
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 				}
-				else if (fs_opcode == FCLOSE_OPCODE)
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
 				{
-					// TODO
-				}
-				else if (fs_opcode == FSEEK_OPCODE)
-				{
-					// TODO
-				}
-				else if (fs_opcode == FTRUNCATE_OPCODE)
-				{
-					// TODO
-				}
-				else if (fs_opcode == FWRITE_OPCODE)
-				{
-					// TODO
-				}
-				else if (fs_opcode == FREAD_OPCODE)
-				{
-					// TODO
-				}
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
-			{
-				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
-				queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
-				crear_hilo_sleep(pcb, tiempo_sleep);
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_PAGEFAULT)
-			{
-				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
-				queue_push_thread_safe(cola_bloqueados_pagefault, pcb, &mutex_cola_bloqueados_pagefault);
-				crear_hilo_page_fault(pcb, numero_pagina);
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
-			{
-				if (!recurso_existe(nombre_recurso))
-				{
-					log_warning(logger, "PID: %d hace WAIT del recurso inexistente %s!", pcb->pid, nombre_recurso);
-					finalizar_proceso(pcb->pid);
-				}
-				else
-				{
-					t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
-					recurso_para_wait->instancias_disponibles--;
-					log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
-					log_info(logger, "BUBA2");
-					list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
-					log_info(logger, "BUBA");
-					if (recurso_para_wait->instancias_disponibles < 0)
-					{
-						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
-						queue_push_thread_safe(recurso_para_wait->pcbs_bloqueados, pcb, &recurso_para_wait->mutex_pcbs_bloqueados);
-						log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
-					}
-					else
+					if (motivo_interrupcion == INTERRUPCION_POR_DESALOJO)
 					{
 						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 					}
+					else if (motivo_interrupcion == INTERRUPCION_POR_KILL)
+					{
+						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+					}
 				}
-			}
-			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
-			{
-				if (!recurso_existe(nombre_recurso))
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
 				{
-					log_warning(logger, "PID: %d hace SIGNAL del recurso inexistente %s!", pcb->pid, nombre_recurso);
-					finalizar_proceso(pcb->pid);
+					if (fs_opcode == FOPEN_OPCODE)
+					{
+						// TODO
+					}
+					else if (fs_opcode == FCLOSE_OPCODE)
+					{
+						// TODO
+					}
+					else if (fs_opcode == FSEEK_OPCODE)
+					{
+						// TODO
+					}
+					else if (fs_opcode == FTRUNCATE_OPCODE)
+					{
+						// TODO
+					}
+					else if (fs_opcode == FWRITE_OPCODE)
+					{
+						// TODO
+					}
+					else if (fs_opcode == FREAD_OPCODE)
+					{
+						// TODO
+					}
 				}
-				else if (!recurso_esta_asignado_a_pcb(nombre_recurso, pcb->pid))
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
 				{
-					log_warning(logger, "PID: %d hace SIGNAL del recurso %s que NO tenia asignado previamente!", pcb->pid, nombre_recurso);
-					finalizar_proceso(pcb->pid);
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+					queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
+					crear_hilo_sleep(pcb, tiempo_sleep);
 				}
-				else
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_PAGEFAULT)
 				{
-					t_recurso *recurso_para_signal = buscar_recurso_por_nombre(nombre_recurso);
-					log_info(logger, "PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
-					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
-					desasignar_recurso_a_pcb(nombre_recurso, pcb->pid);
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+					queue_push_thread_safe(cola_bloqueados_pagefault, pcb, &mutex_cola_bloqueados_pagefault);
+					crear_hilo_page_fault(pcb, numero_pagina);
+				}
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
+				{
+					if (!recurso_existe(nombre_recurso))
+					{
+						log_warning(logger, "PID: %d hace WAIT del recurso inexistente %s!", pcb->pid, nombre_recurso);
+						finalizar_proceso(pcb->pid);
+					}
+					else
+					{
+						t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
+						recurso_para_wait->instancias_disponibles--;
+						log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
+						list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
+						if (recurso_para_wait->instancias_disponibles < 0)
+						{
+							transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+							queue_push_thread_safe(recurso_para_wait->pcbs_bloqueados, pcb, &recurso_para_wait->mutex_pcbs_bloqueados);
+							log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
+						}
+						else
+						{
+							mantener_proceso_ejecutando = true;
+						}
+					}
+				}
+				else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
+				{
+					if (!recurso_existe(nombre_recurso))
+					{
+						log_warning(logger, "PID: %d hace SIGNAL del recurso inexistente %s!", pcb->pid, nombre_recurso);
+						finalizar_proceso(pcb->pid);
+					}
+					else if (!recurso_esta_asignado_a_pcb(nombre_recurso, pcb->pid))
+					{
+						log_warning(logger, "PID: %d hace SIGNAL del recurso %s que NO tenia asignado previamente!", pcb->pid, nombre_recurso);
+						finalizar_proceso(pcb->pid);
+					}
+					else
+					{
+						t_recurso *recurso_para_signal = buscar_recurso_por_nombre(nombre_recurso);
+						log_info(logger, "PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
+						mantener_proceso_ejecutando = true;
+						desasignar_recurso_a_pcb(nombre_recurso, pcb->pid);
+					}
 				}
 			}
 		}
@@ -422,6 +425,10 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
 		{
 			transicionar_proceso_de_executing_a_exit(pcb);
+		}
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXECUTING)
+		{
+			transicionar_proceso_de_executing_a_executing(pcb);
 		}
 	}
 	else if (pcb->estado == CODIGO_ESTADO_PROCESO_BLOCKED)
@@ -515,6 +522,12 @@ void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 	pcb->estado = CODIGO_ESTADO_PROCESO_BLOCKED;
 }
 
+void transicionar_proceso_de_executing_a_executing(t_pcb *pcb)
+{
+	pcb_ejecutando = pcb;
+	ejecutar_proceso_en_cpu(pcb);
+}
+
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
@@ -543,7 +556,6 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
 	sem_post(&semaforo_grado_max_multiprogramacion);
-	log_info(logger, "FINALICE TODOOOAFASFASFG");
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -855,7 +867,7 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* CPU *///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int* fs_opcode)
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
