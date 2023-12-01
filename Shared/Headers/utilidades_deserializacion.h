@@ -49,7 +49,7 @@ t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_mem
 // Memoria recibe de FileSystem
 t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem);
 t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, int conexion_con_filsystem);
-t_contenido_pagina *leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem);
+void* leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem, size_t tamanio_bloque);
 
 //Filesystem recibe de Memoria
 int leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria);

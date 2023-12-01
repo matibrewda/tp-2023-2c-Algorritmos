@@ -6,6 +6,7 @@ t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
 t_list *tabla_de_paginas = NULL;
+t_list *tabla_de_marcos = NULL;
 void *memoria_real;
 
 // Conexiones
@@ -94,6 +95,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Listas
 	procesos_iniciados = list_create();
 	tabla_de_paginas = list_create();
+	tabla_de_marcos = list_create();
 
 	// Creacion de Estructuras
 	inicializar_espacio_contiguo_de_memoria();
@@ -225,7 +227,7 @@ void notificar_escritura_a_cpu()
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
 	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
-
+	*(uint32_t*)(memoria_real + direccion_fisica) = valor_a_escribir;
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 }
@@ -446,6 +448,10 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
 	{
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		if (es_pagina_presente(entrada_tabla_de_paginas))
+		{
+			// TODO vaciar contenido del marco
+		}
 		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
 		//list_remove(tabla_de_paginas, entrada_tabla_de_paginas); // TODO: no compila
 		free(entrada_tabla_de_paginas);
@@ -481,20 +487,21 @@ void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima)
 	- Ese contenido lo tenemos que meter en un paquete
 	- Enviar a Filesystem para que actualice el bloque, pasandole el numero de bloque
 	*/
+	void* contenido_marco = buscar_contenido_marco(victima->marco);
 }
 
-int es_pagina_presente(t_entrada_de_tabla_de_pagina *victima)
+int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
 {
-	if (victima->presencia == 1)
+	if (pagina->presencia == 1)
 	{
 		return 1;
 	}
 	return 0;
 }
 
-int es_pagina_modificada(t_entrada_de_tabla_de_pagina *victima)
+int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina)
 {
-	if (victima->modificado == 1)
+	if (pagina->modificado == 1)
 	{
 		return 1;
 	}
@@ -545,7 +552,7 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	return entradas_tabla_de_pagina;
 }
 
-char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
+void* obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
 	// TODO ver que retorna esta funcion
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
@@ -553,10 +560,11 @@ char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 
 	// TODO hace falta sincronizar
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	char *contenido_del_bloque;
+	// TODO ver donde hacer el free
+	void* contenido_del_bloque = malloc(configuracion_memoria->tam_pagina);
 	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
 	{
-		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem);
+		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem, configuracion_memoria->tam_pagina);
 	}
 
 	return contenido_del_bloque;
@@ -571,7 +579,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		return;
 	}
 	
-	t_contenido_pagina *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
+	void* contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
 
 	/*
 	TODO Listas de marcos? Posible solucion
@@ -593,7 +601,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	return;
 }
 
-t_contenido_pagina *buscar_contenido_marco(int numero_de_marco)
+void* buscar_contenido_marco(int numero_de_marco)
 {
 	/* TODO implementar
 	Va a hacer un memcpy(ver q params se le pasa) desde el numero de marco por el tamaño de pagina y eso me va a traer la primer
