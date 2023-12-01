@@ -288,11 +288,11 @@ void devolver_contexto_por_page_fault(int numero_de_pagina)
 	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
-void devolver_contexto_por_operacion_filesystem(char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio)
+void devolver_contexto_por_operacion_filesystem(fs_op_code fs_opcode, char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
 	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
-	t_operacion_filesystem *operacion_filesystem = crear_objeto_operacion_filesystem(nombre_archivo, modo_apertura, posicion, direccion_fisica, tamanio);
+	t_operacion_filesystem *operacion_filesystem = crear_objeto_operacion_filesystem(fs_opcode, nombre_archivo, modo_apertura, posicion, direccion_fisica, tamanio);
 	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, contexto_de_ejecucion, operacion_filesystem);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
@@ -490,7 +490,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem(nombre_archivo, modo_apertura, -1, -1, -1);
+			devolver_contexto_por_operacion_filesystem(FOPEN_OPCODE, nombre_archivo, modo_apertura, -1, -1, -1);
 		}
 		else if (strcmp(nombre_instruccion, FCLOSE_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -498,7 +498,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s", pid_ejecutando, FCLOSE_NOMBRE_INSTRUCCION, nombre_archivo);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, -1, -1);
+			devolver_contexto_por_operacion_filesystem(FCLOSE_OPCODE, nombre_archivo, "", -1, -1, -1);
 		}
 		else if (strcmp(nombre_instruccion, FSEEK_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -507,7 +507,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FSEEK_NOMBRE_INSTRUCCION, nombre_archivo, posicion);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", posicion, -1, -1);
+			devolver_contexto_por_operacion_filesystem(FSEEK_OPCODE, nombre_archivo, "", posicion, -1, -1);
 		}
 		else if (strcmp(nombre_instruccion, FREAD_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -519,7 +519,7 @@ void ciclo_de_ejecucion()
 			{
 				program_counter++;
 				dejar_de_ejecutar = true;
-				devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, direccion_fisica, -1);
+				devolver_contexto_por_operacion_filesystem(FREAD_OPCODE, nombre_archivo, "", -1, direccion_fisica, -1);
 			}
 		}
 		else if (strcmp(nombre_instruccion, FWRITE_NOMBRE_INSTRUCCION) == 0)
@@ -532,7 +532,7 @@ void ciclo_de_ejecucion()
 			{
 				program_counter++;
 				dejar_de_ejecutar = true;
-				devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, direccion_fisica, -1);
+				devolver_contexto_por_operacion_filesystem(FWRITE_OPCODE, nombre_archivo, "", -1, direccion_fisica, -1);
 			}
 		}
 		else if (strcmp(nombre_instruccion, FTRUNCATE_NOMBRE_INSTRUCCION) == 0)
@@ -542,7 +542,7 @@ void ciclo_de_ejecucion()
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, FTRUNCATE_NOMBRE_INSTRUCCION, nombre_archivo, tamanio);
 			program_counter++;
 			dejar_de_ejecutar = true;
-			devolver_contexto_por_operacion_filesystem(nombre_archivo, "", -1, -1, tamanio);
+			devolver_contexto_por_operacion_filesystem(FTRUNCATE_OPCODE, nombre_archivo, "", -1, -1, tamanio);
 		}
 		else if (strcmp(nombre_instruccion, EXIT_NOMBRE_INSTRUCCION) == 0)
 		{
@@ -603,10 +603,11 @@ t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion()
 	return contexto_de_ejecucion;
 }
 
-t_operacion_filesystem *crear_objeto_operacion_filesystem(char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio)
+t_operacion_filesystem *crear_objeto_operacion_filesystem(fs_op_code fs_opcode, char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
 	t_operacion_filesystem *operacion_filesystem = malloc(sizeof(t_operacion_filesystem));
 
+	operacion_filesystem->fs_opcode = fs_opcode;
 	operacion_filesystem->nombre_archivo = nombre_archivo;
 	operacion_filesystem->modo_apertura = modo_apertura;
 	operacion_filesystem->posicion = posicion;

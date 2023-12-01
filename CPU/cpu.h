@@ -42,7 +42,7 @@ void devolver_contexto_por_wait(char *nombre_recurso);
 void devolver_contexto_por_signal(char *nombre_recurso);
 void devolver_contexto_por_error(int codigo_error);
 void devolver_contexto_por_page_fault(int numero_de_pagina);
-void devolver_contexto_por_operacion_filesystem(char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio);
+void devolver_contexto_por_operacion_filesystem(fs_op_code fs_opcode, char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio);
 
 // Comunicacion con Memoria
 void pedir_info_inicial_a_memoria();
@@ -57,7 +57,7 @@ int mmu(int direccion_logica);
 
 // Utilidades
 t_contexto_de_ejecucion *crear_objeto_contexto_de_ejecucion();
-t_operacion_filesystem *crear_objeto_operacion_filesystem(char* nombre_archivo, char* modo_apertura, int posicion, int direccion_fisica, int tamanio);
+t_operacion_filesystem *crear_objeto_operacion_filesystem(fs_op_code fs_opcode, char *nombre_archivo, char *modo_apertura, int posicion, int direccion_fisica, int tamanio);
 uint32_t leer_valor_de_registro(char *nombre_registro);
 void escribir_valor_a_registro(char *nombre_registro, uint32_t valor);
 

@@ -227,11 +227,12 @@ void *planificador_corto_plazo()
 			int posicion_puntero_archivo = -1;
 			int direccion_fisica = -1;
 			int nuevo_tamanio_archivo = -1;
+			int fs_opcode = -1;
 			char *nombre_recurso = NULL;
 			char *nombre_archivo = NULL;
 			char *modo_apertura = NULL;
 
-			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo);
+			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 			actualizar_pcb(pcb, contexto_de_ejecucion);
 
 			sem_wait(&semaforo_planificador_corto_plazo);
@@ -258,7 +259,30 @@ void *planificador_corto_plazo()
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
 			{
-				// TODO
+				if (fs_opcode == FOPEN_OPCODE)
+				{
+					// TODO
+				}
+				else if (fs_opcode == FCLOSE_OPCODE)
+				{
+					// TODO
+				}
+				else if (fs_opcode == FSEEK_OPCODE)
+				{
+					// TODO
+				}
+				else if (fs_opcode == FTRUNCATE_OPCODE)
+				{
+					// TODO
+				}
+				else if (fs_opcode == FWRITE_OPCODE)
+				{
+					// TODO
+				}
+				else if (fs_opcode == FREAD_OPCODE)
+				{
+					// TODO
+				}
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
 			{
@@ -831,7 +855,7 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* CPU *///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo)
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int* fs_opcode)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
@@ -884,7 +908,7 @@ t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operaci
 	}
 	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
 	{
-		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, conexion_con_cpu_dispatch, nombre_archivo, modo_apertura, posicion_puntero_archivo, direccion_fisica, nuevo_tamanio_archivo);
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, conexion_con_cpu_dispatch, nombre_archivo, modo_apertura, posicion_puntero_archivo, direccion_fisica, nuevo_tamanio_archivo, fs_opcode);
 		t_paquete *paquete_respuesta_devolver_proceso_por_operacion_filesystem = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_operacion_filesystem, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	}
@@ -997,6 +1021,79 @@ bool cargar_pagina_en_memoria(int pid, int numero_pagina)
 	return resultado_cargar_pagina_en_memoria;
 }
 
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////* FILESYSTEM *//////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
+void abrir_archivo_fs(char *nombre_archivo, int *existe, int *tamanio_archivo)
+{
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
+	// Enviar
+	t_paquete *paquete_solicitud_abrir_archivo_fs = crear_paquete_solicitud_abrir_archivo_fs(logger, nombre_archivo);
+	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_abrir_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_ABRIR_ARCHIVO_FS
+	leer_paquete_respuesta_abrir_archivo_fs(logger, conexion_con_filesystem, existe, tamanio_archivo);
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
+}
+
+void crear_archivo_fs(char *nombre_archivo)
+{
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
+	// Enviar
+	t_paquete *paquete_solicitud_crear_archivo_fs = crear_paquete_solicitud_crear_archivo_fs(logger, nombre_archivo);
+	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_crear_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_CREAR_ARCHIVO_FS
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
+}
+
+void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio_archivo)
+{
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
+	// Enviar
+	t_paquete *paquete_solicitud_truncar_archivo_fs = crear_paquete_solicitud_truncar_archivo_fs(logger, nombre_archivo, nuevo_tamanio_archivo);
+	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_truncar_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_TRUNCAR_ARCHIVO_FS
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
+}
+
+void leer_archivo_fs(char *nombre_archivo, int puntero_archivo, int direccion_fisica)
+{
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
+	// Enviar
+	t_paquete *paquete_solicitud_leer_archivo_fs = crear_paquete_solicitud_leer_archivo_fs(logger, nombre_archivo, puntero_archivo, direccion_fisica);
+	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_leer_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_LEER_ARCHIVO_FS
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
+}
+
+void escribir_archivo_fs(char *nombre_archivo, int puntero_archivo, int direccion_fisica)
+{
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
+	// Enviar
+	t_paquete *paquete_solicitud_escribir_archivo_fs = crear_paquete_solicitud_escribir_archivo_fs(logger, nombre_archivo, puntero_archivo, direccion_fisica);
+	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_escribir_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_ESCRIBIR_ARCHIVO_FS
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
+}
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* UTILIDADES *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////

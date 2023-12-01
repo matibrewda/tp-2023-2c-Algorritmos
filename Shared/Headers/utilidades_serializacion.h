@@ -32,6 +32,13 @@ t_paquete *crear_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, t_p
 t_paquete *crear_paquete_solicitud_finalizar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria);
 t_paquete *crear_paquete_solicitud_cargar_pagina_en_memoria(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria);
 
+// Kernel a Filesystem
+t_paquete *crear_paquete_solicitud_abrir_archivo_fs(t_log *logger, char* nombre_archivo);
+t_paquete *crear_paquete_solicitud_crear_archivo_fs(t_log *logger, char* nombre_archivo);
+t_paquete *crear_paquete_solicitud_truncar_archivo_fs(t_log *logger, char* nombre_archivo, int nuevo_tamanio_archivo);
+t_paquete *crear_paquete_solicitud_leer_archivo_fs(t_log *logger, char* nombre_archivo, int puntero_archivo, int direccion_fisica);
+t_paquete *crear_paquete_solicitud_escribir_archivo_fs(t_log *logger, char* nombre_archivo, int puntero_archivo, int direccion_fisica);
+
 // CPU a Kernel
 t_paquete *crear_paquete_respuesta_ejecutar_proceso(t_log *logger);
 t_paquete *crear_paquete_respuesta_interrumpir_proceso(t_log *logger);

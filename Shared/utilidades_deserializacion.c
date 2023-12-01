@@ -44,6 +44,25 @@ bool leer_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, int conexion
 	return respuesta_cargar_pagina_en_memoria;
 }
 
+// Kernel recibe de Filesystem
+void leer_paquete_respuesta_abrir_archivo_fs(t_log *logger, int conexion_con_filesystem, int *existe, int *tamanio_archivo)
+{
+	op_code codigo_operacion = RESPUESTA_ABRIR_ARCHIVO_FS;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'EXISTE? + TAMANIO ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, existe, codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, tamanio_archivo, codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'EXISTE? + TAMANIO ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+}
+
 // Kernel recibe de CPU
 t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, int conexion_con_cpu_dispatch, int *motivo_interrupcion)
 {
@@ -159,7 +178,7 @@ t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_pagefault(t
 }
 
 // Kernel recibe de CPU
-t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo)
+t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int* fs_opcode)
 {
 	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + OPERACION FILESYSTEM' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 
@@ -168,7 +187,7 @@ t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_f
 	void *buffer_con_offset = buffer;
 
 	t_contexto_de_ejecucion *contexto_de_ejecucion = leer_contexto_de_ejecucion_de_paquete(logger, conexion_con_cpu_dispatch, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, &buffer_con_offset);
-
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, fs_opcode, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, nombre_archivo, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, modo_apertura, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, posicion_puntero_archivo, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);

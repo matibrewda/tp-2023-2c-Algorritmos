@@ -80,6 +80,86 @@ t_paquete *crear_paquete_solicitud_cargar_pagina_en_memoria(t_log *logger, t_ped
     return paquete;
 }
 
+// Kernel a Filesystem
+t_paquete *crear_paquete_solicitud_abrir_archivo_fs(t_log *logger, char *nombre_archivo)
+{
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_ABRIR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, SOLICITUD_ABRIR_ARCHIVO_FS);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_ABRIR_ARCHIVO_FS);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_ABRIR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Kernel a Filesystem
+t_paquete *crear_paquete_solicitud_crear_archivo_fs(t_log *logger, char *nombre_archivo)
+{
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_CREAR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, SOLICITUD_CREAR_ARCHIVO_FS);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_CREAR_ARCHIVO_FS);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_CREAR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Kernel a Filesystem
+t_paquete *crear_paquete_solicitud_truncar_archivo_fs(t_log *logger, char *nombre_archivo, int nuevo_tamanio_archivo)
+{
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO + NUEVO TAMANIO' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_TRUNCAR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, SOLICITUD_TRUNCAR_ARCHIVO_FS);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_TRUNCAR_ARCHIVO_FS);
+    agregar_int_a_paquete(logger, paquete, nuevo_tamanio_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_TRUNCAR_ARCHIVO_FS);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO + NUEVO TAMANIO' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_TRUNCAR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Kernel a Filesystem
+t_paquete *crear_paquete_solicitud_leer_archivo_fs(t_log *logger, char *nombre_archivo, int puntero_archivo, int direccion_fisica)
+{
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO + PUNTERO + DIR FISICA' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_LEER_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, SOLICITUD_LEER_ARCHIVO_FS);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_LEER_ARCHIVO_FS);
+    agregar_int_a_paquete(logger, paquete, puntero_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_LEER_ARCHIVO_FS);
+    agregar_int_a_paquete(logger, paquete, direccion_fisica, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_LEER_ARCHIVO_FS);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO + PUNTERO + DIR FISICA' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_LEER_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Kernel a Filesystem
+t_paquete *crear_paquete_solicitud_escribir_archivo_fs(t_log *logger, char *nombre_archivo, int puntero_archivo, int direccion_fisica)
+{
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO + PUNTERO + DIR FISICA' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_ESCRIBIR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, SOLICITUD_ESCRIBIR_ARCHIVO_FS);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_ESCRIBIR_ARCHIVO_FS);
+    agregar_int_a_paquete(logger, paquete, puntero_archivo, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_ESCRIBIR_ARCHIVO_FS);
+    agregar_int_a_paquete(logger, paquete, direccion_fisica, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, SOLICITUD_ESCRIBIR_ARCHIVO_FS);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'NOMBRE ARCHIVO + PUNTERO + DIR FISICA' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_ESCRIBIR_ARCHIVO_FS), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
 // CPU a Kernel
 t_paquete *crear_paquete_respuesta_ejecutar_proceso(t_log *logger)
 {
@@ -210,6 +290,7 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_l
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
     agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
+    agregar_int_a_paquete(logger, paquete, operacion_filesystem->fs_opcode, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_string_a_paquete(logger, paquete, operacion_filesystem->nombre_archivo, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_string_a_paquete(logger, paquete, operacion_filesystem->modo_apertura, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, operacion_filesystem->posicion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);

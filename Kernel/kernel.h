@@ -70,7 +70,7 @@ void crear_hilo_page_fault(t_pcb* pcb, int numero_pagina);
 void* page_fault();
 
 // Comunicacion con CPU
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int* numero_pagina, char **nombre_archivo, char **modo_apertura, int* posicion, int* direccion_fisica, int* tamanio);
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int* fs_opcode);
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
 void interrumpir_proceso_en_cpu(int motivo_interrupcion);
 
@@ -78,6 +78,13 @@ void interrumpir_proceso_en_cpu(int motivo_interrupcion);
 bool iniciar_estructuras_de_proceso_en_memoria(t_pcb *pcb);
 void destruir_estructuras_de_proceso_en_memoria(t_pcb *pcb);
 bool cargar_pagina_en_memoria(int pid, int numero_pagina);
+
+// Comunicacion con Kernel
+void abrir_archivo_fs(char* nombre_archivo, int* existe, int* tamanio_archivo);
+void crear_archivo_fs(char* nombre_archivo);
+void truncar_archivo_fs(char* nombre_archivo, int nuevo_tamanio_archivo);
+void leer_archivo_fs(char* nombre_archivo, int puntero_archivo, int direccion_fisica);
+void escribir_archivo_fs(char* nombre_archivo, int puntero_archivo, int direccion_fisica);
 
 // Consola
 void consola();

@@ -39,6 +39,7 @@ typedef struct
 
 typedef struct
 {
+    fs_op_code fs_opcode;
     char *nombre_archivo;
     char *modo_apertura;
     int posicion;
