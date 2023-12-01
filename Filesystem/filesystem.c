@@ -365,6 +365,7 @@ void *comunicacion_kernel()
 			char* nombreNuevoArchivo = "nuevoArchivo";
 			crear_archivo(configuracion_filesystem->path_fcb, nombreNuevoArchivo);
 			
+			
 			// SIEMPRE DEVOLVER OK AL KERNEL
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_crear_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
@@ -394,7 +395,30 @@ void *comunicacion_kernel()
 			// solicitud_leer_archivo_fs -> direccion_fisica_memoria // TODO: (LUCAS)
 
 			// TO DO: leer TODO el bloque que apunte "puntero_a_bloque_fs" (LUCIANO)
+			//1 - Obtener nombre de archivo: 
+			char* nombreArchivoALeerYEnviar = "nombreArchivo";
+			int direccionFisicaAMemoria = 0;
+
+			//2 - Genero ruta para encontrar el fcb:
+			char* rutaFCBdeArchivo = strcat(configuracion_filesystem->path_fcb,nombreArchivoALeerYEnviar,".fcb");
+			//3 - Abrir el fcb, FAT, y bloques:
+			FCB* fcb = crear_fcb(rutaFCBdeArchivo);
+			FATEntry* fat = abrirFAT(configuracion_filesystem->retardo_acceso_fat,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->cant_bloques_swap);
+			BLOQUE** bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques,configuracion_filesystem->cant_bloques_total,configuracion_filesystem->tam_bloques);
+
+			//4 - Leo la info del archivo:
+			char* infoLeida = malloc(fcb->tamanio_archivo*configuracion_filesystem->tam_bloques);
+			infoLeida = "";
+			int32_t bloqueSiguiente = fcb->bloque_inicial;
+			while (bloqueSiguiente != INT32_MAX){
+				infoLeida = strcat(infoLeida,bloques[bloqueSiguiente + configuracion_filesystem->cant_bloques_swap]->valorDeBloque);
+				bloqueSiguiente = fat[bloqueSiguiente].block_value;
+			}
+
+			// Hay que mandar infoLeida y direccionFisicaAMemoria
+			
 			// TO DO: mandar bloque a memoria para escribir el bloque en "direccion_fisica_memoria" (LUCIANO)
+
 
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_crear_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
