@@ -400,7 +400,7 @@ t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, i
 }
 
 // Memoria recibe de Filesystem
-t_contenido_pagina *leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem)
+void* leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem, size_t tamanio_bloque)
 {
 	op_code codigo_operacion = RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM;
 	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CONTENIDO DEL BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
@@ -409,16 +409,36 @@ t_contenido_pagina *leer_paquete_respuesta_contenido_bloque(t_log *logger, int c
 	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filsystem, codigo_operacion);
 	void *buffer_con_offset = buffer;
 
-	t_contenido_pagina *contenido_del_bloque;
+	void* contenido_del_bloque;
 
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, &(contenido_del_bloque->contenido), codigo_operacion);
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, &(contenido_del_bloque->largo), codigo_operacion);
+	leer_void_desde_buffer_de_paquete(logger,NOMBRE_MODULO_MEMORIA,NOMBRE_MODULO_FILESYSTEM,&buffer_con_offset, &(contenido_del_bloque), &tamanio_bloque, codigo_operacion);
 	free(buffer);
 
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CONTENIDO DEL BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 
 	return contenido_del_bloque;
+}
+
+//Filesystem recibe de Memoria
+int leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria) {
+	op_code codigo_operacion = SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	int cantidad_de_bloques;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, &(cantidad_de_bloques), codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	return cantidad_de_bloques;
 }
 
 // Comunes

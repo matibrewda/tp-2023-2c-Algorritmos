@@ -70,18 +70,19 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid);
 void cerrar_archivo_con_pid(int pid);
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina);
 t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid);
-t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
-t_contenido_pagina *buscar_contenido_marco(int numero_de_marco);
+t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
+void* buscar_contenido_marco(int numero_de_marco);
 
 // Manejo de Paginas
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina);
 int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina);
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina);
-t_contenido_pagina *obtener_contenido_de_pagina_en_swap(int posicion_en_swap);
+void* obtener_contenido_de_pagina_en_swap(int posicion_en_swap);
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);
 void enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
+void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_cargar_pagina_en_memoria);
 
 // Terminar
 void destruir_listas();

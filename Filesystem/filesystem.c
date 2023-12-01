@@ -277,13 +277,13 @@ void *comunicacion_memoria()
 		{
 			log_trace(logger, "Se recibio una orden de %s.", NOMBRE_MODULO_MEMORIA);
 			
-			// int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria); // TODO: (JULI)
+			int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria);
 
 			// TO DO (LUCIANO)
 			// t_list* lista_bloques_libres
 			// SI NO ENCUENTRO LA CANTIDAD DE BLOQUES LIBRES QUE ME PIDIERON, devuelvo lista vacia
 
-			// t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_fs(logger, lista_bloques); // TODO: (JULI)
+			//t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_fs(logger, lista_bloques); // TODO: (JULI)
 			// enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA); // TODO: (JULI)
 		}
 		else if (operacion_recibida_memoria == SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM)
