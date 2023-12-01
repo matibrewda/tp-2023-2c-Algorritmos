@@ -6,8 +6,9 @@ t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
 t_list *tabla_de_paginas = NULL;
-t_list *tabla_de_marcos = NULL;
+t_bitarray *tabla_de_marcos = NULL;
 void *memoria_real;
+int cantidad_de_frames = -1;
 
 // Conexiones
 int socket_kernel = -1;
@@ -95,10 +96,10 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Listas
 	procesos_iniciados = list_create();
 	tabla_de_paginas = list_create();
-	tabla_de_marcos = list_create();
 
 	// Creacion de Estructuras
 	inicializar_espacio_contiguo_de_memoria();
+	inicializar_lista_de_marcos_bitmap();
 
 	// Hilos
 	pthread_create(&hilo_atiendo_cpu, NULL, atender_cpu, NULL);
@@ -259,6 +260,7 @@ void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
 	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
 	*(uint32_t *)(memoria_real + direccion_fisica) = valor_a_escribir;
+	// TODO marcar pagina como modificada
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 }
@@ -288,6 +290,13 @@ void enviar_info_de_memoria_inicial_para_cpu()
 void inicializar_espacio_contiguo_de_memoria()
 {
 	memoria_real = malloc(configuracion_memoria->tam_memoria);
+}
+
+void inicializar_lista_de_marcos_bitmap()
+{
+	cantidad_de_frames = configuracion_memoria->tam_memoria / configuracion_memoria->tam_pagina;
+	char* data = (char *)malloc(cantidad_de_frames / 8);
+    tabla_de_marcos = bitarray_create_with_mode(data, cantidad_de_frames / 8, MSB_FIRST);
 }
 
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
@@ -520,6 +529,7 @@ void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina *victima)
 	void *contenido_marco = buscar_contenido_marco(victima->marco);
 	t_paquete *paquete = crear_paquete_solicitud_escribir_pagina_en_swap(logger, contenido_marco, configuracion_memoria->tam_pagina, victima->posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	// TODO esperamos respuesta?
 }
 
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
@@ -610,25 +620,33 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		return;
 	}
 
-	/*
-	TODO Listas de marcos? Posible solucion
-	if (marco_vacio)
-	{
-		cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
-		return;
-	}
-	*/
-
-	reemplazar_pagina(pid, numero_de_pagina);
-
 	void *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
-	cargar_datos_de_pagina_en_memoria_real(pagina);
 
-	// Actualizar entrada tabla de paginas de la nueva pagina
-	pagina->presencia = 1;
-	// pagina->marco = ?;
+	int marco_desocupado;
+	if (obtener_primer_marco_desocupado(&marco_desocupado))
+	{
+    	// cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);
+		// Actualizar entrada tabla de paginas de la nueva pagina
+		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
+		ocupar_marco(marco_desocupado);
+	}
+	else
+	{
+		int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
+		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
+		actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
+		ocupar_marco(marco_libre);
+	}
 
 	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
+	return;
+}
+
+void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado)
+{
+	pagina->presencia = 1;
+	pagina->marco = marco_asignado;
 	return;
 }
 
@@ -647,7 +665,7 @@ bool existe_un_marco_vacio()
 	// TODO
 }
 
-void reemplazar_pagina(int pid, int numero_de_pagina)
+int reemplazar_pagina(int pid, int numero_de_pagina)
 {
 	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
 	t_entrada_de_tabla_de_pagina *victima = encontrar_pagina_victima();
@@ -658,25 +676,31 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 		escribir_pagina_en_swap(victima);
 	}
 
-	// TODO numero de marco
 	borrar_contenido_de_marco_en_memoria_real(victima->marco);
 
 	// Actualizar entrada tabla de paginas de la victima
 	victima->presencia = 0;
 	victima->modificado = 0;
+
+	return victima->marco;
 }
 
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
 {
-	// TODO todavia no sabemos lo que devuelve, es lo que ocupa un marco de bytes
-	// obtener_contenido_de_marco_en_memoria_real
-	// TODO implementar el borrado de datos de la victima en memoria real
+	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
+    // Establecer todos los bytes del marco en cero
+    memset(fuente, 0, configuracion_memoria->tam_pagina);
+	liberar_marco(numero_de_marco);
 }
 
-void cargar_datos_de_pagina_en_memoria_real(t_entrada_de_tabla_de_pagina *pagina)
+void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_de_marco)
 {
 	// TODO implementar
 	// Cargar datos de la nueva pagina a reemplazar en memoria real
+	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
+
+    // Establecer todos los bytes del marco en cero
+    memset(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
 }
 
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
@@ -716,10 +740,45 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
 
+// Marcos
+
+int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
+{
+    for (int i = 0; i < cantidad_de_frames; ++i)
+    {
+        if (!bitarray_test_bit(tabla_de_marcos, i))
+        {
+            if (indice_marco_desocupado != NULL)
+            {
+                *indice_marco_desocupado = i;
+            }
+            return 1;
+        }
+    }
+    return 0;
+}
+
+
+void ocupar_marco(int numero_de_marco)
+{
+    bitarray_set_bit(tabla_de_marcos, numero_de_marco);
+}
+
+void liberar_marco(int numero_de_marco)
+{
+    bitarray_clean_bit(tabla_de_marcos, numero_de_marco);
+}
+
+int marco_ocupado(int numero_de_marco)
+{
+    return bitarray_test_bit(tabla_de_marcos, numero_de_marco);
+}
+
 void destruir_listas()
 {
 	list_destroy(procesos_iniciados);
 	list_destroy(tabla_de_paginas);
+	bitarray_destroy(tabla_de_marcos);
 	log_trace(logger, "Se destruyen todas las listas de manera correcta");
 }
 

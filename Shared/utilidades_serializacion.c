@@ -536,6 +536,9 @@ t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void *
     log_debug(logger, "Agrego el contenido del marco con tamaño %zu a paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", tamanio_bloque, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
     agregar_void_a_paquete(logger, paquete, contenido_marco, tamanio_bloque, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
+    log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     return paquete;
