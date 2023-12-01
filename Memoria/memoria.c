@@ -578,8 +578,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(false);
 		return;
 	}
-	
-	void* contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
+
 
 	/*
 	TODO Listas de marcos? Posible solucion
@@ -591,6 +590,8 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	*/
 
 	reemplazar_pagina(pid, numero_de_pagina);
+
+	void* contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
 	cargar_datos_de_pagina_en_memoria_real(pagina);
 
 	// Actualizar entrada tabla de paginas de la nueva pagina
@@ -604,10 +605,15 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 void* buscar_contenido_marco(int numero_de_marco)
 {
 	/* TODO implementar
-	Va a hacer un memcpy(ver q params se le pasa) desde el numero de marco por el tamaño de pagina y eso me va a traer la primer
-	posicion del marco
+	Desde el numero de marco por el tamaño de pagina y eso me va a traer la primer posicion del marco
 	*/
-	return NULL;
+	void* contenido_marco = malloc(configuracion_memoria->tam_pagina);
+
+    void* fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
+
+    memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);
+
+	return contenido_marco;
 }
 
 bool existe_un_marco_vacio()
