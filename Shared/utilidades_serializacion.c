@@ -442,6 +442,7 @@ t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posici
     return paquete;
 }
 
+// Memoria a CPU
 t_paquete *crear_paquete_respuesta_pedido_numero_de_marco(t_log *logger, int numero_de_marco)
 {
     op_code codigo_operacion = RESPUESTA_NUMERO_DE_MARCO_A_CPU;
