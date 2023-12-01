@@ -68,14 +68,7 @@ void crear_hilo_sleep(t_pcb* pcb, int tiempo_sleep);
 void* bloqueo_sleep();
 
 // Comunicacion con CPU
-void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar);
-void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion);
-void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
-void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
-void enviar_paquete_respuesta_devolver_proceso_por_sleep();
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char** nombre_recurso);
-bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado);
-bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado);
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int* numero_pagina, char **nombre_archivo, char **modo_apertura, int* posicion, int* direccion_fisica, int* tamanio);
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
 void interrumpir_proceso_en_cpu(int motivo_interrupcion);
 

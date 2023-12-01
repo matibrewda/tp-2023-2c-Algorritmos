@@ -218,15 +218,27 @@ void *planificador_corto_plazo()
 			op_code codigo_operacion_recibido;
 			int tiempo_sleep = -1;
 			int motivo_interrupcion = -1;
-			char *nombre_recurso;
+			int codigo_error = -1;
+			int numero_pagina = -1;
+			int posicion_puntero_archivo = -1;
+			int direccion_fisica = -1;
+			int nuevo_tamanio_archivo = -1;
+			char *nombre_recurso = NULL;
+			char *nombre_archivo = NULL;
+			char *modo_apertura = NULL;
 
-			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso);
+			t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo);
 			actualizar_pcb(pcb, contexto_de_ejecucion);
 
 			sem_wait(&semaforo_planificador_corto_plazo);
 
 			if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 			{
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_ERROR)
+			{
+				log_error(logger, "Ocurrio un error de codigo %d en el proceso PID %d.", codigo_error, pcb->pid);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
@@ -240,11 +252,23 @@ void *planificador_corto_plazo()
 					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 				}
 			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
+			{
+				// TODO
+			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
 			{
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
 				crear_hilo_sleep(pcb, tiempo_sleep);
+			}
+			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_PAGEFAULT)
+			{
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+
+				// TODO
+				// queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
+				// crear_hilo_sleep(pcb, tiempo_sleep);
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
 			{
@@ -768,89 +792,62 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* CPU *///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-void enviar_paquete_solicitud_ejecutar_proceso(t_pcb *pcb_proceso_a_ejecutar)
-{
-	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
-	contexto_de_ejecucion->pid = pcb_proceso_a_ejecutar->pid;
-	contexto_de_ejecucion->program_counter = pcb_proceso_a_ejecutar->program_counter;
-	contexto_de_ejecucion->registro_ax = pcb_proceso_a_ejecutar->registro_ax;
-	contexto_de_ejecucion->registro_bx = pcb_proceso_a_ejecutar->registro_bx;
-	contexto_de_ejecucion->registro_cx = pcb_proceso_a_ejecutar->registro_cx;
-	contexto_de_ejecucion->registro_dx = pcb_proceso_a_ejecutar->registro_dx;
-
-	t_paquete *paquete_solicitud_ejecutar_proceso = crear_paquete_solicitud_ejecutar_proceso(logger, contexto_de_ejecucion);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_solicitud_ejecutar_proceso, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-
-	free(contexto_de_ejecucion);
-}
-
-void enviar_paquete_solicitud_interrumpir_ejecucion(int motivo_interrupcion)
-{
-	t_paquete *paquete_solicitud_interrumpir_ejecucion = crear_paquete_solicitud_interrumpir_proceso(logger, motivo_interrupcion);
-	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_solicitud_interrumpir_ejecucion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
-}
-
-void enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido()
-{
-	t_paquete *paquete_respuesta_devolver_proceso_por_ser_interrumpido = crear_paquete_respuesta_devolver_proceso_por_ser_interrumpido(logger);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-}
-
-void enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion()
-{
-	t_paquete *paquete_respuesta_devolver_proceso_por_correcta_finalizacion = crear_paquete_respuesta_devolver_proceso_por_correcta_finalizacion(logger);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-}
-
-void enviar_paquete_respuesta_devolver_proceso_por_sleep()
-{
-	t_paquete *paquete_respuesta_devolver_proceso_por_sleep = crear_paquete_respuesta_devolver_proceso_por_sleep(logger);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-}
-
-void enviar_paquete_respuesta_devolver_proceso_por_wait()
-{
-	t_paquete *paquete_respuesta_devolver_proceso_por_wait = crear_paquete_respuesta_devolver_proceso_por_wait(logger);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-}
-
-void enviar_paquete_respuesta_devolver_proceso_por_signal()
-{
-	t_paquete *paquete_respuesta_devolver_proceso_por_signal = crear_paquete_respuesta_devolver_proceso_por_signal(logger);
-	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
-}
-
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso)
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
+	// Esperar operacion
 	*codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
 	t_contexto_de_ejecucion *contexto_de_ejecucion;
 
+	// Responder a CPU
 	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 	{
 		contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, *codigo_operacion_recibido, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
-		enviar_paquete_respuesta_devolver_proceso_por_correcta_finalizacion();
+		t_paquete *paquete_respuesta_devolver_proceso_por_correcta_finalizacion = crear_paquete_respuesta_devolver_proceso_por_correcta_finalizacion(logger);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	}
 	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO)
 	{
 		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, conexion_con_cpu_dispatch, motivo_interrupcion);
-		enviar_paquete_respuesta_devolver_proceso_por_ser_interrumpido();
+		t_paquete *paquete_respuesta_devolver_proceso_por_ser_interrumpido = crear_paquete_respuesta_devolver_proceso_por_ser_interrumpido(logger);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	}
 	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
 	{
 		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_sleep(logger, conexion_con_cpu_dispatch, tiempo_sleep);
-		enviar_paquete_respuesta_devolver_proceso_por_sleep();
+		t_paquete *paquete_respuesta_devolver_proceso_por_sleep = crear_paquete_respuesta_devolver_proceso_por_sleep(logger);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	}
 	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
 	{
 		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_wait(logger, conexion_con_cpu_dispatch, nombre_recurso);
-		enviar_paquete_respuesta_devolver_proceso_por_wait();
+		t_paquete *paquete_respuesta_devolver_proceso_por_wait = crear_paquete_respuesta_devolver_proceso_por_wait(logger);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	}
 	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
 	{
 		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_signal(logger, conexion_con_cpu_dispatch, nombre_recurso);
-		enviar_paquete_respuesta_devolver_proceso_por_signal();
+		t_paquete *paquete_respuesta_devolver_proceso_por_signal = crear_paquete_respuesta_devolver_proceso_por_signal(logger);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	}
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_ERROR)
+	{
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_error(logger, conexion_con_cpu_dispatch, codigo_error);
+		t_paquete *paquete_respuesta_devolver_proceso_por_error = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_ERROR, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_error, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	}
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_PAGEFAULT)
+	{
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_pagefault(logger, conexion_con_cpu_dispatch, numero_pagina);
+		t_paquete *paquete_respuesta_devolver_proceso_por_pagefault = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_PAGEFAULT, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_pagefault, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	}
+	else if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
+	{
+		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, conexion_con_cpu_dispatch, nombre_archivo, modo_apertura, posicion_puntero_archivo, direccion_fisica, nuevo_tamanio_archivo);
+		t_paquete *paquete_respuesta_devolver_proceso_por_operacion_filesystem = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+		enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_respuesta_devolver_proceso_por_operacion_filesystem, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	}
 
 	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
@@ -858,31 +855,39 @@ t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operaci
 	return contexto_de_ejecucion;
 }
 
-bool recibir_operacion_de_cpu_dispatch(op_code codigo_operacion_esperado)
-{
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
-	return codigo_operacion_recibido == codigo_operacion_esperado;
-}
-
-bool recibir_operacion_de_cpu_interrupt(op_code codigo_operacion_esperado)
-{
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_interrupt);
-	return codigo_operacion_recibido == codigo_operacion_esperado;
-}
-
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
-	enviar_paquete_solicitud_ejecutar_proceso(pcb_proceso_a_ejecutar);
-	recibir_operacion_de_cpu_dispatch(RESPUESTA_EJECUTAR_PROCESO);
+
+	// Enviar
+	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
+	contexto_de_ejecucion->pid = pcb_proceso_a_ejecutar->pid;
+	contexto_de_ejecucion->program_counter = pcb_proceso_a_ejecutar->program_counter;
+	contexto_de_ejecucion->registro_ax = pcb_proceso_a_ejecutar->registro_ax;
+	contexto_de_ejecucion->registro_bx = pcb_proceso_a_ejecutar->registro_bx;
+	contexto_de_ejecucion->registro_cx = pcb_proceso_a_ejecutar->registro_cx;
+	contexto_de_ejecucion->registro_dx = pcb_proceso_a_ejecutar->registro_dx;
+	t_paquete *paquete_solicitud_ejecutar_proceso = crear_paquete_solicitud_ejecutar_proceso(logger, contexto_de_ejecucion);
+	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_solicitud_ejecutar_proceso, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
+	free(contexto_de_ejecucion);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch); // RESPUESTA_EJECUTAR_PROCESO
+
 	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
 }
 
 void interrumpir_proceso_en_cpu(int motivo_interrupcion)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_interrupt);
-	enviar_paquete_solicitud_interrumpir_ejecucion(motivo_interrupcion);
-	recibir_operacion_de_cpu_interrupt(RESPUESTA_INTERRUMPIR_PROCESO);
+
+	// Enviar
+	t_paquete *paquete_solicitud_interrumpir_ejecucion = crear_paquete_solicitud_interrumpir_proceso(logger, motivo_interrupcion);
+	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_solicitud_interrumpir_ejecucion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_interrupt); // RESPUESTA_INTERRUMPIR_PROCESO
+
 	pthread_mutex_unlock(&mutex_conexion_cpu_interrupt);
 }
 
