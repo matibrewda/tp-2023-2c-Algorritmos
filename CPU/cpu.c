@@ -355,7 +355,7 @@ void escribir_valor_en_memoria(int direccion_fisica, u_int32_t valor_a_escribir)
 	pedido_escribir_valor_en_memoria->valor_a_escribir = valor_a_escribir;
 	pedido_escribir_valor_en_memoria->direccion_fisica = direccion_fisica;
 
-	t_paquete *paquete_solicitud_escribir_valor_en_memoria = crear_paquete_solicitud_escribir_valor_en_memoria(logger, pedido_escribir_valor_en_memoria);
+	t_paquete *paquete_solicitud_escribir_valor_en_memoria = crear_paquete_solicitud_escribir_valor_en_memoria(logger, pedido_escribir_valor_en_memoria, NOMBRE_MODULO_CPU);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_escribir_valor_en_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	// Recibir

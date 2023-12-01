@@ -49,7 +49,7 @@ t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_
 t_paquete *crear_paquete_solicitud_pedir_info_de_memoria_inicial_para_cpu(t_log *logger);
 t_paquete *crear_paquete_solicitud_pedido_numero_de_marco(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria);
 t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int direccion_fisica);
-t_paquete *crear_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria);
+t_paquete *crear_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria, char* nombre_modulo_origen);
 
 // Memoria a Kernel
 t_paquete *crear_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, bool resultado_iniciar_proceso);
@@ -67,6 +67,13 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_
 t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicion_swap);
 t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posicion_swap);
 t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void* contenido_marco, size_t tamanio_bloque, int posicion_swap);
+t_paquete *crear_paquete_respuesta_leer_valor_en_memoria_desde_filesystem(t_log *logger, u_int32_t valor, char* nombre_archivo, int puntero_archivo);
+
+// Filesystem a Kernel
+t_paquete *crear_paquete_respuesta_abrir_archivo_fs(t_log *logger, bool existe_archivo, int tamanio_archivo);
+
+// Filesystem a Memoria
+t_paquete *crear_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(t_log *logger, char* nombre_archivo_a_escribir, int puntero_archivo_a_escribir, int direccion_fisica_a_leer);
 
 // Comunes
 t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_proceso_memoria *proceso_memoria);
