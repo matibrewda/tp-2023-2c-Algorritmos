@@ -6,7 +6,6 @@ t_argumentos_memoria *argumentos_memoria = NULL;
 t_config_memoria *configuracion_memoria = NULL;
 t_list *procesos_iniciados = NULL;
 t_list *tabla_de_paginas = NULL;
-t_list *tabla_de_marcos = NULL; // TODO implementar una lista propia de tamaño fijo? t_list no tiene tamaño fijo, es enlazada
 void *memoria_real;
 
 // Conexiones
@@ -95,12 +94,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Listas
 	procesos_iniciados = list_create();
 	tabla_de_paginas = list_create();
-	tabla_de_marcos = list_create();
 
 	// Creacion de Estructuras
-	uint32_t espacio_memoria[configuracion_memoria->tam_memoria];
-	memoria_real = espacio_memoria;
-
 	inicializar_espacio_contiguo_de_memoria();
 
 	// Hilos
@@ -230,7 +225,7 @@ void notificar_escritura_a_cpu()
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
 	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
-	*(uint32_t*)(memoria_real + direccion_fisica) = valor_a_escribir;
+
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 }
@@ -241,16 +236,6 @@ uint32_t leer_valor_en_memoria(int direccion_fisica)
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return 3; // XD
-}
-
-int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
-{
-	return floor(direccion_fisica / configuracion_memoria->tam_pagina);
-}
-
-int obtener_desplazamiento_desde_direccion_fisica(int direccion_fisica)
-{
-	return direccion_fisica - obtener_numero_de_marco_desde_direccion_fisica(direccion_fisica) * (configuracion_memoria->tam_pagina);
 }
 
 void enviar_info_de_memoria_inicial_para_cpu()
@@ -370,6 +355,7 @@ void finalizar_proceso_en_memoria(int pid)
 	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
 
+	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 	if (archivo_proceso == NULL)
 	{
@@ -460,10 +446,6 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
 	{
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
-		if (es_pagina_presente(entrada_tabla_de_paginas))
-		{
-			// TODO vaciar contenido del marco
-		}
 		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
 		//list_remove(tabla_de_paginas, entrada_tabla_de_paginas); // TODO: no compila
 		free(entrada_tabla_de_paginas);
@@ -501,18 +483,18 @@ void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima)
 	*/
 }
 
-int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
+int es_pagina_presente(t_entrada_de_tabla_de_pagina *victima)
 {
-	if (pagina->presencia == 1)
+	if (victima->presencia == 1)
 	{
 		return 1;
 	}
 	return 0;
 }
 
-int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina)
+int es_pagina_modificada(t_entrada_de_tabla_de_pagina *victima)
 {
-	if (pagina->modificado == 1)
+	if (victima->modificado == 1)
 	{
 		return 1;
 	}
@@ -563,7 +545,7 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	return entradas_tabla_de_pagina;
 }
 
-t_contenido_pagina *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
+char *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
 	// TODO ver que retorna esta funcion
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
@@ -571,7 +553,7 @@ t_contenido_pagina *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 
 	// TODO hace falta sincronizar
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	t_contenido_pagina *contenido_del_bloque;
+	char *contenido_del_bloque;
 	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
 	{
 		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem);

@@ -51,6 +51,9 @@ t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conex
 t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, int conexion_con_filsystem);
 t_contenido_pagina *leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem);
 
+//Filesystem recibe de Memoria
+int leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria);
+
 // Comunes
 t_pedido_pagina_en_memoria *leer_paquete_solicitud_pedido_pagina_en_memoria(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino);
 t_proceso_memoria *leer_paquete_proceso_memoria(t_log *logger, int conexion, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino);
