@@ -34,6 +34,7 @@ sem_t semaforo_planificador_largo_plazo;
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_bloqueados_sleep;
+pthread_mutex_t mutex_cola_bloqueados_pagefault;
 pthread_mutex_t mutex_conexion_cpu_dispatch;
 pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
@@ -44,6 +45,7 @@ pthread_mutex_t mutex_id_hilo_quantum;
 t_queue *cola_new = NULL;
 t_queue *cola_ready = NULL;
 t_queue *cola_bloqueados_sleep = NULL;
+t_queue *cola_bloqueados_pagefault = NULL;
 t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
@@ -123,6 +125,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_cola_new, NULL);
 	pthread_mutex_init(&mutex_cola_ready, NULL);
 	pthread_mutex_init(&mutex_cola_bloqueados_sleep, NULL);
+	pthread_mutex_init(&mutex_cola_bloqueados_pagefault, NULL);
 	pthread_mutex_init(&mutex_conexion_cpu_dispatch, NULL);
 	pthread_mutex_init(&mutex_conexion_cpu_interrupt, NULL);
 	pthread_mutex_init(&mutex_conexion_memoria, NULL);
@@ -133,6 +136,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	cola_new = queue_create();
 	cola_ready = queue_create();
 	cola_bloqueados_sleep = queue_create();
+	cola_bloqueados_pagefault = queue_create();
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
@@ -265,10 +269,8 @@ void *planificador_corto_plazo()
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_PAGEFAULT)
 			{
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
-
-				// TODO
-				// queue_push_thread_safe(cola_bloqueados_sleep, pcb, &mutex_cola_bloqueados_sleep);
-				// crear_hilo_sleep(pcb, tiempo_sleep);
+				queue_push_thread_safe(cola_bloqueados_pagefault, pcb, &mutex_cola_bloqueados_pagefault);
+				crear_hilo_page_fault(pcb, numero_pagina);
 			}
 			else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
 			{
@@ -512,6 +514,7 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
@@ -545,6 +548,34 @@ void *bloqueo_sleep(void *argumentos)
 	if (pcb != NULL)
 	{
 		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+	}
+}
+
+void crear_hilo_page_fault(t_pcb *pcb, int numero_pagina)
+{
+	log_info(logger, "Page Fault PID: %d - Pagina: %d", pcb->pid, numero_pagina);
+	pthread_t hilo_bloqueo_page_fault;
+	t_bloqueo_page_fault *bloqueo_page_fault_parametros = malloc(sizeof(t_bloqueo_page_fault));
+	bloqueo_page_fault_parametros->pcb = pcb;
+	bloqueo_page_fault_parametros->numero_pagina = numero_pagina;
+	pthread_create(&hilo_bloqueo_page_fault, NULL, page_fault, (void *)bloqueo_page_fault_parametros);
+}
+
+void *page_fault(void *argumentos)
+{
+	t_bloqueo_page_fault *bloqueo_page_fault = (t_bloqueo_page_fault *)argumentos;
+
+	int pid_proceso_page_fault = bloqueo_page_fault->pcb->pid;
+
+	// Pedir a memoria cargar pagina
+	// Esperar respuesta
+
+	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_page_fault, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
+
+	if (pcb != NULL)
+	{
+		eliminar_pcb_de_cola(pid_proceso_page_fault, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
 }
@@ -1029,6 +1060,7 @@ void listar_procesos()
 	}
 
 	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_sleep);
+	queue_iterate_thread_safe(cola_bloqueados_pagefault, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_pagefault);
 
 	list_iterate(recursos, (void (*)(void *)) & imprimir_bloqueados_por_recurso_en_consola);
 }
@@ -1079,6 +1111,12 @@ t_pcb *buscar_pcb_con_pid(int pid)
 	}
 
 	pcb = buscar_pcb_con_pid_en_cola(pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+	if (pcb != NULL)
+	{
+		return pcb;
+	}
+
+	pcb = buscar_pcb_con_pid_en_cola(pid, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
 	if (pcb != NULL)
 	{
 		return pcb;

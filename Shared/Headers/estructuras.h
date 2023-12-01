@@ -122,9 +122,14 @@ typedef struct
 
 typedef struct
 {
-    char* contenido;
-    int largo; // TODO ver si es necesario
-}t_contenido_pagina;
+    t_pcb *pcb;
+    int numero_pagina;
+} t_bloqueo_page_fault;
 
+typedef struct
+{
+    char *contenido;
+    int largo; // TODO ver si es necesario
+} t_contenido_pagina;
 
 #endif /* ESTRUCTURAS_H_ */

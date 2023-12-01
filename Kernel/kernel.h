@@ -66,6 +66,8 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb);
 // Bloqueos
 void crear_hilo_sleep(t_pcb* pcb, int tiempo_sleep);
 void* bloqueo_sleep();
+void crear_hilo_page_fault(t_pcb* pcb, int numero_pagina);
+void* page_fault();
 
 // Comunicacion con CPU
 t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int* numero_pagina, char **nombre_archivo, char **modo_apertura, int* posicion, int* direccion_fisica, int* tamanio);
