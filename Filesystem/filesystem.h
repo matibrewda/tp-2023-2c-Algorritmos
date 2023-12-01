@@ -36,9 +36,11 @@
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
 
+t_list* archivos; 
+
 void *comunicacion_kernel();
 void *comunicacion_memoria();
-int crear_archivo (char* path,char* nombreNuevoArchivo);
+int crear_archivo (char* nombreNuevoArchivo);
 int truncar_archivo(char* path, uint32_t nuevo_tamano);
 
 // Terminar

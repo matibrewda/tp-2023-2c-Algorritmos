@@ -50,6 +50,9 @@ typedef enum
 	F_CREATE,
 	F_OPEN,
 
+	// FS a Kernel
+	OK,
+
 	// DEFECTO
 	OPCODE_DEFECTO
 } op_code;

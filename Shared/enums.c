@@ -50,6 +50,9 @@ const char* nombre_opcode(op_code opcode)
         case F_TRUNCATE: return "'F_TRUNCATE'";
         case F_CREATE: return "'F_CREATE'";
         case F_OPEN: return "'F_OPEN'";
+
+        // FS A KERNEL
+        case OK: return "'OK'";
         
         // ERROR
         default: return "NOMBRE DE OPCODE DESCONOCIDO";
