@@ -277,29 +277,26 @@ void *comunicacion_memoria()
 		{
 			log_trace(logger, "Se recibio una orden de %s.", NOMBRE_MODULO_MEMORIA);
 			
-			// int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria); // TODO: (LUCAS)
-			int cantidad_de_bloques_a_reservar = 3;
+			// int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria); // TODO: (JULI)
 
 			// TO DO (LUCIANO)
 			// t_list* lista_bloques_libres
 			// SI NO ENCUENTRO LA CANTIDAD DE BLOQUES LIBRES QUE ME PIDIERON, devuelvo lista vacia
 
-			// t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_fs(logger, lista_bloques); // TODO: (LUCAS)
-			// enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA); // TODO: (LUCAS)
+			// t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_fs(logger, lista_bloques); // TODO: (JULI)
+			// enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA); // TODO: (JULI)
 		}
 		else if (operacion_recibida_memoria == SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM)
 		{
 			log_trace(logger, "Se recibio una orden de %s", NOMBRE_MODULO_MEMORIA);
 			
-			// t_list* bloques_a_liberar = leer_paquete_solicitud_liberar_bloques_de_fs(logger, conexion_con_memoria); // TODO: (LUCAS)
-			t_list* bloques_a_librerar; // (LISTA DE ENTEROS CON NUMERO DE BLOQUES DE SWAP)
+			// t_list* bloques_a_liberar = leer_paquete_solicitud_liberar_bloques_de_fs(logger, conexion_con_memoria); // TODO: (JULI)
 
 			// TO DO (LUCIANO)
 			// Iterar lista y marcar cada bloque como libre
 
-			// RESPONDER OK A MEMORIA
-			// t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_fs(logger, lista_bloques); // TODO: (LUCAS)
-			// enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA); // TODO: (LUCAS)
+			t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			enviar_paquete(logger, conexion_con_memoria, paquete, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 		}
 		else if (operacion_recibida_memoria == RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA_FS)
 		{
@@ -347,7 +344,7 @@ void *comunicacion_kernel()
 			// solicitud_abrir_archivo_fs -> nombre_archivo // TODO: (LUCAS)
 
 			bool existe_archivo = false; // TODO: que contenga info posta (LUCIANO)
-			int tamanio_archivo = 32; // TODO: que contenga info posta: si existe, tamanion, si no existe, mandame un -1 (LUCIANO)
+			int tamanio_archivo = 32; // TODO: que contenga info posta: si existe, tamanio, si no existe, mandame un -1 (LUCIANO)
 			
 			// t_paquete *paquete_respuesta_abrir_archivo_fs = crear_paquete_respuesta_abrir_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_abrir_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
@@ -388,8 +385,9 @@ void *comunicacion_kernel()
 			// solicitud_leer_archivo_fs -> puntero_a_bloque_fs // TODO: (LUCAS)
 			// solicitud_leer_archivo_fs -> direccion_fisica_memoria // TODO: (LUCAS)
 
-			// TO DO: leer TODO el bloque que apunte "puntero_a_bloque_fs" (LUCIANO)
-			// TO DO: mandar bloque a memoria para escribir el bloque en "direccion_fisica_memoria" (LUCIANO)
+			// TO DO: leer byte de filesystem que apunte "puntero_a_bloque_fs" (LUCIANO)
+			// TO DO: mandar byte a memoria para escribirlo en "direccion_fisica_memoria" // TODO: (JULI)
+			// esto es lo que decia de mandar un cacho de bytes a memoria // TODO: (JULI)
 
 			// t_paquete *paquete_respuesta_crear_archivo_fs = crear_paquete_respuesta_crear_archivo_fs(logger, existe_archivo, tamanio_archivo); // TODO: (LUCAS)
 			// enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_crear_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL); // TODO: (LUCAS)
@@ -403,7 +401,8 @@ void *comunicacion_kernel()
 			// solicitud_escribir_archivo_fs -> puntero_a_bloque_fs // TODO: (LUCAS)
 			// solicitud_escribir_archivo_fs -> direccion_fisica_memoria // TODO: (LUCAS)
 
-			// TO DO: solicitar pagina a memoria en "direccion_fisica_memoria" (LUCAS)
+			// TO DO: leer byte de memoria que este en "direccion_fisica_memoria" // TODO: (JULI)
+			// TO DO: escribir byte en filesystem donde apunte "puntero_a_bloque_fs" (LUCIANO)
 		}
 		else
 		{
