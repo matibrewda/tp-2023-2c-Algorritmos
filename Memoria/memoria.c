@@ -9,9 +9,6 @@ t_list *tabla_de_paginas = NULL;
 t_list *tabla_de_marcos = NULL; // TODO implementar una lista propia de tamaño fijo? t_list no tiene tamaño fijo, es enlazada
 void *memoria_real;
 
-
-
-
 // Conexiones
 int socket_kernel = -1;
 int socket_cpu = -1;
@@ -316,6 +313,13 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	}
 
 	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques);
+	if (list_is_empty(posiciones_swap))
+	{
+		log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid);
+		enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
+		return;
+	}
+
 	crear_entrada_de_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap, pid);
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 }
@@ -329,6 +333,12 @@ void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado
 void enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel()
 {
 	t_paquete *paquete = crear_paquete_respuesta_finalizar_proceso_en_memoria(logger);
+	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+}
+
+void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_cargar_pagina_en_memoria)
+{
+	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger, resultado_cargar_pagina_en_memoria);
 	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 }
 
@@ -439,8 +449,6 @@ t_list *recibir_paquete_pedir_bloques_a_filesystem()
 		void *buffer_con_offset = buffer;
 
 		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-
-		// TO DO: si posiciones_swap is empty, entonces devolver error al kernel
 	}
 
 	return posiciones_swap;
@@ -484,9 +492,13 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
 }
 
-void escribir_pagina_en_swap()
+void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima)
 {
-	// TODO IMPLEMENTAME PAA
+	/* TODO IMPLEMENTAME PAA
+	- Busco el contenido del marco porque se supone que esta modificado (contenido_marco o nose)
+	- Ese contenido lo tenemos que meter en un paquete
+	- Enviar a Filesystem para que actualice el bloque, pasandole el numero de bloque
+	*/
 }
 
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
@@ -570,13 +582,10 @@ t_contenido_pagina *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 {
-	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
-	if (es_pagina_presente(pagina))
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	if (pagina == NULL)
 	{
-		// Retornar el contenido del marco en el que esta esa pagina
-		t_contenido_pagina *contenido_pagina = buscar_contenido_marco(pagina->marco);
-		t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger, contenido_pagina);
-		enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(false);
 		return;
 	}
 	
@@ -598,8 +607,8 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	pagina->presencia = 1;
 	// pagina->marco = ?;
 
-	t_paquete *paquete = crear_paquete_respuesta_cargar_pagina_en_memoria(logger, NULL); // TODOO mandar contenido pagina
-	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
+	return;
 }
 
 t_contenido_pagina *buscar_contenido_marco(int numero_de_marco)
@@ -613,7 +622,7 @@ t_contenido_pagina *buscar_contenido_marco(int numero_de_marco)
 
 bool existe_un_marco_vacio()
 {
-	//
+	// TODO
 }
 
 void reemplazar_pagina(int pid, int numero_de_pagina)
@@ -624,7 +633,7 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
 	if (es_pagina_presente(victima) == 1 && es_pagina_modificada(victima) == 1)
 	{
-		escribir_pagina_en_swap(pid, victima);
+		escribir_pagina_en_swap(victima);
 	}
 
 	// TODO numero de marco
@@ -632,6 +641,7 @@ void reemplazar_pagina(int pid, int numero_de_pagina)
 
 	// Actualizar entrada tabla de paginas de la victima
 	victima->presencia = 0;
+	victima->modificado = 0;
 }
 
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
@@ -647,7 +657,7 @@ void cargar_datos_de_pagina_en_memoria_real(t_entrada_de_tabla_de_pagina *pagina
 	// Cargar datos de la nueva pagina a reemplazar en memoria real
 }
 
-t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
+t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
 {
 	bool _filtro_pagina_de_memoria_por_numero_y_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
 	{
@@ -668,7 +678,7 @@ t_entrada_de_tabla_de_pagina *obtener_entradas_de_tabla_de_pagina_por_pid_y_nume
 
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
-	t_entrada_de_tabla_de_pagina *pagina = obtener_entradas_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 	int numero_marco = -1;
 
 	if (pagina->presencia == 0)

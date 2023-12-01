@@ -122,7 +122,7 @@ typedef struct
 
 typedef struct
 {
-    char* contenido;
+    t_list *contenido;
     int largo; // TODO ver si es necesario
 }t_contenido_pagina;
 
