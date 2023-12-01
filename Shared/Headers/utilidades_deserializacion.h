@@ -20,12 +20,16 @@
 
 // Kernel recibe de Memoria
 bool leer_paquete_respuesta_iniciar_proceso_en_memoria(t_log *logger, int conexion_con_memoria);
+bool leer_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, int conexion_con_memoria);
 
 // Kernel recibe de CPU
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_ser_interrumpido(t_log *logger, int conexion_con_cpu_dispatch, int* motivo_interrupcion);
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_sleep(t_log *logger, int conexion_con_cpu_dispatch, int* tiempo_sleep);
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_wait(t_log *logger, int conexion_con_cpu_dispatch, char** nombre_recurso);
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_signal(t_log *logger, int conexion_con_cpu_dispatch, char** nombre_recurso);
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_error(t_log *logger, int conexion_con_cpu_dispatch, int* codigo_error);
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_pagefault(t_log *logger, int conexion_con_cpu_dispatch, int* numero_pagina);
+t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char** nombre_archivo, char** modo_apertura, int* posicion_puntero_archivo, int* direccion_fisica, int* nuevo_tamanio_archivo);
 
 // CPU recibe de Kernel
 t_contexto_de_ejecucion *leer_paquete_solicitud_ejecutar_proceso(t_log *logger, int conexion_con_kernel_dispatch);

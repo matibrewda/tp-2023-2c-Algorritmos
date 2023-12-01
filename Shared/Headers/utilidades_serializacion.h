@@ -30,6 +30,7 @@ t_paquete *crear_paquete_respuesta_devolver_proceso_por_signal(t_log *logger);
 // Kernel a Memoria
 t_paquete *crear_paquete_solicitud_iniciar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria);
 t_paquete *crear_paquete_solicitud_finalizar_proceso_en_memoria(t_log *logger, t_proceso_memoria *proceso_memoria);
+t_paquete *crear_paquete_solicitud_cargar_pagina_en_memoria(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria);
 
 // CPU a Kernel
 t_paquete *crear_paquete_respuesta_ejecutar_proceso(t_log *logger);

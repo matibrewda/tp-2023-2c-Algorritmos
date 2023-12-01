@@ -83,14 +83,12 @@ typedef struct
 
 typedef struct
 {
-    /* PEDIIIILLOOOOOOO */
     int pid;
     int numero_de_pagina;
 } t_pedido_pagina_en_memoria;
 
 typedef struct
 {
-    /* ESCRIBIIIILOOOOOOO */
     uint32_t valor_a_escribir;
     int direccion_fisica;
 } t_pedido_escribir_valor_en_memoria;
@@ -119,5 +117,17 @@ typedef struct
     t_pcb *pcb;
     int tiempo_sleep;
 } t_bloqueo_sleep;
+
+typedef struct
+{
+    t_pcb *pcb;
+    int numero_pagina;
+} t_bloqueo_page_fault;
+
+typedef struct
+{
+    char *contenido;
+    int largo; // TODO ver si es necesario
+} t_contenido_pagina;
 
 #endif /* ESTRUCTURAS_H_ */

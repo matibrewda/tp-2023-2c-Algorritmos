@@ -64,6 +64,22 @@ t_paquete *crear_paquete_solicitud_finalizar_proceso_en_memoria(t_log *logger, t
     return crear_paquete_proceso_memoria(logger, SOLICITUD_FINALIZAR_PROCESO_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, proceso_memoria);
 }
 
+// Kernel a Memoria
+t_paquete *crear_paquete_solicitud_cargar_pagina_en_memoria(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria)
+{
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'PID + NRO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_CARGAR_PAGINA_EN_MEMORIA), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+
+    t_paquete *paquete = crear_paquete(logger, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, pedido_pagina_en_memoria->pid, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA);
+    agregar_int_a_paquete(logger, paquete, pedido_pagina_en_memoria->numero_de_pagina, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'PROCESO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_CARGAR_PAGINA_EN_MEMORIA), NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
+
+    return paquete;
+}
+
 // CPU a Kernel
 t_paquete *crear_paquete_respuesta_ejecutar_proceso(t_log *logger)
 {
@@ -185,7 +201,7 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_pagefault(t_log *logger,
 }
 
 // CPU a Kernel
-t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log* logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_operacion_filesystem *operacion_filesystem)
+t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, t_operacion_filesystem *operacion_filesystem)
 {
     op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + OPERACION FILESYSTEM' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
@@ -262,7 +278,6 @@ t_paquete *crear_paquete_respuesta_cargar_pagina_en_memoria(t_log *logger, bool 
     agregar_int_a_paquete(logger, paquete, resultado_cargar_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-
 
     return paquete;
 }
