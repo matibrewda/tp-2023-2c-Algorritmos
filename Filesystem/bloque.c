@@ -1,111 +1,36 @@
+
 #include "bloque.h"
-
-BLOQUE* asignarTamanioBloque(uint32_t tamanioBloqueEnArchivoConfig);
-
-/* int crearArchivoDeBloques(char* blocksFilePath, uint32_t cantDeBloquesTotales, uint32_t tamanioBloque) {
-    FILE* archivoDeBloques = fopen(blocksFilePath, "wb");
-
-    if (archivoDeBloques == NULL) {
-        perror("Error al abrir el archivo de bloques");
-        return 1;
-    }
-
-    for (uint32_t ai = 0; i < cantDeBloquesTotales; i++) {
-        BLOQUE* bloque = asignarTamanioBloque(tamanioBloque);
-        fwrite(bloque, sizeof(BLOQUE), 1, archivoDeBloques);
-        //fwrite(bloque, sizeof(BLOQUE), 1, archivoDeBloques);
-        free(bloque->valorDeBloque);
-        free(bloque);
-    }
-
-    fclose(archivoDeBloques);
-    return 0;
-} */
-
-int crearArchivoDeBloques1(char* blocksFilePath, uint32_t cantDeBloquesTotales, uint32_t tamanioBloque) {
-    FILE* archivoDeBloques = fopen(blocksFilePath, "wb");
-
-    if (archivoDeBloques == NULL) {
-        perror("Error al abrir el archivo de bloques");
-        return 1;
-    }
-
-    for (uint32_t i = 0; i < cantDeBloquesTotales; i++) {
-        BLOQUE* bloque = asignarTamanioBloque(tamanioBloque);
-        bloque->valorDeBloque[i] = 'N';
-
-        if (bloque == NULL) {
-            // Manejar el error aquí, liberar memoria y cerrar el archivo si es necesario
-            fclose(archivoDeBloques);
-            return 1;
-        }
-
-        fwrite(bloque->valorDeBloque, tamanioBloque * sizeof(uint8_t), 1, archivoDeBloques);
-
-        free(bloque->valorDeBloque);
-        free(bloque);
-    }
-
-    fclose(archivoDeBloques);
-    return 0;
-}
+#include <stdlib.h> // Para rand() y srand()
+#include <time.h>   // Para time()
 
 int crearArchivoDeBloques(char* blocksFilePath, uint32_t cantDeBloquesTotales, uint32_t tamanioBloque) {
-    
-    FILE* archivoDeBloques = fopen(blocksFilePath, "rb+");
-    if (archivoDeBloques == NULL)
-    {
-
     FILE* archivoDeBloques = fopen(blocksFilePath, "wb+");
 
-    if (archivoDeBloques == NULL)
-        { 
-            printf("FS FAT: No se pudo crear el archivo fat.bin");
-            return 1;
-        } else {
-    BLOQUE* bloque = asignarTamanioBloque(tamanioBloque);
-
-    if (bloque == NULL) {
-        // Manejar el error aquí, cerrar el archivo si es necesario
-        fclose(archivoDeBloques);
+    if (archivoDeBloques == NULL) {
+        printf("FS FAT: No se pudo crear el archivo fat.bin\n");
         return 1;
     }
+    else {
+        // Crear un bloque para llenar el archivo con datos binarios válidos
+        BLOQUE* bloque = asignarTamanioBloque(tamanioBloque);
+        for (uint32_t i = 0; i < cantDeBloquesTotales; i++) {
+            fwrite(bloque->valorDeBloque, tamanioBloque * sizeof(uint8_t), 1, archivoDeBloques);
+        }
 
-    // Rellenar el bloque con el carácter 'N'
-    memset(bloque->valorDeBloque, 'N', tamanioBloque);
-
-    for (uint32_t i = 0; i < cantDeBloquesTotales; i++) {
-        // Escribir el bloque en el archivo
-        fwrite(bloque->valorDeBloque, tamanioBloque * sizeof(uint8_t), 1, archivoDeBloques);
+        free(bloque->valorDeBloque);
+        free(bloque);
     }
-
-    free(bloque->valorDeBloque);
-    free(bloque);
 
     fclose(archivoDeBloques);
-    return 0;}
-    } else printf("EL archivo BLOQUES ya existe");
+    return 0;
 }
 
-
-/* 
 BLOQUE* asignarTamanioBloque(uint32_t tamanioBloqueEnArchivoConfig) {
-    BLOQUE* bloque = malloc(sizeof(BLOQUE));
-
-    if (bloque == NULL) {
+    if (tamanioBloqueEnArchivoConfig <= 0) {
+        // Manejar error de tamaño no válido
         return NULL;
     }
 
-    bloque->valorDeBloque = malloc(tamanioBloqueEnArchivoConfig);
-    if (bloque->valorDeBloque == NULL) {
-        free(bloque);
-        return NULL;
-    }
-
-    return bloque;
-} */
-
-BLOQUE* asignarTamanioBloque(uint32_t tamanioBloqueEnArchivoConfig) {
     BLOQUE* bloque = (BLOQUE*)malloc(sizeof(BLOQUE));
     if (bloque == NULL) {
         perror("Error al asignar bloque");
@@ -119,6 +44,9 @@ BLOQUE* asignarTamanioBloque(uint32_t tamanioBloqueEnArchivoConfig) {
         return NULL;
     }
 
+    // Inicializar con el equivalente hexadecimal de 'N' (0x4E)
+    memset(bloque->valorDeBloque, 0, tamanioBloqueEnArchivoConfig);
+
     return bloque;
 }
 
@@ -129,31 +57,9 @@ void liberarESpacioBloqueCreado(BLOQUE* bloque) {
     }
 }
 
-
-
-/* void modificarBLOQUEenArchivoBLOQUE(char* pathBLOQUES,uint32_t numeroBloque, BLOQUE* nuevaEntrada){
-    
-    // Abrir el archivo en modo lectura y escritura binaria
-    FILE *archivoBLOQUE = fopen(pathBLOQUES, "r+b");
-
-    if (archivoBLOQUE == NULL) {
-        perror("Error al abrir el archivo FAT");
-    }
-
-    // Mover el puntero de archivo a la posición de la entrada deseada
-    fseek(archivoBLOQUE, (numeroBloque) * sizeof(BLOQUE), SEEK_SET);
-
-    // Escribir la nueva entrada en el archivo
-    fwrite(nuevaEntrada, sizeof(BLOQUE), 1, archivoBLOQUE);
-
-    // Cerrar el archivo
-    fclose(archivoBLOQUE);
-
-}
- */
 int modificarBLOQUEenArchivoBLOQUE(char* pathBLOQUES, uint32_t numeroBloque, BLOQUE* nuevaEntrada, u_int32_t tamanioBloque) {
-    // Abrir el archivo en modo lectura y escritura
-    FILE* archivoBLOQUE = fopen(pathBLOQUES, "r+");
+    // Abrir el archivo en modo lectura y escritura binaria
+    FILE* archivoBLOQUE = fopen(pathBLOQUES, "rb+");
 
     if (archivoBLOQUE == NULL) {
         perror("Error al abrir el archivo de bloques");
@@ -225,10 +131,17 @@ BLOQUE** leerBloquesDesdeArchivo(char* pathBLOQUES, uint32_t cantDeBloquesTotale
 }
 
 
-void modificarBloque (char* path,int32_t tamanioBloque){
-    FILE* archivoBloques = fopen(path,"r+b");
+int obtenerContenidoRandom() {
+    srand(time(NULL)); // Inicializar la semilla del generador de números aleatorios
 
-    fwrite("UUUU",sizeof(u_int8_t)*tamanioBloque,1,archivoBloques);
+    int valor;
+    if (rand() % 2 == 0) {
+        // Generar un valor aleatorio entre 0x00 y 0x1F
+        valor = rand() % 0x20;
+    } else {
+        // Generar un valor aleatorio entre 0x7F y 0xFF
+        valor = rand() % 0x80 + 0x7F;
+    }
 
+    return valor;
 }
-

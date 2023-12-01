@@ -26,6 +26,7 @@
         "utilidades_configuracion.h": "c",
         "main.h": "c",
         "math.h": "c",
-        "utilidades_archivos.h": "c"
+        "utilidades_archivos.h": "c",
+        "bloque.h": "c"
     }
 }
