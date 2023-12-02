@@ -111,6 +111,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
 
 	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
+	
+	/*
 	if (fat_checker == 0)
 	{
 		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.\n");
@@ -207,7 +209,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	{
 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 	}
-
+*/
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
 	{
