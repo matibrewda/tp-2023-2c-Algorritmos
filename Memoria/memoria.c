@@ -287,10 +287,11 @@ int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
-	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego leer el valor usando el puntero "memoria_real"
+	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
+	
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
-	return 3; // XD
+	return valor_leido;
 }
 
 void enviar_info_de_memoria_inicial_para_cpu()
