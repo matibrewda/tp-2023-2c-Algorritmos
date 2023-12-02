@@ -28,12 +28,7 @@ t_queue *cola_fifo_entradas = NULL;
 
 // Mutex
 pthread_mutex_t mutex_cola_fifo_entradas;
-pthread_mutex_t mutex_conexion_cpu;
-pthread_mutex_t mutex_conexion_kernel;
 pthread_mutex_t mutex_conexion_filesystem;
-
-// Semaforos
-sem_t semaforo_pedir_bloques_a_filesystem;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -105,13 +100,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	// Semaforos
-	sem_init(&semaforo_pedir_bloques_a_filesystem, false, 0);
-
 	// Mutex
 	pthread_mutex_init(&mutex_cola_fifo_entradas, NULL);
-	pthread_mutex_init(&mutex_conexion_cpu, NULL);
-	pthread_mutex_init(&mutex_conexion_kernel, NULL);
 	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
 
 	// Colas
@@ -492,33 +482,16 @@ void notificar_escritura_a_filesystem()
 
 t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 {
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
 	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
-	// Bloquear el hilo hasta que haya respuesta para que no se pidan bloques simultaneamente
-    sem_wait(&semaforo_pedir_bloques_a_filesystem);
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM
+	t_list *posiciones_swap = leer_paquete_respuesta_pedir_bloques_a_filesystem(logger, conexion_con_filesystem);
 
-	return recibir_paquete_pedir_bloques_a_filesystem();
-}
-
-t_list *recibir_paquete_pedir_bloques_a_filesystem()
-{
-	t_list *posiciones_swap = NULL;
-	while (true)
-    {
-        op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-        if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
-        {
-            int tamanio_buffer;
-            void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-            void *buffer_con_offset = buffer;
-
-            posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-            sem_post(&semaforo_pedir_bloques_a_filesystem);
-
-			break;
-        }
-    }
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
 
 	return posiciones_swap;
 }
@@ -671,16 +644,18 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 
 void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
-	// TODO hace falta sincronizar
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
 	void *contenido_del_bloque = malloc(configuracion_memoria->tam_pagina);
-	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
-	{
-		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem, configuracion_memoria->tam_pagina);
-	}
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM
+	contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem, configuracion_memoria->tam_pagina);
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
 
 	return contenido_del_bloque;
 }

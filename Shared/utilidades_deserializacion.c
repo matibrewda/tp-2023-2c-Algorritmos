@@ -504,6 +504,27 @@ void *leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_fi
 	return contenido_del_bloque;
 }
 
+// Memoria recibe de Filesystem
+t_list *leer_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, int conexion_con_filesystem)
+{
+	op_code codigo_operacion = RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+	int tamanio_buffer;
+    void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+    void *buffer_con_offset = buffer;
+
+	t_list *posiciones_swap;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+    posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'POSICIONES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	return posiciones_swap;
+}
+
 // Filesystem recibe de Memoria
 int leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria)
 {
