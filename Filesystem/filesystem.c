@@ -489,7 +489,7 @@ uint32_t buscar_bloque_fat(int nro_bloque,char* nombre_archivo){
 	uint32_t *entrada_fat = mmap(NULL,tamanio_FAT,PROT_READ | PROT_WRITE,MAP_SHARED,fatfd,0);
 	for (uint32_t i = 0; i < nro_bloque; i++)
 	{
-		log_info(logger, "Acceso FAT - Entrada: <%s> - Valor: <%d>",i,entrada_fat[bloque_a_leer]);
+		log_info(logger, "Acceso FAT - Entrada: <%d> - Valor: <%d>",i,entrada_fat[bloque_a_leer]);
 		bloque_a_leer = entrada_fat[bloque_a_leer];
 	}
 	return bloque_a_leer;
