@@ -23,6 +23,12 @@ pthread_t hilo_atiendo_kernel;
 pthread_t hilo_atiendo_cpu;
 pthread_t hilo_atiendo_filesystem;
 
+// Colas
+t_queue *cola_fifo_entradas = NULL;
+
+// Mutex
+pthread_mutex_t mutex_cola_fifo_entradas;
+
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	atexit(terminar_memoria);
@@ -92,6 +98,12 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		terminar_memoria();
 		return EXIT_FAILURE;
 	}
+
+	// Mutex
+	pthread_mutex_init(&mutex_cola_fifo_entradas, NULL);
+
+	// Colas
+	cola_fifo_entradas = queue_create();
 
 	// Listas
 	procesos_iniciados = list_create();
@@ -488,15 +500,37 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
 	{
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
-			// TODO vaciar contenido del marco
+			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
 		}
 		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
-		// list_remove(tabla_de_paginas, entrada_tabla_de_paginas); // TODO: no compila
+		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
 	}
 	log_trace(logger, "Se limpian correctamente las entradas de tabla de paginas para el pid %d", pid);
+}
+
+void eliminar_entrada_de_tabla_de_paginas(int pid)
+{
+	// TODO agregar mutex a tabla_de_paginas
+	bool _filtro_paginas_de_memoria_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
+	{
+		return pagina_de_memoria->pid == pid;
+	};
+
+	list_remove_by_condition(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid);
+}
+
+void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
+{
+	bool _filtro_paginas_de_memoria_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
+	{
+		return pagina_de_memoria->pid == pid;
+	};
+
+	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);
 }
 
 void pedir_liberacion_de_bloques_a_filesystem(int posicion_de_swap)
@@ -534,25 +568,18 @@ void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina *victima)
 
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
 {
-	if (pagina->presencia == 1)
-	{
-		return 1;
-	}
-	return 0;
+	return (pagina->presencia == 1) ? 1 : 0;
 }
 
 int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina)
 {
-	if (pagina->modificado == 1)
-	{
-		return 1;
-	}
-	return 0;
+	return (pagina->modificado == 1) ? 1 : 0;
 }
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo()
 {
-	// TODO implementame PORFI
+	t_entrada_de_tabla_de_pagina *pagina_victima = queue_pop_thread_safe(cola_fifo_entradas, &mutex_cola_fifo_entradas);
+	return pagina_victima;
 }
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
@@ -630,6 +657,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		// Actualizar entrada tabla de paginas de la nueva pagina
 		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
 		ocupar_marco(marco_desocupado);
+		
 	}
 	else
 	{
@@ -639,6 +667,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		ocupar_marco(marco_libre);
 	}
 
+	queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
 	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 	return;
 }
@@ -695,12 +724,11 @@ void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
 
 void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_de_marco)
 {
-	// TODO implementar
 	// Cargar datos de la nueva pagina a reemplazar en memoria real
-	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
+    void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
-    // Establecer todos los bytes del marco en cero
-    memset(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
+    // Copiar el contenido de contenido_pagina en fuente
+    memcpy(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
 }
 
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
@@ -767,11 +795,6 @@ void ocupar_marco(int numero_de_marco)
 void liberar_marco(int numero_de_marco)
 {
     bitarray_clean_bit(tabla_de_marcos, numero_de_marco);
-}
-
-int marco_ocupado(int numero_de_marco)
-{
-    return bitarray_test_bit(tabla_de_marcos, numero_de_marco);
 }
 
 void destruir_listas()
