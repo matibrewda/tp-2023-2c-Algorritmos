@@ -28,6 +28,11 @@ t_queue *cola_fifo_entradas = NULL;
 
 // Mutex
 pthread_mutex_t mutex_cola_fifo_entradas;
+pthread_mutex_t mutex_conexion_filesystem;
+pthread_mutex_t mutex_entradas_tabla_de_paginas;
+pthread_mutex_t mutex_procesos_iniciados;
+pthread_mutex_t mutex_memoria_real;
+pthread_mutex_t mutex_tabla_de_marcos;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -101,6 +106,11 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Mutex
 	pthread_mutex_init(&mutex_cola_fifo_entradas, NULL);
+	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
+	pthread_mutex_init(&mutex_entradas_tabla_de_paginas, NULL);
+	pthread_mutex_init(&mutex_procesos_iniciados, NULL);
+	pthread_mutex_init(&mutex_memoria_real, NULL);
+	pthread_mutex_init(&mutex_tabla_de_marcos, NULL);
 
 	// Colas
 	cola_fifo_entradas = queue_create();
@@ -270,11 +280,15 @@ void notificar_escritura_a_filesytem()
 
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
+	pthread_mutex_lock(&mutex_memoria_real);
 	*(uint32_t *)(memoria_real + direccion_fisica) = valor_a_escribir;
+	pthread_mutex_unlock(&mutex_memoria_real);
 
 	int numero_de_marco = obtener_numero_de_marco_desde_direccion_fisica(direccion_fisica);
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->modificado = 1;
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
@@ -287,10 +301,12 @@ int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
-	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego leer el valor usando el puntero "memoria_real"
+	// TODO se debe lockear?
+	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
+
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
-	return 3; // XD
+	return valor_leido;
 }
 
 void enviar_info_de_memoria_inicial_para_cpu()
@@ -350,7 +366,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	iniciar_proceso->pid = pid;
 
 	log_trace(logger, "Intento agregar proceso PID: %d a la lista", pid);
-	list_add(procesos_iniciados, iniciar_proceso);
+	list_add_thread_safe(procesos_iniciados, iniciar_proceso, &mutex_procesos_iniciados);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
 	int cantidad_de_bloques = size / configuracion_memoria->tam_pagina;
@@ -368,6 +384,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	}
 
 	crear_entrada_de_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap, pid);
+	log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>",pid,cantidad_de_bloques);
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 }
 
@@ -424,11 +441,15 @@ void finalizar_proceso_en_memoria(int pid)
 		return;
 	}
 	cerrar_archivo_con_pid(pid);
-
-	// TODO: liberar bloques en swap (CONEXION CON FILESYSTEM)
+	int cantidad_de_bloques = cantidad_de_paginas_proceso(pid);
 	limpiar_entradas_tabla_de_paginas(pid);
+	log_info(logger, "Destruccion - PID: <%d> - Tamanio : <%d>",pid,cantidad_de_bloques);
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 	free(archivo_proceso);
+}
+
+int cantidad_de_paginas_proceso(int pid) {
+	return list_size_thread_safe(obtener_entradas_de_tabla_de_pagina_por_pid(pid),&mutex_entradas_tabla_de_paginas);
 }
 
 t_archivo_proceso *buscar_archivo_con_pid(int pid)
@@ -438,7 +459,7 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid)
 		return archivo_proceso->pid == pid;
 	};
 
-	t_archivo_proceso *resultado = list_find(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id);
+	t_archivo_proceso *resultado = list_find_thread_safe(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, &mutex_procesos_iniciados);
 
 	if (resultado == NULL)
 	{
@@ -461,7 +482,7 @@ void cerrar_archivo_con_pid(int pid)
 		free(archivo_proceso);
 	}
 
-	list_remove_and_destroy_by_condition(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso);
+	list_remove_and_destroy_by_condition_thread_safe(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso, &mutex_procesos_iniciados);
 }
 
 void notificar_lectura_a_filesystem()
@@ -480,24 +501,16 @@ void notificar_escritura_a_filesystem()
 
 t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 {
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
 	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	// TODO bloquear hilo esperando el paquete de respuesta?
-	return recibir_paquete_pedir_bloques_a_filesystem();
-}
 
-t_list *recibir_paquete_pedir_bloques_a_filesystem()
-{
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	t_list *posiciones_swap;
-	if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
-	{
-		int tamanio_buffer;
-		void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-		void *buffer_con_offset = buffer;
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM
+	t_list *posiciones_swap = leer_paquete_respuesta_pedir_bloques_a_filesystem(logger, conexion_con_filesystem);
 
-		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-	}
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
 
 	return posiciones_swap;
 }
@@ -505,15 +518,15 @@ t_list *recibir_paquete_pedir_bloques_a_filesystem()
 void limpiar_entradas_tabla_de_paginas(int pid)
 {
 	t_list *entradas_tabla_de_paginas = obtener_entradas_de_tabla_de_pagina_por_pid(pid);
-	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
+	for (int i = 0; i < list_size_thread_safe(entradas_tabla_de_paginas,&mutex_entradas_tabla_de_paginas); i++)
 	{
-		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
 		eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
 		}
-		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
+		pedir_liberacion_de_bloque_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
 		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
 	}
@@ -528,7 +541,7 @@ void eliminar_entrada_de_tabla_de_paginas(int pid)
 		return pagina_de_memoria->pid == pid;
 	};
 
-	list_remove_by_condition(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid);
+	list_remove_by_condition_thread_safe(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid, &mutex_entradas_tabla_de_paginas);
 }
 
 void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
@@ -541,7 +554,7 @@ void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);
 }
 
-void pedir_liberacion_de_bloques_a_filesystem(int posicion_de_swap)
+void pedir_liberacion_de_bloque_a_filesystem(int posicion_de_swap)
 {
 	t_paquete *paquete = crear_paquete_liberar_bloque_en_filesystem(logger, posicion_de_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -556,8 +569,8 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = malloc(sizeof(t_entrada_de_tabla_de_pagina));
 		entrada_tabla_de_paginas->numero_de_pagina = i;
 		entrada_tabla_de_paginas->presencia = 0;
-		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int *)list_get(posiciones_swap, i)));
-		list_add(tabla_de_paginas, entrada_tabla_de_paginas);
+		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int *)list_get_thread_safe(posiciones_swap, i, &mutex_entradas_tabla_de_paginas)));
+		list_add_thread_safe(tabla_de_paginas, entrada_tabla_de_paginas, &mutex_entradas_tabla_de_paginas);
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
 }
@@ -636,7 +649,7 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 		return pagina_de_memoria->marco == marco && pagina_de_memoria->presencia == 1;
 	};
 
-	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_por_marco_presente);
+	t_entrada_de_tabla_de_pagina *pagina = list_find_thread_safe(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_por_marco_presente, &mutex_entradas_tabla_de_paginas);
 
 	if (pagina == NULL)
 	{
@@ -650,17 +663,18 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 
 void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
-	// TODO hace falta sincronizar
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	// TODO ver donde hacer el free
 	void *contenido_del_bloque = malloc(configuracion_memoria->tam_pagina);
-	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
-	{
-		contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem, configuracion_memoria->tam_pagina);
-	}
+
+	// Recibir
+	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM
+	contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem, configuracion_memoria->tam_pagina);
+
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
 
 	return contenido_del_bloque;
 }
@@ -668,6 +682,7 @@ void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
+	//log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco); TODO ver si este log va
 	if (pagina == NULL)
 	{
 		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(false);
@@ -683,6 +698,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);
 		// Actualizar entrada tabla de paginas de la nueva pagina
 		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
+		log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco);
 		ocupar_marco(marco_desocupado);
 		
 	}
@@ -691,9 +707,11 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
 		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
 		actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
+		log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco);
 		ocupar_marco(marco_libre);
 	}
 
+	free(contenido_en_swap);
 	queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
 	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 	return;
@@ -701,8 +719,11 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 
 void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado)
 {
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->presencia = 1;
 	pagina->marco = marco_asignado;
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
+	
 	return;
 }
 
@@ -711,7 +732,9 @@ void *buscar_contenido_marco(int numero_de_marco)
 	void *contenido_marco = malloc(configuracion_memoria->tam_pagina);
 	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
+	pthread_mutex_lock(&mutex_memoria_real);
 	memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);
+	pthread_mutex_unlock(&mutex_memoria_real);
 
 	return contenido_marco;
 }
@@ -730,8 +753,10 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 	borrar_contenido_de_marco_en_memoria_real(victima->marco);
 
 	// Actualizar entrada tabla de paginas de la victima
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	victima->presencia = 0;
 	victima->modificado = 0;
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	return victima->marco;
 }
@@ -739,8 +764,12 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
 {
 	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
-    // Establecer todos los bytes del marco en cero
-    memset(fuente, 0, configuracion_memoria->tam_pagina);
+
+	pthread_mutex_lock(&mutex_memoria_real);
+	// Establecer todos los bytes del marco en cero
+	memset(fuente, 0, configuracion_memoria->tam_pagina);
+	pthread_mutex_unlock(&mutex_memoria_real);
+    
 	liberar_marco(numero_de_marco);
 }
 
@@ -749,8 +778,10 @@ void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_d
 	// Cargar datos de la nueva pagina a reemplazar en memoria real
     void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
-    // Copiar el contenido de contenido_pagina en fuente
+	pthread_mutex_lock(&mutex_memoria_real);
+	// Copiar el contenido de contenido_pagina en fuente
     memcpy(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
+	pthread_mutex_unlock(&mutex_memoria_real);
 }
 
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
@@ -760,7 +791,7 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 		return pagina_de_memoria->pid == pid && pagina_de_memoria->numero_de_pagina == numero_de_pagina;
 	};
 
-	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid);
+	t_entrada_de_tabla_de_pagina *pagina = list_find_thread_safe(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid, &mutex_entradas_tabla_de_paginas);
 
 	if (pagina == NULL)
 	{
@@ -785,7 +816,7 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 	{
 		numero_marco = pagina->marco;
 	}
-
+	log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco);
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
@@ -796,7 +827,7 @@ int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
 {
     for (int i = 0; i < cantidad_de_frames; ++i)
     {
-        if (!bitarray_test_bit(tabla_de_marcos, i))
+        if (!bitarray_test_bit_thread_safe(tabla_de_marcos, i, &mutex_tabla_de_marcos))
         {
             if (indice_marco_desocupado != NULL)
             {
@@ -811,12 +842,12 @@ int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
 
 void ocupar_marco(int numero_de_marco)
 {
-    bitarray_set_bit(tabla_de_marcos, numero_de_marco);
+    bitarray_set_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
 }
 
 void liberar_marco(int numero_de_marco)
 {
-    bitarray_clean_bit(tabla_de_marcos, numero_de_marco);
+    bitarray_clean_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
 }
 
 void destruir_listas()

@@ -103,9 +103,40 @@ void list_sort_thread_safe(t_list *lista, bool (*comparador)(void *, void *), pt
 	pthread_mutex_unlock(mutex);
 }
 
-void list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex)
+void* list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex)
 {
     pthread_mutex_lock(mutex);
-	list_get(lista, indice);
+	void* resultado = list_get(lista, indice);
 	pthread_mutex_unlock(mutex);
+    return resultado;
+}
+
+int list_size_thread_safe(t_list *lista, pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	int resultado = list_size(lista);
+	pthread_mutex_unlock(mutex);
+    return resultado;
+}
+
+void bitarray_set_bit_thread_safe(t_bitarray *bitarray, int indice, pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	bitarray_set_bit(bitarray, indice);
+	pthread_mutex_unlock(mutex);
+}
+
+void bitarray_clean_bit_thread_safe(t_bitarray *bitarray, int indice, pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	bitarray_clean_bit(bitarray, indice);
+	pthread_mutex_unlock(mutex);
+}
+
+bool bitarray_test_bit_thread_safe(t_bitarray *bitarray, int indice, pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	bool resultado = bitarray_test_bit(bitarray, indice);
+	pthread_mutex_unlock(mutex);
+    return resultado;
 }
