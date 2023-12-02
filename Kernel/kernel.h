@@ -33,7 +33,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_INFO
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -118,5 +118,6 @@ t_recurso *buscar_recurso_por_nombre(char *nombre_recurso);
 bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid);
 void desasignar_recurso_a_pcb(char *nombre_recurso, int pid);
 void desasignar_todos_los_recursos_a_pcb(int pid);
+void log_fin_de_proceso(t_pcb* pcb);
 
 #endif /* KERNEL_H_ */

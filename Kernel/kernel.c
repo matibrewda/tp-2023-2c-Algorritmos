@@ -214,7 +214,9 @@ void *planificador_corto_plazo()
 	{
 		sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
 		t_pcb *pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
-		bool mantener_proceso_ejecutando = false;
+
+		sem_wait(&semaforo_planificador_corto_plazo);
+		bool mantener_proceso_ejecutando = true;
 
 		if (pcb != NULL)
 		{
@@ -238,8 +240,6 @@ void *planificador_corto_plazo()
 
 				t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 				actualizar_pcb(pcb, contexto_de_ejecucion);
-
-				sem_wait(&semaforo_planificador_corto_plazo);
 
 				if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 				{
@@ -304,8 +304,8 @@ void *planificador_corto_plazo()
 				{
 					if (!recurso_existe(nombre_recurso))
 					{
-						log_warning(logger, "PID: %d hace WAIT del recurso inexistente %s!", pcb->pid, nombre_recurso);
-						finalizar_proceso(pcb->pid);
+						pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
+						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 					}
 					else
 					{
@@ -329,13 +329,13 @@ void *planificador_corto_plazo()
 				{
 					if (!recurso_existe(nombre_recurso))
 					{
-						log_warning(logger, "PID: %d hace SIGNAL del recurso inexistente %s!", pcb->pid, nombre_recurso);
-						finalizar_proceso(pcb->pid);
+						pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
+						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 					}
 					else if (!recurso_esta_asignado_a_pcb(nombre_recurso, pcb->pid))
 					{
-						log_warning(logger, "PID: %d hace SIGNAL del recurso %s que NO tenia asignado previamente!", pcb->pid, nombre_recurso);
-						finalizar_proceso(pcb->pid);
+						pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
+						transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 					}
 					else
 					{
@@ -470,7 +470,7 @@ void transicionar_proceso_de_new_a_ready(t_pcb *pcb)
 void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
-	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new);
 	free(pcb);
 }
@@ -499,7 +499,7 @@ void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
-	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	log_fin_de_proceso(pcb);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready);
@@ -531,8 +531,7 @@ void transicionar_proceso_de_executing_a_executing(t_pcb *pcb)
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
-	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
-	pcb_ejecutando = NULL;
+	log_fin_de_proceso(pcb);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
@@ -549,7 +548,7 @@ void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
-	log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
@@ -1184,6 +1183,7 @@ void listar_procesos()
 	}
 
 	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_sleep);
+
 	queue_iterate_thread_safe(cola_bloqueados_pagefault, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_pagefault);
 
 	list_iterate(recursos, (void (*)(void *)) & imprimir_bloqueados_por_recurso_en_consola);
@@ -1205,6 +1205,7 @@ t_pcb *crear_pcb(char *path, int size, int prioridad)
 	pcb->size = size;
 	pcb->quantum_finalizado = false;
 	pcb->id_hilo_quantum = -1;
+	pcb->motivo_finalizacion = FINALIZACION_SUCCESS;
 
 	return pcb;
 }
@@ -1401,8 +1402,11 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 
 	if (recurso->instancias_disponibles <= 0)
 	{
-		t_pcb *pcb_a_desbloquear = queue_pop_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
-		transicionar_proceso(pcb_a_desbloquear, CODIGO_ESTADO_PROCESO_READY);
+		if (!queue_is_empty_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados))
+		{
+			t_pcb *pcb_a_desbloquear = queue_pop_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
+			transicionar_proceso(pcb_a_desbloquear, CODIGO_ESTADO_PROCESO_READY);
+		}
 	}
 }
 
@@ -1418,16 +1422,27 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 		};
 
 		list_remove_by_condition_thread_safe(recurso->pcbs_bloqueados->elements, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_bloqueados);
-	}
-
-	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
-	{
-		t_recurso *recurso = list_get(recursos, i);
 
 		while (recurso_esta_asignado_a_pcb(recurso->nombre, pid))
 		{
 			desasignar_recurso_a_pcb(recurso->nombre, pid);
 		}
+	}
+}
+
+void log_fin_de_proceso(t_pcb *pcb)
+{
+	if (pcb->motivo_finalizacion == FINALIZACION_SUCCESS)
+	{
+		log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	}
+	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_RESOURCE)
+	{
+		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_RESOURCE", pcb->pid);
+	}
+	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_WRITE)
+	{
+		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_WRITE", pcb->pid);
 	}
 }
 

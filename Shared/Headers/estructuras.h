@@ -14,6 +14,7 @@ typedef struct
     int size;
     bool quantum_finalizado;
     int id_hilo_quantum;
+    int motivo_finalizacion;
 
     // Registros del CPU
     int program_counter;
