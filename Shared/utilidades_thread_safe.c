@@ -111,6 +111,14 @@ void* list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex)
     return resultado;
 }
 
+int list_size_thread_safe(t_list *lista, pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	int resultado = list_size(lista);
+	pthread_mutex_unlock(mutex);
+    return resultado;
+}
+
 void bitarray_set_bit_thread_safe(t_bitarray *bitarray, int indice, pthread_mutex_t *mutex)
 {
     pthread_mutex_lock(mutex);
