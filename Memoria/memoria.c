@@ -31,6 +31,7 @@ pthread_mutex_t mutex_cola_fifo_entradas;
 pthread_mutex_t mutex_conexion_filesystem;
 pthread_mutex_t mutex_entradas_tabla_de_paginas;
 pthread_mutex_t mutex_procesos_iniciados;
+pthread_mutex_t mutex_memoria_real;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -107,6 +108,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
 	pthread_mutex_init(&mutex_entradas_tabla_de_paginas, NULL);
 	pthread_mutex_init(&mutex_procesos_iniciados, NULL);
+	pthread_mutex_init(&mutex_memoria_real, NULL);
 
 	// Colas
 	cola_fifo_entradas = queue_create();
@@ -276,11 +278,15 @@ void notificar_escritura_a_filesytem()
 
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
+	pthread_mutex_lock(&mutex_memoria_real);
 	*(uint32_t *)(memoria_real + direccion_fisica) = valor_a_escribir;
+	pthread_mutex_unlock(&mutex_memoria_real);
 
 	int numero_de_marco = obtener_numero_de_marco_desde_direccion_fisica(direccion_fisica);
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->modificado = 1;
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
@@ -293,6 +299,7 @@ int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
+	// TODO se debe lockear?
 	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
 
 	// Retardo de respuesta!
@@ -701,8 +708,11 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 
 void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado)
 {
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->presencia = 1;
 	pagina->marco = marco_asignado;
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
+	
 	return;
 }
 
@@ -711,7 +721,9 @@ void *buscar_contenido_marco(int numero_de_marco)
 	void *contenido_marco = malloc(configuracion_memoria->tam_pagina);
 	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
+	pthread_mutex_lock(&mutex_memoria_real);
 	memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);
+	pthread_mutex_unlock(&mutex_memoria_real);
 
 	return contenido_marco;
 }
@@ -730,8 +742,10 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 	borrar_contenido_de_marco_en_memoria_real(victima->marco);
 
 	// Actualizar entrada tabla de paginas de la victima
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	victima->presencia = 0;
 	victima->modificado = 0;
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	return victima->marco;
 }
@@ -739,8 +753,12 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
 {
 	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
-    // Establecer todos los bytes del marco en cero
-    memset(fuente, 0, configuracion_memoria->tam_pagina);
+
+	pthread_mutex_lock(&mutex_memoria_real);
+	// Establecer todos los bytes del marco en cero
+	memset(fuente, 0, configuracion_memoria->tam_pagina);
+	pthread_mutex_unlock(&mutex_memoria_real);
+    
 	liberar_marco(numero_de_marco);
 }
 
@@ -749,8 +767,10 @@ void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_d
 	// Cargar datos de la nueva pagina a reemplazar en memoria real
     void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
-    // Copiar el contenido de contenido_pagina en fuente
+	pthread_mutex_lock(&mutex_memoria_real);
+	// Copiar el contenido de contenido_pagina en fuente
     memcpy(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
+	pthread_mutex_unlock(&mutex_memoria_real);
 }
 
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina)
