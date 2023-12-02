@@ -413,11 +413,13 @@ t_paquete *crear_paquete_respuesta_abrir_archivo_fs(t_log *logger, bool existe_a
     return paquete;
 }
 
+
 // Filesystem a Memoria
 t_paquete *crear_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(t_log *logger, char *nombre_archivo_a_escribir, int puntero_archivo_a_escribir, int direccion_fisica_a_leer)
 {
     op_code codigo_operacion = SOLICITUD_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'INFO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
