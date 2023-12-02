@@ -91,7 +91,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
+	//crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
 
 	// INICIAR ARCHIVO DE BLOQUES V2
 
