@@ -32,6 +32,7 @@ pthread_mutex_t mutex_conexion_filesystem;
 pthread_mutex_t mutex_entradas_tabla_de_paginas;
 pthread_mutex_t mutex_procesos_iniciados;
 pthread_mutex_t mutex_memoria_real;
+pthread_mutex_t mutex_tabla_de_marcos;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -109,6 +110,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_entradas_tabla_de_paginas, NULL);
 	pthread_mutex_init(&mutex_procesos_iniciados, NULL);
 	pthread_mutex_init(&mutex_memoria_real, NULL);
+	pthread_mutex_init(&mutex_tabla_de_marcos, NULL);
 
 	// Colas
 	cola_fifo_entradas = queue_create();
@@ -816,7 +818,7 @@ int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
 {
     for (int i = 0; i < cantidad_de_frames; ++i)
     {
-        if (!bitarray_test_bit(tabla_de_marcos, i))
+        if (!bitarray_test_bit_thread_safe(tabla_de_marcos, i, &mutex_tabla_de_marcos))
         {
             if (indice_marco_desocupado != NULL)
             {
@@ -831,12 +833,12 @@ int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
 
 void ocupar_marco(int numero_de_marco)
 {
-    bitarray_set_bit(tabla_de_marcos, numero_de_marco);
+    bitarray_set_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
 }
 
 void liberar_marco(int numero_de_marco)
 {
-    bitarray_clean_bit(tabla_de_marcos, numero_de_marco);
+    bitarray_clean_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
 }
 
 void destruir_listas()
