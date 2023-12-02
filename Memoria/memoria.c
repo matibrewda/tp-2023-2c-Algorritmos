@@ -655,7 +655,6 @@ void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 
 	// TODO hace falta sincronizar
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	// TODO ver donde hacer el free
 	void *contenido_del_bloque = malloc(configuracion_memoria->tam_pagina);
 	if (codigo_operacion_recibido == RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM)
 	{
@@ -694,6 +693,7 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 		ocupar_marco(marco_libre);
 	}
 
+	free(contenido_en_swap);
 	queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
 	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 	return;
