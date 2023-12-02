@@ -103,9 +103,10 @@ void list_sort_thread_safe(t_list *lista, bool (*comparador)(void *, void *), pt
 	pthread_mutex_unlock(mutex);
 }
 
-void list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex)
+void* list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex)
 {
     pthread_mutex_lock(mutex);
-	list_get(lista, indice);
+	void* resultado = list_get(lista, indice);
 	pthread_mutex_unlock(mutex);
+    return resultado;
 }

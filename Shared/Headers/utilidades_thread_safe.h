@@ -21,6 +21,6 @@ void list_sort_thread_safe(t_list *lista, bool (*comparador)(void *, void *), pt
 void list_add_thread_safe(t_list *lista, void *elemento, pthread_mutex_t *mutex);
 void list_remove_by_condition_thread_safe(t_list *lista, bool(*filtro)(void*), pthread_mutex_t *mutex);
 void list_iterate_thread_safe(t_list *lista, void(*funcion_elemento)(void*), pthread_mutex_t *mutex);
-void list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex);
+void* list_get_thread_safe(t_list *lista, int indice, pthread_mutex_t *mutex);
 
 #endif /* UTILIDADES_THREAD_SAFE_H_ */

@@ -29,6 +29,8 @@ t_queue *cola_fifo_entradas = NULL;
 // Mutex
 pthread_mutex_t mutex_cola_fifo_entradas;
 pthread_mutex_t mutex_conexion_filesystem;
+pthread_mutex_t mutex_entradas_tabla_de_paginas;
+pthread_mutex_t mutex_procesos_iniciados;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -103,6 +105,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// Mutex
 	pthread_mutex_init(&mutex_cola_fifo_entradas, NULL);
 	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
+	pthread_mutex_init(&mutex_entradas_tabla_de_paginas, NULL);
+	pthread_mutex_init(&mutex_procesos_iniciados, NULL);
 
 	// Colas
 	cola_fifo_entradas = queue_create();
@@ -353,7 +357,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	iniciar_proceso->pid = pid;
 
 	log_trace(logger, "Intento agregar proceso PID: %d a la lista", pid);
-	list_add(procesos_iniciados, iniciar_proceso);
+	list_add_thread_safe(procesos_iniciados, iniciar_proceso, &mutex_procesos_iniciados);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
 	int cantidad_de_bloques = size / configuracion_memoria->tam_pagina;
@@ -440,7 +444,7 @@ t_archivo_proceso *buscar_archivo_con_pid(int pid)
 		return archivo_proceso->pid == pid;
 	};
 
-	t_archivo_proceso *resultado = list_find(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id);
+	t_archivo_proceso *resultado = list_find_thread_safe(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, &mutex_procesos_iniciados);
 
 	if (resultado == NULL)
 	{
@@ -463,7 +467,7 @@ void cerrar_archivo_con_pid(int pid)
 		free(archivo_proceso);
 	}
 
-	list_remove_and_destroy_by_condition(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso);
+	list_remove_and_destroy_by_condition_thread_safe(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso, &mutex_procesos_iniciados);
 }
 
 void notificar_lectura_a_filesystem()
@@ -501,7 +505,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	t_list *entradas_tabla_de_paginas = obtener_entradas_de_tabla_de_pagina_por_pid(pid);
 	for (int i = 0; i < list_size(entradas_tabla_de_paginas); i++)
 	{
-		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get(entradas_tabla_de_paginas, i); // TODO ver si es puntero
+		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
 		eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
@@ -522,7 +526,7 @@ void eliminar_entrada_de_tabla_de_paginas(int pid)
 		return pagina_de_memoria->pid == pid;
 	};
 
-	list_remove_by_condition(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid);
+	list_remove_by_condition_thread_safe(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid, &mutex_entradas_tabla_de_paginas);
 }
 
 void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
@@ -550,8 +554,8 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = malloc(sizeof(t_entrada_de_tabla_de_pagina));
 		entrada_tabla_de_paginas->numero_de_pagina = i;
 		entrada_tabla_de_paginas->presencia = 0;
-		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int *)list_get(posiciones_swap, i)));
-		list_add(tabla_de_paginas, entrada_tabla_de_paginas);
+		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int *)list_get_thread_safe(posiciones_swap, i, &mutex_entradas_tabla_de_paginas)));
+		list_add_thread_safe(tabla_de_paginas, entrada_tabla_de_paginas, &mutex_entradas_tabla_de_paginas);
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
 }
@@ -630,7 +634,7 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 		return pagina_de_memoria->marco == marco && pagina_de_memoria->presencia == 1;
 	};
 
-	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_por_marco_presente);
+	t_entrada_de_tabla_de_pagina *pagina = list_find_thread_safe(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_por_marco_presente, &mutex_entradas_tabla_de_paginas);
 
 	if (pagina == NULL)
 	{
@@ -756,7 +760,7 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 		return pagina_de_memoria->pid == pid && pagina_de_memoria->numero_de_pagina == numero_de_pagina;
 	};
 
-	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid);
+	t_entrada_de_tabla_de_pagina *pagina = list_find_thread_safe(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid, &mutex_entradas_tabla_de_paginas);
 
 	if (pagina == NULL)
 	{
