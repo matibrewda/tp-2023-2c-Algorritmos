@@ -234,10 +234,6 @@ void *comunicacion_kernel()
 		default:
 			break;
 		}
-		
-		t_paquete *paquete_para_cpu = crear_paquete(logger, operacion_recibida_kernel);
-		log_debug(logger,"creo un paquete con el codigo de operacion recibido: %s , y se lo devuelvo a",operacion_recibida_kernel, NOMBRE_MODULO_KERNEL);
-		enviar_paquete(logger,conexion_con_kernel,paquete_para_cpu,NOMBRE_MODULO_FILESYSTEM,NOMBRE_MODULO_KERNEL);
 	
 	}
 }
