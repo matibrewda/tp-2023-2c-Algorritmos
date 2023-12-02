@@ -239,8 +239,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
-	liberarDirectorioArray(&directorio);
-	cerrarFAT(fat);
+	//liberarDirectorioArray(&directorio);
+	//cerrarFAT(fat);
 	return EXIT_SUCCESS;
 }
 
