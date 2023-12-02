@@ -5,6 +5,8 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
+#include "fat.h"
+#include "bloque.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
@@ -47,6 +49,7 @@ t_list* archivos;
 
 void *comunicacion_kernel();
 void *comunicacion_memoria();
+
 int crear_archivo (char* nombreNuevoArchivo);
 void truncar_archivo(char* path, int nuevo_tamano);
 uint32_t buscar_bloque_fat(int nro_bloque,char* nombre_archivo);
@@ -66,8 +69,9 @@ char* concatenarRutas(const char* rutaFat, const char* nombreFCB);
 
 
 
+
 // Terminar
-void terminar_filesystem(t_log *logger, t_argumentos_filesystem *argumentos_filesystem, t_config_filesystem *configuracion_filesystem, int socket_kernel, int conexion_con_kernel, int conexion_con_memoria);
+void terminar_filesystem();
 
 
 #endif /* FILESYSTEM_H_ */
