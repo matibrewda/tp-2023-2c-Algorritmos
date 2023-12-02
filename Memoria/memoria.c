@@ -270,11 +270,19 @@ void notificar_escritura_a_filesytem()
 
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
-	// TO DO: usando la direccion fisica, averiguar el numero de marco y desplazamiento, y luego escribir el valor usando el puntero "memoria_real"
 	*(uint32_t *)(memoria_real + direccion_fisica) = valor_a_escribir;
-	// TODO marcar pagina como modificada
+
+	int numero_de_marco = obtener_numero_de_marco_desde_direccion_fisica(direccion_fisica);
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
+	pagina->modificado = 1;
+
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
+}
+
+int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
+{
+	return floor(direccion_fisica / configuracion_memoria->tam_pagina);
 }
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
@@ -621,6 +629,25 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	return entradas_tabla_de_pagina;
 }
 
+t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_presente(int marco)
+{
+	bool _filtro_paginas_de_memoria_por_marco_presente(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
+	{
+		return pagina_de_memoria->marco == marco && pagina_de_memoria->presencia == 1;
+	};
+
+	t_entrada_de_tabla_de_pagina *pagina = list_find(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_por_marco_presente);
+
+	if (pagina == NULL)
+	{
+		log_error(logger, "No existe un marco presente en memoria con el numero %d", marco);
+		// TODO ver que notificar aca, es Page Fault? Es un error?
+		return NULL;
+	}
+
+	return pagina;
+}
+
 void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
 	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
@@ -687,11 +714,6 @@ void *buscar_contenido_marco(int numero_de_marco)
 	memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);
 
 	return contenido_marco;
-}
-
-bool existe_un_marco_vacio()
-{
-	// TODO
 }
 
 int reemplazar_pagina(int pid, int numero_de_pagina)
