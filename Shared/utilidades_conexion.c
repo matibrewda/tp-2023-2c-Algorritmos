@@ -274,6 +274,29 @@ void agregar_string_a_paquete(t_log *logger, t_paquete *paquete, char *string, c
 	log_trace(logger, "Se agrego el string '%s' al paquete de origen %s, destino %s, y codigo de operacion %s.", string, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
 }
 
+// Esta función agrega un bloque de datos al stream del buffer del paquete (tamaño del bloque primero, luego el bloque)
+void agregar_void_a_paquete(t_log* logger, t_paquete* paquete, void* data, size_t data_length, const char* nombre_proceso_origen, const char* nombre_proceso_destino, op_code codigo_operacion)
+{
+    if (data == NULL || data_length == 0)
+    {
+        log_trace(logger, "Se está intentando agregar un bloque de datos NULL o de longitud 0 al paquete de origen %s, destino %s, y código de operación %s.", nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+        log_trace(logger, "Se agregará el tamaño del bloque de datos (0) para poder luego deserializarlo al paquete de origen %s, destino %s, y código de operación %s.", nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+        agregar_int_a_paquete(logger, paquete, 0, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+        return;
+    }
+
+    log_trace(logger, "Se agregará un bloque de datos al paquete de origen %s, destino %s, y código de operación %s.", nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+
+    log_trace(logger, "Se agregará el tamaño del bloque de datos %zu para poder luego deserializarlo al paquete de origen %s, destino %s, y código de operación %s.", data_length, nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+    agregar_int_a_paquete(logger, paquete, (int)data_length, nombre_proceso_origen, nombre_proceso_destino, codigo_operacion);
+
+    paquete->buffer->stream = realloc(paquete->buffer->stream, paquete->buffer->size + data_length);
+    memcpy((paquete->buffer->stream) + (paquete->buffer->size), data, data_length);
+    paquete->buffer->size += data_length;
+
+    log_trace(logger, "Se agregó un bloque de datos al paquete de origen %s, destino %s, y código de operación %s.", nombre_proceso_origen, nombre_proceso_destino, nombre_opcode(codigo_operacion));
+}
+
 // Agrega una lista de enteros al stream del buffer del paquete (tamanio de la lista primero, luego cada elemento de la lista en orden)
 void agregar_lista_de_enteros_a_paquete(t_log *logger, t_list *lista, t_paquete *paquete, const char *nombre_proceso_origen, const char *nombre_proceso_destino, op_code codigo_operacion)
 {
@@ -310,7 +333,7 @@ op_code esperar_operacion(t_log *logger, const char *nombre_proceso_que_espera, 
 	}
 
 	log_error(logger, "%s no pudo recibir un codigo de operacion proveniente de %s.", nombre_proceso_que_espera, nombre_proceso_que_manda);
-	exit(EXIT_FAILURE);
+	exit(EXIT_SUCCESS);
 	return -1;
 }
 
@@ -367,7 +390,7 @@ void leer_caracter_desde_buffer_de_paquete(t_log *logger, const char *nombre_pro
 	log_trace(logger, "%s leyo un caracter del paquete ya recibido de operacion %s proveniente de %s y es %c.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando, *caracter);
 }
 
-// Lee un int32 del buffer del paquete, cargandolo en el parametro "entero", y avanza el buffer
+// Lee un int del buffer del paquete, cargandolo en el parametro "entero", y avanza el buffer
 void leer_int_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, int *entero, op_code codigo_operacion)
 {
 	log_trace(logger, "%s intentara leer un entero del paquete ya recibido de operacion %s proveniente de %s.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando);
@@ -376,6 +399,17 @@ void leer_int_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_
 	*buffer_de_paquete_con_offset += sizeof(int);
 
 	log_trace(logger, "%s leyo un entero del paquete ya recibido de operacion %s proveniente de %s y es %d.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando, *entero);
+}
+
+// Lee un sizet del buffer del paquete, cargandolo en el parametro "entero", y avanza el buffer
+void leer_sizet_desde_buffer_de_paquete(t_log *logger, const char *nombre_proceso_que_lee, const char *nombre_proceso_mando, void **buffer_de_paquete_con_offset, size_t *entero, op_code codigo_operacion)
+{
+	log_trace(logger, "%s intentara leer un size_t del paquete ya recibido de operacion %s proveniente de %s.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando);
+
+	memcpy(entero, *buffer_de_paquete_con_offset, sizeof(size_t));
+	*buffer_de_paquete_con_offset += sizeof(size_t);
+
+	log_trace(logger, "%s leyo un size_t del paquete ya recibido de operacion %s proveniente de %s y es %zu.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando, *entero);
 }
 
 // Lee un int32 del buffer del paquete, cargandolo en el parametro "entero", y avanza el buffer
@@ -411,4 +445,31 @@ void leer_string_desde_buffer_de_paquete(t_log *logger, const char *nombre_proce
 	*buffer_de_paquete_con_offset += string_length;
 
 	log_trace(logger, "%s leyo un string del paquete ya recibido de operacion %s proveniente de %s y es '%s'.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando, *string);
+}
+
+// Esta función lee un bloque de datos desde el buffer del paquete y avanza el buffer
+void leer_void_desde_buffer_de_paquete(t_log* logger, const char* nombre_proceso_que_lee, const char* nombre_proceso_mando, void** buffer_de_paquete_con_offset, void** data, size_t* data_length, op_code codigo_operacion)
+{
+    size_t block_length;
+
+    log_trace(logger, "%s intentará leer un bloque de datos del paquete ya recibido de operación %s proveniente de %s.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando);
+
+    log_trace(logger, "%s intentará leer el tamaño del bloque de datos del paquete ya recibido de operación %s proveniente de %s.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando);
+    leer_sizet_desde_buffer_de_paquete(logger, nombre_proceso_que_lee, nombre_proceso_mando, buffer_de_paquete_con_offset, &block_length, codigo_operacion);
+    log_trace(logger, "%s leyó que el tamaño del bloque de datos a leer del paquete ya recibido de operación %s proveniente de %s es de %zu bytes.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando, block_length);
+
+    if (block_length == 0)
+    {
+        *data = NULL;
+        *data_length = 0;
+        return;
+    }
+
+    *data = malloc(block_length);
+    memcpy(*data, *buffer_de_paquete_con_offset, block_length);
+    *buffer_de_paquete_con_offset += block_length;
+
+    *data_length = block_length;
+
+    log_trace(logger, "%s leyó un bloque de datos del paquete ya recibido de operación %s proveniente de %s.", nombre_proceso_que_lee, nombre_opcode(codigo_operacion), nombre_proceso_mando);
 }
