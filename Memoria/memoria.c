@@ -28,6 +28,12 @@ t_queue *cola_fifo_entradas = NULL;
 
 // Mutex
 pthread_mutex_t mutex_cola_fifo_entradas;
+pthread_mutex_t mutex_conexion_cpu;
+pthread_mutex_t mutex_conexion_kernel;
+pthread_mutex_t mutex_conexion_filesystem;
+
+// Semaforos
+sem_t semaforo_pedir_bloques_a_filesystem;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -99,8 +105,14 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
+	// Semaforos
+	sem_init(&semaforo_pedir_bloques_a_filesystem, false, 0);
+
 	// Mutex
 	pthread_mutex_init(&mutex_cola_fifo_entradas, NULL);
+	pthread_mutex_init(&mutex_conexion_cpu, NULL);
+	pthread_mutex_init(&mutex_conexion_kernel, NULL);
+	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
 
 	// Colas
 	cola_fifo_entradas = queue_create();
@@ -288,7 +300,7 @@ int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
 uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
 	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
-	
+
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return valor_leido;
@@ -426,7 +438,6 @@ void finalizar_proceso_en_memoria(int pid)
 	}
 	cerrar_archivo_con_pid(pid);
 
-	// TODO: liberar bloques en swap (CONEXION CON FILESYSTEM)
 	limpiar_entradas_tabla_de_paginas(pid);
 	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 	free(archivo_proceso);
@@ -483,22 +494,31 @@ t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
 {
 	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	// TODO bloquear hilo esperando el paquete de respuesta?
+
+	// Bloquear el hilo hasta que haya respuesta para que no se pidan bloques simultaneamente
+    sem_wait(&semaforo_pedir_bloques_a_filesystem);
+
 	return recibir_paquete_pedir_bloques_a_filesystem();
 }
 
 t_list *recibir_paquete_pedir_bloques_a_filesystem()
 {
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-	t_list *posiciones_swap;
-	if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
-	{
-		int tamanio_buffer;
-		void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-		void *buffer_con_offset = buffer;
+	t_list *posiciones_swap = NULL;
+	while (true)
+    {
+        op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
+        if (codigo_operacion_recibido == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
+        {
+            int tamanio_buffer;
+            void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+            void *buffer_con_offset = buffer;
 
-		posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
-	}
+            posiciones_swap = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, buffer_con_offset, RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM);
+            sem_post(&semaforo_pedir_bloques_a_filesystem);
+
+			break;
+        }
+    }
 
 	return posiciones_swap;
 }
@@ -514,7 +534,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
 		}
-		pedir_liberacion_de_bloques_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
+		pedir_liberacion_de_bloque_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
 		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
 	}
@@ -542,7 +562,7 @@ void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);
 }
 
-void pedir_liberacion_de_bloques_a_filesystem(int posicion_de_swap)
+void pedir_liberacion_de_bloque_a_filesystem(int posicion_de_swap)
 {
 	t_paquete *paquete = crear_paquete_liberar_bloque_en_filesystem(logger, posicion_de_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);

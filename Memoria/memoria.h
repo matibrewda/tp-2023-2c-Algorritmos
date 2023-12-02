@@ -64,7 +64,7 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 
 // Finalizar proceso
 void finalizar_proceso_en_memoria(int pid);
-void pedir_liberacion_de_bloques_a_filesystem();
+void pedir_liberacion_de_bloque_a_filesystem();
 void limpiar_entradas_tabla_de_paginas(int pid);
 void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_entrada_de_tabla_de_paginas(int pid);
