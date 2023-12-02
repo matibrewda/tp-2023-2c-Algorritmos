@@ -80,6 +80,7 @@ void cerrar_archivo_con_pid(int pid);
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina);
 t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid);
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
+t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_presente(int marco);
 
 // Manejo de Paginas
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina);
@@ -97,6 +98,7 @@ int obtener_primer_marco_desocupado(int *indice_marco_desocupado);
 void* buscar_contenido_marco(int numero_de_marco);
 void ocupar_marco(int numero_de_marco);
 void liberar_marco(int numero_de_marco);
+int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica);
 
 // Terminar
 void destruir_listas();
