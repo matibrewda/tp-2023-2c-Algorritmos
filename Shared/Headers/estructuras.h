@@ -14,6 +14,8 @@ typedef struct
     int size;
     bool quantum_finalizado;
     int id_hilo_quantum;
+    int motivo_finalizacion;
+    char* ultimo_recurso_pedido;
 
     // Registros del CPU
     int program_counter;
@@ -111,6 +113,7 @@ typedef struct
     bool finalizado;
     int *recursos_asignados;
     int *solicitudes_actuales;
+    char* ultimo_recurso_pedido;
 } t_pcb_analisis_deadlock;
 
 typedef struct
