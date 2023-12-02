@@ -207,14 +207,17 @@ t_paquete* crear_paquete_para_filesystem(op_code codigo,uint32_t puntero , uint3
     return paquete;
 }
 
-void deserializar_paquete_filesystem(t_buffer* buffer, uint32_t* puntero , uint32_t* tamanio, double* direccion_fisica,char* nombre){
+t_mensaje_filesystem* deserializar_paquete_filesystem(t_buffer* buffer){
     void *stream = buffer->stream;
+    t_mensaje_filesystem* mensaje_filesystem = malloc(sizeof(t_mensaje_filesystem));
     uint32_t tamaniochar;
-    memcpy(puntero,stream,sizeof(uint32_t));
-    memcpy(tamanio,stream+sizeof(uint32_t),sizeof(uint32_t));
-    memcpy(direccion_fisica,stream+sizeof(uint32_t)+sizeof(uint32_t),sizeof(double));
-    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double),tamaniochar,sizeof(uint32_t));
-    memcpy(stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double)+sizeof(uint32_t),nombre,tamaniochar);
+    memcpy(&mensaje_filesystem->puntero,stream,sizeof(uint32_t));
+    memcpy(&mensaje_filesystem->tamanio,stream+sizeof(uint32_t),sizeof(uint32_t));
+    memcpy(&mensaje_filesystem->direccion_fisica,stream+sizeof(uint32_t)+sizeof(uint32_t),sizeof(double));
+    memcpy(&tamaniochar,stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double),sizeof(uint32_t));
+    mensaje_filesystem->nombre_archivo = malloc(tamaniochar);
+    memcpy(&mensaje_filesystem->nombre_archivo,stream+sizeof(uint32_t)+sizeof(uint32_t)+sizeof(double)+sizeof(uint32_t),tamaniochar);
+    return mensaje_filesystem;
 }
 
 

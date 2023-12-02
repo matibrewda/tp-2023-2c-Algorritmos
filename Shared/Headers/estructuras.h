@@ -87,4 +87,11 @@ typedef struct
     int tiempo_sleep;
 } t_bloqueo_sleep;
 
+typedef struct {
+    uint32_t puntero; 
+    uint32_t tamanio; 
+    double direccion_fisica; 
+    char* nombre_archivo;
+} t_mensaje_filesystem; 
+
 #endif /* ESTRUCTURAS_H_ */
