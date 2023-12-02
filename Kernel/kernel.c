@@ -10,6 +10,7 @@ char *aux_pids_cola;
 bool planifico_con_round_robin = false;
 bool planifico_con_prioridades = false;
 int id_hilo_quantum = 0;
+bool en_deadlock = false;
 
 // Recursos
 t_list *recursos;
@@ -312,15 +313,18 @@ void *planificador_corto_plazo()
 						t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
 						recurso_para_wait->instancias_disponibles--;
 						log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
-						list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
+
 						if (recurso_para_wait->instancias_disponibles < 0)
 						{
 							transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+							pcb->ultimo_recurso_pedido = recurso_para_wait->nombre;
 							queue_push_thread_safe(recurso_para_wait->pcbs_bloqueados, pcb, &recurso_para_wait->mutex_pcbs_bloqueados);
 							log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
+							hay_deadlock();
 						}
 						else
 						{
+							list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
 							mantener_proceso_ejecutando = true;
 						}
 					}
@@ -504,6 +508,8 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready);
 	free(pcb);
+	if (en_deadlock)
+		hay_deadlock();
 	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
@@ -535,6 +541,8 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
+	if (en_deadlock)
+		hay_deadlock();
 	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
@@ -554,6 +562,8 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
+	if (en_deadlock)
+		hay_deadlock();
 	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
@@ -637,7 +647,7 @@ void consola()
 		do
 		{
 			valor_ingresado_por_teclado = readline("KERNEL> ");
-		} while (valor_ingresado_por_teclado == NULL);
+		} while (!valor_ingresado_por_teclado);
 
 		log_trace(logger, "Valor ingresado por consola: %s", valor_ingresado_por_teclado);
 
@@ -860,7 +870,7 @@ void detener_planificacion()
 
 void modificar_grado_max_multiprogramacion(int grado_multiprogramacion)
 {
-	// TO DO
+	// TODO
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -1206,6 +1216,7 @@ t_pcb *crear_pcb(char *path, int size, int prioridad)
 	pcb->quantum_finalizado = false;
 	pcb->id_hilo_quantum = -1;
 	pcb->motivo_finalizacion = FINALIZACION_SUCCESS;
+	pcb->ultimo_recurso_pedido = NULL;
 
 	return pcb;
 }
@@ -1405,6 +1416,7 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		if (!queue_is_empty_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados))
 		{
 			t_pcb *pcb_a_desbloquear = queue_pop_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
+			list_add_thread_safe(recurso->pcbs_asignados, pcb_a_desbloquear, &recurso->mutex_pcbs_asignados);
 			transicionar_proceso(pcb_a_desbloquear, CODIGO_ESTADO_PROCESO_READY);
 		}
 	}
@@ -1446,192 +1458,235 @@ void log_fin_de_proceso(t_pcb *pcb)
 	}
 }
 
-// t_list *obtener_procesos_analisis_deadlock()
-// {
-// 	t_list *resultado = list_create();
-// 	t_pcb *pcb;
-// 	t_pcb_analisis_deadlock *pcb_a_analizar_existente;
-// 	t_pcb_analisis_deadlock *pcb_a_analizar_nuevo;
-// 	t_recurso *recurso;
-// 	t_list_iterator *iterador_pcbs_asignados;
-// 	t_list_iterator *iterador_pcbs_bloqueados;
-// 	int i, j;
-// 	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+t_list *obtener_procesos_analisis_deadlock()
+{
+	t_list *resultado = list_create();
+	t_pcb *pcb;
+	t_pcb_analisis_deadlock *pcb_a_analizar_existente;
+	t_pcb_analisis_deadlock *pcb_a_analizar_nuevo;
+	t_recurso *recurso;
+	t_list_iterator *iterador_pcbs_asignados;
+	t_list_iterator *iterador_pcbs_bloqueados;
+	int i, j;
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
 
-// 	bool _filtro_pcb_por_id(t_pcb * unpcb)
-// 	{
-// 		return unpcb->pid == pcb->pid;
-// 	};
+	bool _filtro_pcb_por_id(t_pcb * unpcb)
+	{
+		return unpcb->pid == pcb->pid;
+	};
 
-// 	for (i = 0; i < cantidad_de_recursos; i++)
-// 	{
-// 		recurso = list_get(recursos, i);
-// 		iterador_pcbs_asignados = list_iterator_create(recurso->pcbs_asignados);
+	for (i = 0; i < cantidad_de_recursos; i++)
+	{
+		recurso = list_get(recursos, i);
+		iterador_pcbs_asignados = list_iterator_create(recurso->pcbs_asignados);
 
-// 		while (list_iterator_has_next(iterador_pcbs_asignados))
-// 		{
-// 			pcb = list_iterator_next(iterador_pcbs_asignados);
-// 			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
+		while (list_iterator_has_next(iterador_pcbs_asignados))
+		{
+			pcb = list_iterator_next(iterador_pcbs_asignados);
+			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
 
-// 			if (pcb_a_analizar_existente == NULL)
-// 			{
-// 				pcb_a_analizar_nuevo = malloc(sizeof(t_pcb_analisis_deadlock));
+			if (pcb_a_analizar_existente == NULL)
+			{
+				pcb_a_analizar_nuevo = malloc(sizeof(t_pcb_analisis_deadlock));
 
-// 				pcb_a_analizar_nuevo->finalizado = false;
-// 				pcb_a_analizar_nuevo->pid = pcb->pid;
-// 				pcb_a_analizar_nuevo->recursos_asignados = malloc(cantidad_de_recursos * sizeof(int));
-// 				pcb_a_analizar_nuevo->solicitudes_actuales = malloc(cantidad_de_recursos * sizeof(int));
+				pcb_a_analizar_nuevo->finalizado = false;
+				pcb_a_analizar_nuevo->pid = pcb->pid;
+				pcb_a_analizar_nuevo->recursos_asignados = malloc(cantidad_de_recursos * sizeof(int));
+				pcb_a_analizar_nuevo->solicitudes_actuales = malloc(cantidad_de_recursos * sizeof(int));
+				pcb_a_analizar_nuevo->ultimo_recurso_pedido = pcb->ultimo_recurso_pedido;
 
-// 				for (j = 0; j < cantidad_de_recursos; j++)
-// 				{
-// 					pcb_a_analizar_nuevo->recursos_asignados[j] = 0;
-// 					pcb_a_analizar_nuevo->solicitudes_actuales[j] = 0;
-// 				}
+				for (j = 0; j < cantidad_de_recursos; j++)
+				{
+					pcb_a_analizar_nuevo->recursos_asignados[j] = 0;
+					pcb_a_analizar_nuevo->solicitudes_actuales[j] = 0;
+				}
 
-// 				pcb_a_analizar_nuevo->recursos_asignados[i]++;
+				pcb_a_analizar_nuevo->recursos_asignados[i]++;
 
-// 				list_add(resultado, pcb_a_analizar_nuevo);
-// 			}
-// 			else
-// 			{
-// 				pcb_a_analizar_existente->recursos_asignados[i]++;
-// 			}
-// 		}
-// 		list_iterator_destroy(iterador_pcbs_asignados);
-// 	}
+				list_add(resultado, pcb_a_analizar_nuevo);
+			}
+			else
+			{
+				pcb_a_analizar_existente->recursos_asignados[i]++;
+			}
+		}
+		list_iterator_destroy(iterador_pcbs_asignados);
+	}
 
-// 	for (i = 0; i < cantidad_de_recursos; i++)
-// 	{
-// 		recurso = list_get(recursos, i);
-// 		iterador_pcbs_bloqueados = list_iterator_create(recurso->pcbs_bloqueados->elements);
-// 		while (list_iterator_has_next(iterador_pcbs_bloqueados))
-// 		{
-// 			pcb = list_iterator_next(iterador_pcbs_bloqueados);
-// 			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
+	for (i = 0; i < cantidad_de_recursos; i++)
+	{
+		recurso = list_get(recursos, i);
+		iterador_pcbs_bloqueados = list_iterator_create(recurso->pcbs_bloqueados->elements);
+		while (list_iterator_has_next(iterador_pcbs_bloqueados))
+		{
+			pcb = list_iterator_next(iterador_pcbs_bloqueados);
+			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
 
-// 			if (pcb_a_analizar_existente != NULL)
-// 			{
-// 				pcb_a_analizar_existente->solicitudes_actuales[i]++;
-// 			}
-// 		}
-// 		list_iterator_destroy(iterador_pcbs_bloqueados);
-// 	}
+			if (pcb_a_analizar_existente != NULL)
+			{
+				pcb_a_analizar_existente->solicitudes_actuales[i]++;
+			}
+		}
+		list_iterator_destroy(iterador_pcbs_bloqueados);
+	}
 
-// 	return resultado;
-// }
+	return resultado;
+}
 
-// int *obtener_vector_recursos_disponibles()
-// {
-// 	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
-// 	int *recursos_disponibles = (int *)malloc(cantidad_de_recursos * sizeof(int));
+int *obtener_vector_recursos_disponibles()
+{
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+	int *recursos_disponibles = (int *)malloc(cantidad_de_recursos * sizeof(int));
 
-// 	for (int i = 0; i < cantidad_de_recursos; i++)
-// 	{
-// 		t_recurso *recurso = list_get(recursos, i);
-// 		recursos_disponibles[i] = recurso->instancias_disponibles;
-// 	}
+	for (int i = 0; i < cantidad_de_recursos; i++)
+	{
+		t_recurso *recurso = list_get(recursos, i);
+		recursos_disponibles[i] = recurso->instancias_disponibles;
+	}
 
-// 	return recursos_disponibles;
-// }
+	return recursos_disponibles;
+}
 
-// // TODO: chequear frees!
-// // free(recursos_disponibles);
-// // list_destroy(procesos_a_analizar);
-// void analisis_deadlock()
-// {
-// 	int *recursos_totales = configuracion_kernel->instancias_recursos;
-// 	int *recursos_disponibles = obtener_vector_recursos_disponibles();
-// 	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
-// 	bool finalice_alguno = true;
-// 	t_list_iterator *iterador_procesos_a_analizar;
-// 	t_pcb_analisis_deadlock *pcb_analisis_deadlock;
-// 	int cantidad_procesos_a_analizar = list_size(procesos_a_analizar);
-// 	int cantidad_iteraciones_realizadas = 0;
-// 	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+bool hay_deadlock()
+{
+	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK");
 
-// 	// INICIO LOGUEO
-// 	loguear_vector(recursos_totales, cantidad_de_recursos, "RECURSOS TOTALES", -1);
-// 	loguear_vector(recursos_disponibles, cantidad_de_recursos, "RECURSOS DISPONIBLES", -1);
-// 	iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
-// 	while (list_iterator_has_next(iterador_procesos_a_analizar))
-// 	{
-// 		pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
-// 		loguear_vector(pcb_analisis_deadlock->recursos_asignados, cantidad_de_recursos, "RECURSOS DISPONIBLES", pcb_analisis_deadlock->pid);
-// 		loguear_vector(pcb_analisis_deadlock->solicitudes_actuales, cantidad_de_recursos, "SOLICITUDES ACTUALES", pcb_analisis_deadlock->pid);
-// 	}
-// 	list_iterator_destroy(iterador_procesos_a_analizar);
-// 	// FIN LOGUEO
+	int *recursos_totales = configuracion_kernel->instancias_recursos;
+	int *recursos_disponibles = obtener_vector_recursos_disponibles();
+	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
+	bool finalice_alguno = true;
+	t_list_iterator *iterador_procesos_a_analizar;
+	t_pcb_analisis_deadlock *pcb_analisis_deadlock;
+	int cantidad_procesos_a_analizar = list_size(procesos_a_analizar);
+	int cantidad_iteraciones_realizadas = 0;
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+	bool ya_estaba_en_deadlock = en_deadlock;
 
-// 	// INICIO ALGORITMO
-// 	if (list_is_empty(procesos_a_analizar))
-// 	{
-// 		return false;
-// 	}
+	if (list_is_empty(procesos_a_analizar))
+	{
+		return false;
+	}
 
-// 	while (finalice_alguno && cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar)
-// 	{
-// 		finalice_alguno = false;
+	while (finalice_alguno && cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar)
+	{
+		finalice_alguno = false;
+		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
 
-// 		log_info(logger, "ITERACION %d", cantidad_iteraciones_realizadas);
-// 		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
-// 		while (list_iterator_has_next(iterador_procesos_a_analizar) && !finalice_alguno)
-// 		{
-// 			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+		while (list_iterator_has_next(iterador_procesos_a_analizar) && !finalice_alguno)
+		{
+			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
 
-// 			if (!pcb_analisis_deadlock->finalizado)
-// 			{
-// 				log_info(logger, "SE PUEDEN SATISFACER LAS SOLICITUDES DE PID %d?", pcb_analisis_deadlock->pid);
+			if (!pcb_analisis_deadlock->finalizado)
+			{
+				bool se_puede_satisfacer_solicitudes = true;
 
-// 				bool se_puede_satisfacer_solicitudes = true;
-// 				for (int i = 0; i < cantidad_de_recursos; i++)
-// 				{
-// 					se_puede_satisfacer_solicitudes = se_puede_satisfacer_solicitudes && recursos_disponibles[i] >= pcb_analisis_deadlock->solicitudes_actuales[i];
-// 				}
+				for (int i = 0; i < cantidad_de_recursos; i++)
+				{
+					se_puede_satisfacer_solicitudes = se_puede_satisfacer_solicitudes && recursos_disponibles[i] >= pcb_analisis_deadlock->solicitudes_actuales[i];
+				}
 
-// 				if (se_puede_satisfacer_solicitudes)
-// 				{
-// 					finalice_alguno = true;
-// 					log_info(logger, "SI!");
+				if (se_puede_satisfacer_solicitudes)
+				{
+					finalice_alguno = true;
+					pcb_analisis_deadlock->finalizado = true;
 
-// 					pcb_analisis_deadlock->finalizado = true;
+					for (int i = 0; i < cantidad_de_recursos; i++)
+					{
+						recursos_disponibles[i] = recursos_disponibles[i] + pcb_analisis_deadlock->recursos_asignados[i];
+					}
+				}
+			}
+		}
+		list_iterator_destroy(iterador_procesos_a_analizar);
 
-// 					for (int i = 0; i < cantidad_de_recursos; i++)
-// 					{
-// 						recursos_disponibles[i] = recursos_disponibles[i] + pcb_analisis_deadlock->recursos_asignados[i];
-// 					}
-// 				}
-// 				else
-// 				{
-// 					log_info(logger, "NO!");
-// 				}
-// 			}
-// 		}
-// 		list_iterator_destroy(iterador_procesos_a_analizar);
+		cantidad_iteraciones_realizadas++;
+	}
 
-// 		loguear_vector(recursos_disponibles, cantidad_de_recursos, "RECURSOS DISPONIBLES", -1);
-// 		cantidad_iteraciones_realizadas++;
-// 	}
+	free(recursos_disponibles);
 
-// 	bool hay_deadlock = cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar;
+	en_deadlock = cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar;
 
-// 	if (hay_deadlock)
-// 	{
-// 		log_info(logger, "HAY DEADLOCK");
+	if (en_deadlock)
+	{
+		printf("\n-");
+		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
+		while (list_iterator_has_next(iterador_procesos_a_analizar))
+		{
+			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+			if (!pcb_analisis_deadlock->finalizado)
+			{
+				char *mensaje_deadlock = malloc(strlen("Deadlock detectado: ") * sizeof(char) + 1);
+				strcpy(mensaje_deadlock, "Deadlock detectado: ");
+				int cantidad_digitos_pid = floor(log10(abs(pcb_analisis_deadlock->pid))) + 1;
+				char pid_string[cantidad_digitos_pid + 1];
+				sprintf(pid_string, "%d", pcb_analisis_deadlock->pid);
+				int tamanio_anterior = strlen(mensaje_deadlock);
+				int tamanio_a_aumentar = strlen(pid_string);
+				mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+				strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), pid_string);
 
-// 		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
-// 		while (list_iterator_has_next(iterador_procesos_a_analizar))
-// 		{
-// 			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
-// 			if (!pcb_analisis_deadlock->finalizado)
-// 			{
-// 				log_info(logger, "PID %d ESTA EN DEADLOCK", pcb_analisis_deadlock->pid);
-// 			}
-// 		}
-// 	}
-// 	else
-// 	{
-// 		log_info(logger, "NO HAY DEADLOCK");
-// 	}
+				tamanio_anterior = strlen(mensaje_deadlock);
+				tamanio_a_aumentar = strlen(" - Recursos en posesion: ") + 1;
+				mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+				strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), " - Recursos en posesion: ");
+				bool agregue_recurso_a_lista_posesion = false;
+				for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+				{
+					t_recurso *recurso = list_get(recursos, i);
 
-// 	return hay_deadlock;
-// }
+					if (recurso_esta_asignado_a_pcb(recurso->nombre, pcb_analisis_deadlock->pid))
+					{
+						tamanio_anterior = strlen(mensaje_deadlock);
+						char *recurso_coma;
+						if (!agregue_recurso_a_lista_posesion)
+						{
+							recurso_coma = malloc(strlen(recurso->nombre) * sizeof(char) + 1);
+							sprintf(recurso_coma, "%s", recurso->nombre);
+							agregue_recurso_a_lista_posesion = true;
+						}
+						else
+						{
+							recurso_coma = malloc(strlen(recurso->nombre) * sizeof(char) + 2);
+							sprintf(recurso_coma, ",%s", recurso->nombre);
+						}
+
+						tamanio_a_aumentar = strlen(recurso_coma);
+						mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+						strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), recurso_coma);
+					}
+				}
+
+				tamanio_anterior = strlen(mensaje_deadlock);
+				tamanio_a_aumentar = strlen(" - Recurso requerido: ") + 1;
+				mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+				strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), " - Recurso requerido: ");
+
+				if (pcb_analisis_deadlock->ultimo_recurso_pedido != NULL)
+				{
+					tamanio_anterior = strlen(mensaje_deadlock);
+					char *ultimorecurso_coma;
+					ultimorecurso_coma = malloc(strlen(pcb_analisis_deadlock->ultimo_recurso_pedido) * sizeof(char) + 1);
+					sprintf(ultimorecurso_coma, "%s", pcb_analisis_deadlock->ultimo_recurso_pedido);
+					tamanio_a_aumentar = strlen(ultimorecurso_coma);
+					mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
+					strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), ultimorecurso_coma);
+				}
+
+				log_info(logger, "%s", mensaje_deadlock);
+				printf("\n%s", mensaje_deadlock);
+
+				free(mensaje_deadlock);
+			}
+		}
+		list_iterator_destroy(iterador_procesos_a_analizar);
+		printf("\n-\n");
+	}
+	else
+	{
+		log_info(logger, "NO HAY DEADLOCK");
+	}
+
+	list_destroy(procesos_a_analizar);
+
+	return en_deadlock;
+}

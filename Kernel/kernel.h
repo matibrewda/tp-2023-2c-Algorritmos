@@ -109,6 +109,7 @@ t_pcb *buscar_pcb_con_pid(int pid);
 t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void push_cola_ready(t_pcb *pcb);
+void log_fin_de_proceso(t_pcb* pcb);
 
 // Recursos
 void crear_recursos();
@@ -118,6 +119,10 @@ t_recurso *buscar_recurso_por_nombre(char *nombre_recurso);
 bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid);
 void desasignar_recurso_a_pcb(char *nombre_recurso, int pid);
 void desasignar_todos_los_recursos_a_pcb(int pid);
-void log_fin_de_proceso(t_pcb* pcb);
+
+// Deadlock
+t_list *obtener_procesos_analisis_deadlock();
+int *obtener_vector_recursos_disponibles();
+bool hay_deadlock();
 
 #endif /* KERNEL_H_ */
