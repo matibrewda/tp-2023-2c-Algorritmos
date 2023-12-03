@@ -369,22 +369,22 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	list_add_thread_safe(procesos_iniciados, iniciar_proceso, &mutex_procesos_iniciados);
 	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
-	// int cantidad_de_bloques = size / configuracion_memoria->tam_pagina;
-	// if (size % configuracion_memoria->tam_pagina != 0)
-	// {
-	// 	cantidad_de_bloques++;
-	// }
+	int cantidad_de_bloques = size / configuracion_memoria->tam_pagina;
+	if (size % configuracion_memoria->tam_pagina != 0)
+	{
+		cantidad_de_bloques++;
+	}
 
-	// t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques);
-	// if (list_is_empty(posiciones_swap))
-	// {
-	// 	log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid);
-	// 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
-	// 	return;
-	// }
+	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques);
+	if (list_is_empty(posiciones_swap))
+	{
+		log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid);
+		enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
+		return;
+	}
 
-	// crear_entrada_de_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap, pid);
-	// log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>",pid,cantidad_de_bloques);
+	crear_entrada_de_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap, pid);
+	log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>",pid,cantidad_de_bloques);
 	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 }
 
