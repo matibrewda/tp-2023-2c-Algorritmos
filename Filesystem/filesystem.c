@@ -1,14 +1,4 @@
 #include "filesystem.h"
-#include "commons/config.h"
-#include "fcb.h"
-#include "fat.h"
-#include "swap.h"
-#include "bloque.h"
-#include "directorio.h"
-
-// Retardo de respuesta! TODO:
-// usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
-// usleep((configuracion_filesystem->retardo_acceso_fat) * 1000);
 
 pthread_t hilo_memoria;
 pthread_t hilo_kernel;
@@ -21,41 +11,14 @@ int socket_kernel = -1;
 int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
-int32_t abrirArchivo(char *pathFCBFolder, char *nombreDeArchivo);
-
-char *concatenarRutas(const char *rutaFat, const char *nombreFCB)
-{
-	// Asegúrate de tener suficiente espacio para ambas cadenas más el carácter nulo
-	size_t longitudTotal = strlen(rutaFat) + strlen(nombreFCB) + 1;
-
-	// Reserva memoria para la nueva cadena
-	char *rutaCompleta = (char *)malloc(longitudTotal);
-
-	// Verifica si la asignación de memoria fue exitosa
-	if (rutaCompleta == NULL)
-	{
-		perror("Error al asignar memoria");
-		exit(EXIT_FAILURE);
-	}
-
-	// Copia la primera cadena en la nueva cadena
-	strcpy(rutaCompleta, rutaFat);
-
-	// Concatena la segunda cadena en la nueva cadena
-	strcat(rutaCompleta, nombreFCB);
-
-	return rutaCompleta;
-}
-
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
 	atexit(terminar_filesystem);
 
-	// Inicializacion
 	logger = crear_logger(RUTA_ARCHIVO_DE_LOGS, NOMBRE_MODULO_FILESYSTEM, LOG_LEVEL);
 	if (logger == NULL)
 	{
-		terminar_filesystem();
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
 
@@ -64,183 +27,47 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	argumentos_filesystem = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_filesystem == NULL)
 	{
-		terminar_filesystem();
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
 
 	configuracion_filesystem = leer_configuracion(logger, argumentos_filesystem->ruta_archivo_configuracion);
-
 	if (configuracion_filesystem == NULL)
 	{
-		terminar_filesystem();
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
 
-	// INICIAR SU FCB
-	// char *ruta_fcb_completa = NULL;
-	// asprintf(&ruta_fcb_completa, "%s/%s", configuracion_filesystem->path_fcb, "Notas1erParcialK9999.fcb");
-	// FCB *fcb = crear_fcb(ruta_fcb_completa);
-	// if (fcb != NULL)
-	// {
-	// 	log_info(logger, "Pude cargar el siguiente archivo fcb");
-	// 	log_info(logger, "Nombre archivo: %s - Tamaño Archivo: %d - Inicio de bloque: %d", fcb->nombre_archivo, fcb->tamanio_archivo, fcb->bloque_inicial);
-	// }
-	// else
-	// {
-	// 	terminar_filesystem();
-	// 	return EXIT_FAILURE;
-	// }
-
-	//crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
-
-// 	// INICIAR ARCHIVO DE BLOQUES V2
-
-// 	crearArchivoDeBloques("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
-
-// 	/* // INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES -- NO NECESARIO, POR EL MOMENTO NO MANEJO LA SWAP.
-
-// 	int blocks_file_checker = iniciarSWAP(logger, configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_swap);
-// 	if (blocks_file_checker == 0)
-// 	{
-// 		log_debug(logger, "FS BLOCKS FILE: BLOCKS FILE con particion SWAP iniciado correctamente.");
-// 	}
-// 	else
-// 		log_debug(logger, "FS BLOCKS FILE: No fue posible iniciar BLOCKS FILE.");
-//  */
-
-// 	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
-
-	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
-	
-	/*
-	if (fat_checker == 0)
-	{
-		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.\n");
-	}
-	else
-		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.\n");
-
-// 	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
-// 	// Nombre: El nombre de archivo, utilizado como ID de archivo.
-// 	// Bloque inicial: El bloque logico inicial, se utilizará en la tabla FAT para buscar su bloque siguiente.
-
-// 	DirectorioArray directorio = inicializarDirectorioArray(logger);
-// 	procesarArchivosEnDirectorio(&directorio, configuracion_filesystem->path_fcb);
-
-// 	// Utilizar el array de directorios como desees
-// 	for (size_t i = 0; i < directorio.cantidadDirectorios; i++)
-// 	{
-// 		printf("Nombre: %s, Bloque Inicial: %u\n", directorio.directorios[i].nombreArchivo, directorio.directorios[i].numBloqueInicial);
-// 	}
-
-// 	// Liberar la memoria utilizada por el array de directorios, al final, al terminar filesystem.
-
-// 	// prueba asignar bloques
-// 	FATEntry *fat = abrirFAT(configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap);
-
-// 	// Prueba del contenido de cada ENTRADA FAT
-
-// 	printf("Mostrando tabla FAT inicial\n"); // Luego borrar esta linea!
-// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-// 	{
-// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-// 	}
-
-// 	char *ruta = concatenarRutas(configuracion_filesystem->path_fcb, "Notas1erParcialK9999.fcb");
-// 	BLOQUE **bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
-
-// 	printf("Mostrando tabla BLOQUES inicial\n"); // Luego borrar esta linea!
-// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-// 	{
-// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-// 	}
-
-// 	// Prueba de CREAR ARCHIVO
-// 	// Caso 1) No existe:
-// 	abrirArchivo(configuracion_filesystem->path_fcb, "ArchivoPepito");
-// 	// Caso 2) Existe:
-// 	abrirArchivo(configuracion_filesystem->path_fcb, "estadisticas");
-
-// 	// modificarBloque (configuracion_filesystem->path_bloques,configuracion_filesystem->tam_bloques);
-// 	asignarBloques(configuracion_filesystem->path_fat, "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", ruta, bloques, fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
-
-// 	printf("Mostrando tabla FAT post modificacion\n"); // Luego borrar esta linea!
-
-// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-// 	{
-// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-// 	}
-
-// 	printf("Mostrando tabla BLOQUES post modificacion\n"); // Luego borrar esta linea!
-// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-// 	{
-// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-// 	}
-
-// 	eliminarBloques(configuracion_filesystem->path_fat, ruta, configuracion_filesystem->path_bloques, fat, bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
-
-// 	printf("Mostrando tabla FAT post eliminacion de bloques\n");
-// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-// 	{
-// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-// 	}
-
-// 	printf("Mostrando tabla BLOQUES post eliminacion de bloques\n");
-// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-// 	{
-// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-// 	}
-
-// 	// liberar memoria!
-// 	// PRUEBA DE TRUNCAR truncar_archivo
-
-// 	asignarBloques(configuracion_filesystem->path_fat, "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb", bloques, fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
-
-// 	truncar_archivo("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb", 2, configuracion_filesystem, fat, bloques);
-
-// 	printf("Mostrando tabla FAT post truncamiento\n");
-// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-// 	{
-// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-// 	}
-
-	printf("Mostrando tabla BLOQUES post truncamiento\n");
-	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-	{
-		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-	}
-*/
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
 	{
-		terminar_filesystem();
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
 
 	conexion_con_memoria = crear_socket_cliente(logger, configuracion_filesystem->ip_memoria, configuracion_filesystem->puerto_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 	if (conexion_con_memoria == -1)
 	{
-		terminar_filesystem();
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
 
 	conexion_con_kernel = esperar_conexion_de_cliente(logger, socket_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (conexion_con_kernel == -1)
 	{
-		terminar_filesystem();
+		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
 	}
 
+	inicializar_archivo_de_bloques();
+	inicializar_fat();
+
 	pthread_create(&hilo_kernel, NULL, comunicacion_kernel, NULL);
 	pthread_create(&hilo_memoria, NULL, comunicacion_memoria, NULL);
-
 	pthread_join(hilo_kernel, NULL);
 	pthread_join(hilo_memoria, NULL);
 
-	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
-	//liberarDirectorioArray(&directorio);
-	//cerrarFAT(fat);
 	return EXIT_SUCCESS;
 }
 
@@ -248,9 +75,12 @@ void terminar_filesystem()
 {
 	if (logger != NULL)
 	{
-		log_warning(logger, "Algo salio mal!");
-		log_warning(logger, "Finalizando %s", NOMBRE_MODULO_FILESYSTEM);
+		log_debug(logger, "Finalizando %s", NOMBRE_MODULO_FILESYSTEM);
 	}
+
+	destruir_logger(logger);
+	destruir_argumentos(argumentos_filesystem);
+	destruir_configuracion(configuracion_filesystem);
 
 	if (socket_kernel != -1)
 	{
@@ -275,52 +105,22 @@ void *comunicacion_memoria()
 		op_code operacion_recibida_memoria = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 		log_debug(logger, "se recibió la operacion %s de %s", nombre_opcode(operacion_recibida_memoria), NOMBRE_MODULO_MEMORIA);
 
-		if (operacion_recibida_memoria == SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM)
+		switch (operacion_recibida_memoria)
 		{
-			log_trace(logger, "Se recibio una orden de %s.", NOMBRE_MODULO_MEMORIA);
+		case SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM:
 
-			int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria);
+			break;
+		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
 
-			// TO DO (LUCIANO)
-			// t_list* lista_bloques_libres
-			// SI NO ENCUENTRO LA CANTIDAD DE BLOQUES LIBRES QUE ME PIDIERON, devuelvo lista vacia
+			break;
+		case SOLICITUD_CONTENIDO_BLOQUE_EN_FILESYSTEM:
 
-			// t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_fs(logger, lista_bloques); // TODO: (JULI)
-			//  enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA); // TODO: (JULI)
-		}
-		else if (operacion_recibida_memoria == SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM)
-		{
-			log_trace(logger, "Se recibio una orden de %s", NOMBRE_MODULO_MEMORIA);
+			break;
+		case SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP:
 
-			// t_list* bloques_a_liberar = leer_paquete_solicitud_liberar_bloques_de_fs(logger, conexion_con_memoria); // TODO: (JULI)
-
-			// TO DO (LUCIANO)
-			// Iterar lista y marcar cada bloque como libre
-
-			t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-			enviar_paquete(logger, conexion_con_memoria, paquete, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-		}
-		else if (operacion_recibida_memoria == RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA)
-		{
-			t_paquete *paquete_respuesta_leer_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LEER_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-			enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_leer_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-		}
-		else if (operacion_recibida_memoria == RESPUESTA_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM)
-		{
-			char *nombre_archivo_a_escribir;
-			int puntero_archivo_a_escribir;
-			u_int32_t valor_a_escribir;
-
-			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir, &valor_a_escribir);
-
-			// TO DO: escribir byte en filesystem donde apunte "puntero_archivo_a_escribir" (LUCIANO)
-
-			t_paquete *paquete_respuesta_escribir_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-			enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_escribir_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-		}
-		else
-		{
-			log_trace(logger, "Se recibio una orden desconocida de %s.", NOMBRE_MODULO_KERNEL);
+			break;
+		default:
+			break;
 		}
 	}
 }
@@ -329,86 +129,75 @@ void *comunicacion_kernel()
 {
 	while (true)
 	{
-		int operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
+		op_code operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+
 		log_debug(logger, "se recibio la operacion %s de %s", nombre_opcode(operacion_recibida_kernel), NOMBRE_MODULO_KERNEL);
-
-		if (operacion_recibida_kernel == SOLICITUD_ABRIR_ARCHIVO_FS)
+		switch (operacion_recibida_kernel)
 		{
-			log_trace(logger, "Se recibio una orden de %s para abrir un archivo.", NOMBRE_MODULO_KERNEL);
 
-			char *nombre_archivo_a_abrir = leer_paquete_solicitud_abrir_archivo_fs(logger, conexion_con_kernel);
+		case SOLICITUD_ABRIR_ARCHIVO_FS:
+			char *nombre_abrir = leer_paquete_solicitud_abrir_archivo_fs(logger, conexion_con_kernel);
+			log_debug(logger, "Entramos a F_CREATE");
+			int tam = abrirarchivo(nombre_abrir);
+			if (tam < 0)
+			{
+				t_paquete *respuesta_abrir = crear_paquete_respuesta_abrir_archivo_fs(logger, false, 0);
+				enviar_paquete(logger, conexion_con_kernel, respuesta_abrir, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+			}
+			else
+			{
+				t_paquete *respuesta_abrir = crear_paquete_respuesta_abrir_archivo_fs(logger, true, tam);
+			}
+			break;
 
-			bool existe_archivo = false; // TODO: que contenga info posta (LUCIANO)
-			int tamanio_archivo = 32;	 // TODO: que contenga info posta: si existe, tamanio, si no existe, mandame un -1 (LUCIANO)
+		case SOLICITUD_CREAR_ARCHIVO_FS:
+			char *nombre_crear = leer_paquete_solicitud_crear_archivo_fs(logger, conexion_con_kernel);
+			log_debug(logger, "Entramos a F_CREATE");
+			crear_archivo(nombre_crear);
 
-			t_paquete *paquete_respuesta_abrir_archivo_fs = crear_paquete_respuesta_abrir_archivo_fs(logger, existe_archivo, tamanio_archivo);
-			enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_abrir_archivo_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-		}
-		else if (operacion_recibida_kernel == SOLICITUD_CREAR_ARCHIVO_FS)
-		{
-			log_trace(logger, "Se recibio una orden de %s para crear un archivo.", NOMBRE_MODULO_KERNEL);
+			break;
 
-			char *nombre_archivo_a_crear = leer_paquete_solicitud_crear_archivo_fs(logger, conexion_con_kernel);
+		case SOLICITUD_LEER_ARCHIVO_FS:
+			char **nombre_leer;
+			int *puntero_lectura;
+			int *direccion_fisica_a_escribir;
+			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, nombre_leer, puntero_lectura, direccion_fisica_a_escribir);
+			log_debug(logger, "entramos a f_read");
+			int nro_bloque = *puntero_lectura / configuracion_filesystem->tam_bloques;
+			uint32_t bloque_fat_leer = buscar_bloque_fat(nro_bloque, *nombre_leer);
+			leer_bloque(bloque_fat_leer);
+			break;
+		case SOLICITUD_ESCRIBIR_ARCHIVO_FS:
+			log_debug(logger, "entramos a f_write");
+			char **nombre_escribir;
+			int *puntero_archivo_a_escribir;
+			int *direccion_fisica_a_leer;
+			char *informacion;
+			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, nombre_escribir, puntero_archivo_a_escribir, direccion_fisica_a_leer);
+			int nro_bloque_esc = *puntero_lectura / configuracion_filesystem->tam_bloques;
+			uint32_t bloque_fat = buscar_bloque_fat(nro_bloque_esc, *nombre_leer);
+			escribir_bloque(bloque_fat, informacion);
 
-			// TO DO: crear FCB para archivo de "nombre_archivo" (LUCIANO)
+			break;
 
-			t_paquete *paquete_respuesta_crear_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CREAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-			enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_crear_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-		}
-		else if (operacion_recibida_kernel == SOLICITUD_TRUNCAR_ARCHIVO_FS)
-		{
-			log_trace(logger, "Se recibio una orden de %s para truncar un archivo.", NOMBRE_MODULO_KERNEL);
+		case SOLICITUD_TRUNCAR_ARCHIVO_FS:
 
-			char *nombre_archivo_a_crear;
-			int nuevo_tamanio_archivo;
+			char **nombre_truncar;
+			int *nuevo_tamanio_archivo;
+			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, nombre_truncar, nuevo_tamanio_archivo);
+			log_debug(logger, "entro a f_truncate");
+			truncar_archivo(*nombre_truncar, *nuevo_tamanio_archivo);
+			break;
 
-			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_a_crear, &nuevo_tamanio_archivo);
-
-			// TO DO: crear FCB para archivo de "nombre_archivo" (LUCIANO)
-
-			t_paquete *paquete_respuesta_truncar_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_TRUNCAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-			enviar_paquete(logger, conexion_con_kernel, paquete_respuesta_truncar_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-		}
-		else if (operacion_recibida_kernel == SOLICITUD_LEER_ARCHIVO_FS)
-		{
-			log_trace(logger, "Se recibio una orden de %s para leer un archivo.", NOMBRE_MODULO_KERNEL);
-
-			char *nombre_archivo_a_leer;
-			int puntero_archivo_a_leer;
-			int direccion_fisica_a_escribir;
-
-			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_a_leer, &puntero_archivo_a_leer, &direccion_fisica_a_escribir);
-
-			// TO DO: leer byte de filesystem donde apunta "puntero_archivo_a_leer" (LUCIANO)
-
-			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = malloc(sizeof(t_pedido_escribir_valor_en_memoria));
-			pedido_escribir_valor_en_memoria->valor_a_escribir = 3; // TODO LUCIANO
-			pedido_escribir_valor_en_memoria->direccion_fisica = direccion_fisica_a_escribir;
-			t_paquete *paquete_solicitud_escribir_valor_en_memoria = crear_paquete_solicitud_escribir_valor_en_memoria(logger, pedido_escribir_valor_en_memoria, NOMBRE_MODULO_FILESYSTEM);
-			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_escribir_valor_en_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-		}
-		else if (operacion_recibida_kernel == SOLICITUD_ESCRIBIR_ARCHIVO_FS)
-		{
-			log_trace(logger, "Se recibio una orden de %s para escribir un archivo.", NOMBRE_MODULO_KERNEL);
-
-			char *nombre_archivo_a_escribir;
-			int puntero_archivo_a_escribir;
-			int direccion_fisica_a_leer;
-
-			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir, &direccion_fisica_a_leer);
-
-			t_paquete *paquete_solicitud_leer_valor_en_memoria_desde_filesystem = crear_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, direccion_fisica_a_leer);
-			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_valor_en_memoria_desde_filesystem, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-		}
-		else
-		{
-			log_trace(logger, "Se recibio una orden desconocida de %s.", NOMBRE_MODULO_KERNEL);
+		default:
+			break;
 		}
 	}
 }
 
-int32_t crear_archivo(char *path, char *nombreNuevoArchivo)
+int crear_archivo(char *nombreNuevoArchivo)
 {
+	char *path = configuracion_filesystem->path_fcb;
 	char nombreFormateado[256]; // Asegúrate de que este array es lo suficientemente grande
 	sprintf(nombreFormateado, "%s.fcb", nombreNuevoArchivo);
 	// Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
@@ -425,6 +214,8 @@ int32_t crear_archivo(char *path, char *nombreNuevoArchivo)
 		snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s", path, nombreFormateado);
 
 		guardar_fcb_en_archivo(fcbArchivoNuevo, rutaCompleta);
+		list_add(archivos, fcbArchivoNuevo);
+
 		// Liberar la memoria no utilizada.
 		log_debug(logger, "FS: Archivo FCB, del nuevo archivo, creado correctamente.");
 
@@ -437,51 +228,251 @@ int32_t crear_archivo(char *path, char *nombreNuevoArchivo)
 	return 0;
 }
 
-int32_t abrirArchivo(char *pathFCBFolder, char *nombreDeArchivo)
+/* void ampliar_tamano_archivo(FCB *fcb , t_config *config,int nuevo_tamano) {
+	fcb->tamanio_archivo = nuevo_tamano;
+	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
+	sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
+	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
+} */
+
+void ampliar_tamano_archivo(FCB *fcb, int nuevo_tamano)
 {
-	// Concatenar pathFCBFolder, nombreDeArchivo y la extensión ".fcb"
-	char rutaCompleta[256]; // Asegúrate de que este array sea lo suficientemente grande
-	snprintf(rutaCompleta, sizeof(rutaCompleta), "%s%s.fcb", pathFCBFolder, nombreDeArchivo);
-	int32_t checker = verificarSiExisteFCBdeArchivo(rutaCompleta);
+	// Actualizar tamaño en la estructura FCB
+	int bloques_a_agregar = (nuevo_tamano - (fcb->tamanio_archivo)) / configuracion_filesystem->tam_bloques;
+	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
+	uint32_t bloque_a_leer = fcb->bloque_inicial;
+	int fatfd = open(configuracion_filesystem->path_fat, O_RDWR);
+	uint32_t *entrada_fat = mmap(NULL, tamanio_FAT, PROT_READ | PROT_WRITE, MAP_SHARED, fatfd, 0);
 
-	if (checker == 0)
+	// busco el ultimo bloque del archivo
+	while (entrada_fat[bloque_a_leer] != UINT32_MAX)
 	{
-		FCB *fcb = crear_fcb(rutaCompleta);
-		printf("tamanio_archivo: %i", fcb->tamanio_archivo);
-		return fcb->tamanio_archivo;
+		bloque_a_leer = entrada_fat[bloque_a_leer];
+	}
 
-		log_info(logger, "Abrir Archivo: <%s>", fcb->nombre_archivo);
+	uint32_t ultimo_bloque = bloque_a_leer;
+	bloque_a_leer = 1;
+
+	while (bloques_a_agregar != 0)
+	{
+		if (entrada_fat[bloque_a_leer] == 0)
+		{
+			entrada_fat[ultimo_bloque] = bloque_a_leer;
+			ultimo_bloque = bloque_a_leer;
+			bloques_a_agregar--;
+		}
+		bloque_a_leer++;
+	}
+	entrada_fat[ultimo_bloque] = UINT32_MAX;
+	munmap(entrada_fat, tamanio_FAT);
+	close(fatfd);
+	fcb->tamanio_archivo = nuevo_tamano;
+	// Actualizar tamaño en la configuración
+}
+
+void reducir_tamano_archivo(FCB *fcb, int nuevo_tamano)
+{
+	int bloques_a_quitar = ((fcb->tamanio_archivo) - nuevo_tamano) / configuracion_filesystem->tam_bloques;
+	fcb->tamanio_archivo = nuevo_tamano;
+	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
+	uint32_t bloque_a_leer = fcb->bloque_inicial;
+	int fatfd = open(configuracion_filesystem->path_fat, O_RDWR);
+	uint32_t *entrada_fat = mmap(NULL, tamanio_FAT, PROT_READ | PROT_WRITE, MAP_SHARED, fatfd, 0);
+
+	// busco el ultimo bloque del archivo
+	while (entrada_fat[bloque_a_leer] != UINT32_MAX)
+	{
+		bloque_a_leer = entrada_fat[bloque_a_leer];
+	}
+	uint32_t ultimo_bloque = bloque_a_leer;
+	while (bloques_a_quitar != 0)
+	{
+		bloque_a_leer = 1;
+		while (entrada_fat[bloque_a_leer] != ultimo_bloque)
+			;
+		{
+			bloque_a_leer++;
+		}
+		entrada_fat[ultimo_bloque] = 0; // Libero el ultimo bloque
+		ultimo_bloque = bloque_a_leer;
+		bloques_a_quitar--;
+	}
+	entrada_fat[ultimo_bloque] = UINT32_MAX;
+	munmap(entrada_fat, tamanio_FAT);
+	close(fatfd);
+}
+
+void truncar_archivo(char *nombre, int nuevo_tamano)
+{
+	FCB *fcb = buscar_archivo(nombre);
+	t_config *config;
+	log_debug(logger, "Truncar Archivo: Iniciado.");
+	// BUSCAR RUTA DEL ARCHIVO COMLETAR!!!
+	// Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
+	if (fcb == NULL)
+	{
+		log_debug(logger, "Truncar Archivo: No existe el archivo: <%s>.", nombre);
+		return;
+	}
+	if (nuevo_tamano > fcb->tamanio_archivo)
+	{
+		log_info(logger, "Truncar Archivo: <%s> - Tamaño: <%d>", fcb->nombre_archivo, nuevo_tamano);
+		// Ampliar el tamaño del archivo
+		ampliar_tamano_archivo(fcb, nuevo_tamano);
+		return;
+	}
+	else if (nuevo_tamano < fcb->tamanio_archivo)
+	{
+		log_info(logger, "Truncar Archivo: <%s> - Tamaño: <%d>", fcb->nombre_archivo, nuevo_tamano);
+		// Reducir el tamaño del archivo
+		reducir_tamano_archivo(fcb, nuevo_tamano);
+		return;
+	}
+	// Si el nuevo tamaño es igual al actual, no se requiere acción.
+	return;
+}
+
+void inicializar_fat()
+{
+	FILE *fat;
+	log_debug(logger, "Inicializando Tabla FAT");
+	fat = fopen(configuracion_filesystem->path_fat, "rb");
+	if (!fat)
+	{
+		fat = fopen(configuracion_filesystem->path_fat, "wb");
+		if (fat)
+		{
+			uint32_t a = 0;
+			uint32_t tamanio_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap);
+			for (uint32_t i = 0; i < tamanio_fat; i++)
+			{
+				fwrite(&a, sizeof(uint32_t), 1, fat);
+			}
+		}
+		else
+		{
+			log_debug(logger, "No se pudo crear el archivo FAT");
+		}
 	}
 	else
 	{
-		log_info(logger, "Abrir Archivo: NO EXISTE <%s>", nombreDeArchivo);
-		printf("No existe el archivo.");
+		log_debug(logger, "ya existe el archivo FAT");
+	}
+}
+
+void inicializar_archivo_de_bloques()
+{
+	int fd = open(configuracion_filesystem->path_bloques, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+	int tamanio_bloques = configuracion_filesystem->cant_bloques_total * configuracion_filesystem->tam_bloques;
+	ftruncate(fd, tamanio_bloques);
+	void *ptrblq = mmap(NULL, tamanio_bloques, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	void *bloques = malloc(tamanio_bloques);
+	memcpy(ptrblq, bloques, tamanio_bloques);
+	munmap(ptrblq, tamanio_bloques);
+	free(bloques);
+	close(fd);
+}
+
+void escribir_bloque(uint32_t bloqueFAT, char *informacion)
+{
+	uint32_t bloque_real = configuracion_filesystem->cant_bloques_swap + bloqueFAT;
+	int tamanio_archivo = configuracion_filesystem->cant_bloques_total * configuracion_filesystem->tam_bloques;
+	int byte_inicial = bloque_real * configuracion_filesystem->tam_bloques;
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
+	fseek(archivo_bloques, byte_inicial, SEEK_SET);
+	fwrite(informacion, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
+	fclose(archivo_bloques);
+}
+
+void leer_bloque(uint32_t bloqueFAT)
+{
+	uint32_t bloque_real = configuracion_filesystem->cant_bloques_swap + bloqueFAT;
+	int tamanio_archivo = configuracion_filesystem->cant_bloques_total * configuracion_filesystem->tam_bloques;
+	int byte_a_leer = bloque_real * configuracion_filesystem->tam_bloques;
+	char *informacion = malloc(configuracion_filesystem->tam_bloques);
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
+
+	fseek(archivo_bloques, byte_a_leer, SEEK_SET);
+	fread(informacion, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
+	log_debug(logger, "leo la siguiente info: %s", informacion);
+	fclose(archivo_bloques);
+	solicitar_escribir_memoria(informacion);
+
+	/*int fdab = open(configuracion_filesystem->path_bloques, O_RDWR);
+	char *bloque = mmap(NULL,tamanio_archivo,PROT_READ | PROT_WRITE, MAP_SHARED ,fdab, 0);
+	char *informacion = bloque[bloque_real*configuracion_filesystem->tam_bloques];
+	*/
+	// ENVIAR A MEMORIA DESPUES
+}
+
+int abrirarchivo(char *nombre_archivo)
+{
+	log_info(logger, "Abrir Archivo: %s", nombre_archivo);
+	FCB *fcb = buscar_archivo(nombre_archivo);
+	if (fcb)
+	{
+		log_debug(logger, "Existe el archivo: %s", nombre_archivo);
+		return fcb->tamanio_archivo;
+	}
+	else
+	{
 		return -1;
 	}
 }
 
-int32_t truncar_archivo(char *path, uint32_t nuevo_tamano, t_config_filesystem *configuracion_filesystem, FATEntry fat[], BLOQUE *bloques[])
+FCB *buscar_archivo(char *nombre_archivo)
 {
-
-	// validar que haya espacio en FAT
-	FCB *fcb = crear_fcb(path);
-
-	printf("%d", fcb->tamanio_archivo);
-
-	if (nuevo_tamano > fcb->tamanio_archivo)
+	for (int i = 0; i < list_size(archivos); i++)
 	{
-		uint32_t aSumar = nuevo_tamano - fcb->tamanio_archivo;
-		sumarBloques(configuracion_filesystem->path_fat, configuracion_filesystem->path_bloques, path, fat, bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques, aSumar);
-		fcb->tamanio_archivo = nuevo_tamano;
+		FCB *fcb = list_get(archivos, i);
+		if (fcb != NULL && fcb->nombre_archivo != NULL && strcmp(fcb->nombre_archivo, nombre_archivo) == 0)
+		{
+			return fcb;
+		}
+	}
+	return NULL;
+}
+
+void solicitar_escribir_memoria(char *informacion)
+{
+	t_paquete paquete;
+}
+
+uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo)
+{
+	FCB *fcb = buscar_archivo(nombre_archivo);
+	uint32_t bloque_a_leer = fcb->bloque_inicial;
+	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
+	int fatfd = open(configuracion_filesystem->path_fat, O_RDWR);
+	uint32_t *entrada_fat = mmap(NULL, tamanio_FAT, PROT_READ | PROT_WRITE, MAP_SHARED, fatfd, 0);
+	for (uint32_t i = 0; i < nro_bloque; i++)
+	{
+		log_info(logger, "Acceso FAT - Entrada: <%d> - Valor: <%d>", i, entrada_fat[bloque_a_leer]);
+		bloque_a_leer = entrada_fat[bloque_a_leer];
+	}
+	return bloque_a_leer;
+}
+
+char *concatenarRutas(const char *rutaFat, const char *nombreFCB)
+{
+	// Asegúrate de tener suficiente espacio para ambas cadenas más el carácter nulo
+	size_t longitudTotal = strlen(rutaFat) + strlen(nombreFCB) + 1;
+
+	// Reserva memoria para la nueva cadena
+	char *rutaCompleta = (char *)malloc(longitudTotal);
+
+	// Verifica si la asignación de memoria fue exitosa
+	if (rutaCompleta == NULL)
+	{
+		perror("Error al asignar memoria");
+		exit(EXIT_FAILURE);
 	}
 
-	if (fcb->tamanio_archivo > nuevo_tamano)
-	{
-		uint32_t aRestar = fcb->tamanio_archivo - nuevo_tamano;
-		restarBloques(configuracion_filesystem->path_fat, configuracion_filesystem->path_bloques, path, fat, bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques, aRestar);
-		fcb->tamanio_archivo = nuevo_tamano;
-	}
+	// Copia la primera cadena en la nueva cadena
+	strcpy(rutaCompleta, rutaFat);
 
-	guardar_fcb_en_archivo(fcb, path);
-	log_info(logger, "Truncar Archivo: <%s> - Tamaño: <%d>", fcb->nombre_archivo, nuevo_tamano);
+	// Concatena la segunda cadena en la nueva cadena
+	strcat(rutaCompleta, nombreFCB);
+
+	return rutaCompleta;
 }
