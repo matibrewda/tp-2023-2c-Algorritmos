@@ -91,7 +91,11 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	// 	return EXIT_FAILURE;
 	// }
 
+<<<<<<< HEAD
 // 	crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
+=======
+	//crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
+>>>>>>> desarrollo
 
 // 	// INICIAR ARCHIVO DE BLOQUES V2
 
@@ -110,6 +114,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 // 	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
 
+<<<<<<< HEAD
 // 	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
 // 	if (fat_checker == 0)
 // 	{
@@ -117,6 +122,17 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 // 	}
 // 	else
 // 		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.\n");
+=======
+	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
+	
+	/*
+	if (fat_checker == 0)
+	{
+		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.\n");
+	}
+	else
+		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.\n");
+>>>>>>> desarrollo
 
 // 	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
 // 	// Nombre: El nombre de archivo, utilizado como ID de archivo.
@@ -202,12 +218,21 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 // 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
 // 	}
 
+<<<<<<< HEAD
 // 	printf("Mostrando tabla BLOQUES post truncamiento\n");
 // 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
 // 	{
 // 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
 // 	}
 
+=======
+	printf("Mostrando tabla BLOQUES post truncamiento\n");
+	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
+	{
+		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+	}
+*/
+>>>>>>> desarrollo
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
 	{
@@ -237,8 +262,13 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+<<<<<<< HEAD
 	// liberarDirectorioArray(&directorio);
 	// cerrarFAT(fat);
+=======
+	//liberarDirectorioArray(&directorio);
+	//cerrarFAT(fat);
+>>>>>>> desarrollo
 	return EXIT_SUCCESS;
 }
 
