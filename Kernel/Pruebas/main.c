@@ -293,3 +293,56 @@ t_list *obtener_procesos_analisis_deadlock()
 
 	return resultado;
 }
+
+void debug_deadlock(int cantidad_de_recursos, int *recursos_totales, int *recursos_disponibles, t_list *procesos_a_analizar)
+{
+	t_list_iterator *iterador_procesos_a_analizar;
+	t_pcb_analisis_deadlock *pcb_analisis_deadlock;
+
+	// --
+	crear_string_dinamico();
+	for (int i = 0; i < cantidad_de_recursos; i++)
+	{
+		agregar_entero_a_string_dinamico(recursos_totales[i]);
+		agregar_string_a_string_dinamico(" ");
+	}
+	log_warning(logger, "* VECTOR DE RECURSOS TOTALES: [ %s]", string_dinamico);
+	liberar_string_dinamico();
+	// --
+
+	// --
+	crear_string_dinamico();
+	for (int i = 0; i < cantidad_de_recursos; i++)
+	{
+		agregar_entero_a_string_dinamico(recursos_disponibles[i]);
+		agregar_string_a_string_dinamico(" ");
+	}
+	log_warning(logger, "* VECTOR DE RECURSOS DISPONIBLES: [ %s]", string_dinamico);
+	liberar_string_dinamico();
+	// --
+
+	// --
+	iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
+	while (list_iterator_has_next(iterador_procesos_a_analizar))
+	{
+		pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+		crear_string_dinamico();
+		for (int i = 0; i < cantidad_de_recursos; i++)
+		{
+			agregar_entero_a_string_dinamico(pcb_analisis_deadlock->solicitudes_actuales[i]);
+			agregar_string_a_string_dinamico(" ");
+		}
+		log_warning(logger, "* VECTOR DE PETICIONES ACTUALES PARA PID %d: [%s]", pcb_analisis_deadlock->pid, string_dinamico);
+		liberar_string_dinamico();
+
+		crear_string_dinamico();
+		for (int i = 0; i < cantidad_de_recursos; i++)
+		{
+			agregar_entero_a_string_dinamico(pcb_analisis_deadlock->recursos_asignados[i]);
+			agregar_string_a_string_dinamico(" ");
+		}
+		log_warning(logger, "* VECTOR DE RECURSOS ASIGNADOS PARA PID %d: [%s]", pcb_analisis_deadlock->pid, string_dinamico);
+		liberar_string_dinamico();
+	}
+	// --
+}

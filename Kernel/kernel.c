@@ -6,7 +6,7 @@ t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
 int proximo_pid = 0;
 bool planificacion_detenida = false;
-char *aux_pids_cola;
+char *string_dinamico;
 bool planifico_con_round_robin = false;
 bool planifico_con_prioridades = false;
 int id_hilo_quantum = 0;
@@ -32,6 +32,7 @@ sem_t semaforo_hay_algun_proceso_en_cola_ready;
 sem_t semaforo_planificador_corto_plazo;
 sem_t semaforo_planificador_largo_plazo;
 
+pthread_mutex_t mutex_string_dinamico;
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_bloqueados_sleep;
@@ -123,6 +124,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		sem_init(&semaforo_planificador_largo_plazo, false, 1);
 	}
 
+	pthread_mutex_init(&mutex_string_dinamico, NULL);
 	pthread_mutex_init(&mutex_cola_new, NULL);
 	pthread_mutex_init(&mutex_cola_ready, NULL);
 	pthread_mutex_init(&mutex_cola_bloqueados_sleep, NULL);
@@ -1138,72 +1140,87 @@ const char *nombre_estado_proceso(char codigo_estado_proceso)
 	}
 }
 
-int obtener_nuevo_pid()
+void agregar_pid_a_string_dinamico(t_pcb *pcb)
 {
-	++proximo_pid;
-	return proximo_pid;
-}
-
-void agregar_pid_a_aux_pids_cola(t_pcb *pcb)
-{
-	int cantidad_digitos_pid = floor(log10(abs(pcb->pid))) + 1;
-	char pid_string[cantidad_digitos_pid + 1];
-	sprintf(pid_string, "%d,", pcb->pid);
-	int tamanio_anterior = strlen(aux_pids_cola);
-	int tamanio_a_aumentar = strlen(pid_string);
-	aux_pids_cola = realloc(aux_pids_cola, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-	strcpy(aux_pids_cola + (tamanio_anterior) * sizeof(char), pid_string);
+	agregar_entero_a_string_dinamico(pcb->pid);
+	agregar_string_a_string_dinamico(",");
 }
 
 void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola)
 {
-	aux_pids_cola = malloc(sizeof(char));
-	strcpy(aux_pids_cola, "");
+	crear_string_dinamico();
 
-	queue_iterate_thread_safe(cola, (void (*)(void *)) & agregar_pid_a_aux_pids_cola, mutex_cola);
+	queue_iterate_thread_safe(cola, (void (*)(void *)) & agregar_pid_a_string_dinamico, mutex_cola);
 
-	int tamanio_pids = strlen(aux_pids_cola);
+	int tamanio_pids = strlen(string_dinamico);
 	if (tamanio_pids > 0)
 	{
-		aux_pids_cola[tamanio_pids - 1] = '\0';
+		string_dinamico[tamanio_pids - 1] = '\0';
 	}
 
-	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, aux_pids_cola);
-	free(aux_pids_cola);
+	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, string_dinamico);
+	liberar_string_dinamico();
 }
 
-void imprimir_proceso_en_consola(t_pcb *pcb)
+void agregar_pid_recursos_bloqueados_a_string_dinamico(t_recurso *recurso)
 {
-	printf("Proceso PID: %d - Estado %s\n", pcb->pid, nombre_estado_proceso(pcb->estado));
-}
-
-void imprimir_bloqueados_por_recurso_en_consola(t_recurso *recurso)
-{
-	queue_iterate_thread_safe(recurso->pcbs_bloqueados, (void (*)(void *)) & imprimir_proceso_en_consola, &recurso->mutex_pcbs_bloqueados);
+	queue_iterate_thread_safe(recurso->pcbs_bloqueados, (void (*)(void *)) & agregar_pid_a_string_dinamico, &recurso->mutex_pcbs_bloqueados);
 }
 
 void listar_procesos()
 {
-	queue_iterate_thread_safe(cola_new, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_new);
-	queue_iterate_thread_safe(cola_ready, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_ready);
+	// NEW
+	crear_string_dinamico();
+	queue_iterate_thread_safe(cola_new, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_new);
+	if (strlen(string_dinamico))
+	{
+		string_dinamico[strlen(string_dinamico) - 1] = '\0';
+	}
+	printf("Estado: NEW     - Procesos: %s", string_dinamico);
+	log_info(logger, "Estado: NEW - Procesos: %s", string_dinamico);
+	liberar_string_dinamico();
 
+	// READY
+	crear_string_dinamico();
+	queue_iterate_thread_safe(cola_ready, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_ready);
+	if (strlen(string_dinamico))
+	{
+		string_dinamico[strlen(string_dinamico) - 1] = '\0';
+	}
+	printf("\nEstado: READY   - Procesos: %s", string_dinamico);
+	log_info(logger, "Estado: READY - Procesos: %s", string_dinamico);
+	liberar_string_dinamico();
+
+	// EXECUTING
+	crear_string_dinamico();
 	if (pcb_ejecutando != NULL)
 	{
-		imprimir_proceso_en_consola(pcb_ejecutando);
+		agregar_pid_a_string_dinamico(pcb_ejecutando);
+		string_dinamico[strlen(string_dinamico) - 1] = '\0';
 	}
+	printf("\nEstado: EXEC    - Procesos: %s", string_dinamico);
+	log_info(logger, "Estado: EXEC - Procesos: %s", string_dinamico);
+	liberar_string_dinamico();
 
-	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_sleep);
-
-	queue_iterate_thread_safe(cola_bloqueados_pagefault, (void (*)(void *)) & imprimir_proceso_en_consola, &mutex_cola_bloqueados_pagefault);
-
-	list_iterate(recursos, (void (*)(void *)) & imprimir_bloqueados_por_recurso_en_consola);
+	// BLOCKED
+	crear_string_dinamico();
+	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_sleep);
+	queue_iterate_thread_safe(cola_bloqueados_pagefault, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_pagefault);
+	list_iterate(recursos, (void (*)(void *)) & agregar_pid_recursos_bloqueados_a_string_dinamico);
+	if (strlen(string_dinamico))
+	{
+		string_dinamico[strlen(string_dinamico) - 1] = '\0';
+	}
+	printf("\nEstado: BLOCKED - Procesos: %s\n", string_dinamico);
+	log_info(logger, "Estado: BLOCKED - Procesos: %s", string_dinamico);
+	liberar_string_dinamico();
 }
 
 t_pcb *crear_pcb(char *path, int size, int prioridad)
 {
 	t_pcb *pcb = malloc(sizeof(t_pcb));
 
-	pcb->pid = obtener_nuevo_pid();
+	pcb->pid = ++proximo_pid;
 	pcb->estado = CODIGO_ESTADO_PROCESO_DESCONOCIDO;
 	pcb->program_counter = 1;
 	pcb->registro_ax = 0;
@@ -1536,12 +1553,20 @@ t_list *obtener_procesos_analisis_deadlock()
 int *obtener_vector_recursos_disponibles()
 {
 	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
-	int *recursos_disponibles = (int *)malloc(cantidad_de_recursos * sizeof(int));
+	int *recursos_disponibles = malloc(cantidad_de_recursos * sizeof(int));
 
 	for (int i = 0; i < cantidad_de_recursos; i++)
 	{
 		t_recurso *recurso = list_get(recursos, i);
-		recursos_disponibles[i] = recurso->instancias_disponibles;
+
+		if (recurso->instancias_disponibles < 0)
+		{
+			recursos_disponibles[i] = 0;
+		}
+		else
+		{
+			recursos_disponibles[i] = recurso->instancias_disponibles;
+		}
 	}
 
 	return recursos_disponibles;
@@ -1550,7 +1575,7 @@ int *obtener_vector_recursos_disponibles()
 bool hay_deadlock()
 {
 	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK");
-
+	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
 	int *recursos_totales = configuracion_kernel->instancias_recursos;
 	int *recursos_disponibles = obtener_vector_recursos_disponibles();
 	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
@@ -1559,11 +1584,11 @@ bool hay_deadlock()
 	t_pcb_analisis_deadlock *pcb_analisis_deadlock;
 	int cantidad_procesos_a_analizar = list_size(procesos_a_analizar);
 	int cantidad_iteraciones_realizadas = 0;
-	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
 	bool ya_estaba_en_deadlock = en_deadlock;
 
 	if (list_is_empty(procesos_a_analizar))
 	{
+		log_info(logger, "NO HAY DEADLOCK");
 		return false;
 	}
 
@@ -1601,11 +1626,10 @@ bool hay_deadlock()
 
 		cantidad_iteraciones_realizadas++;
 	}
-
 	free(recursos_disponibles);
-
 	en_deadlock = cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar;
 
+	// INICIO LOG/IMPRIMIR DEADLOCK
 	if (en_deadlock)
 	{
 		printf("\n-");
@@ -1615,20 +1639,11 @@ bool hay_deadlock()
 			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
 			if (!pcb_analisis_deadlock->finalizado)
 			{
-				char *mensaje_deadlock = malloc(strlen("Deadlock detectado: ") * sizeof(char) + 1);
-				strcpy(mensaje_deadlock, "Deadlock detectado: ");
-				int cantidad_digitos_pid = floor(log10(abs(pcb_analisis_deadlock->pid))) + 1;
-				char pid_string[cantidad_digitos_pid + 1];
-				sprintf(pid_string, "%d", pcb_analisis_deadlock->pid);
-				int tamanio_anterior = strlen(mensaje_deadlock);
-				int tamanio_a_aumentar = strlen(pid_string);
-				mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-				strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), pid_string);
+				crear_string_dinamico();
+				agregar_string_a_string_dinamico("Deadlock detectado: ");
+				agregar_entero_a_string_dinamico(pcb_analisis_deadlock->pid);
+				agregar_string_a_string_dinamico(" - Recursos en posesion: ");
 
-				tamanio_anterior = strlen(mensaje_deadlock);
-				tamanio_a_aumentar = strlen(" - Recursos en posesion: ") + 1;
-				mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-				strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), " - Recursos en posesion: ");
 				bool agregue_recurso_a_lista_posesion = false;
 				for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
 				{
@@ -1636,46 +1651,29 @@ bool hay_deadlock()
 
 					if (recurso_esta_asignado_a_pcb(recurso->nombre, pcb_analisis_deadlock->pid))
 					{
-						tamanio_anterior = strlen(mensaje_deadlock);
-						char *recurso_coma;
-						if (!agregue_recurso_a_lista_posesion)
+						if (agregue_recurso_a_lista_posesion)
 						{
-							recurso_coma = malloc(strlen(recurso->nombre) * sizeof(char) + 1);
-							sprintf(recurso_coma, "%s", recurso->nombre);
-							agregue_recurso_a_lista_posesion = true;
+							agregar_string_a_string_dinamico(",");
 						}
 						else
 						{
-							recurso_coma = malloc(strlen(recurso->nombre) * sizeof(char) + 2);
-							sprintf(recurso_coma, ",%s", recurso->nombre);
+							agregue_recurso_a_lista_posesion = true;
 						}
 
-						tamanio_a_aumentar = strlen(recurso_coma);
-						mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-						strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), recurso_coma);
+						agregar_string_a_string_dinamico(recurso->nombre);
 					}
 				}
 
-				tamanio_anterior = strlen(mensaje_deadlock);
-				tamanio_a_aumentar = strlen(" - Recurso requerido: ") + 1;
-				mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-				strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), " - Recurso requerido: ");
+				agregar_string_a_string_dinamico(" - Recurso requerido: ");
 
 				if (pcb_analisis_deadlock->ultimo_recurso_pedido != NULL)
 				{
-					tamanio_anterior = strlen(mensaje_deadlock);
-					char *ultimorecurso_coma;
-					ultimorecurso_coma = malloc(strlen(pcb_analisis_deadlock->ultimo_recurso_pedido) * sizeof(char) + 1);
-					sprintf(ultimorecurso_coma, "%s", pcb_analisis_deadlock->ultimo_recurso_pedido);
-					tamanio_a_aumentar = strlen(ultimorecurso_coma);
-					mensaje_deadlock = realloc(mensaje_deadlock, (tamanio_anterior + tamanio_a_aumentar) * sizeof(char));
-					strcpy(mensaje_deadlock + (tamanio_anterior) * sizeof(char), ultimorecurso_coma);
+					agregar_string_a_string_dinamico(pcb_analisis_deadlock->ultimo_recurso_pedido);
 				}
 
-				log_info(logger, "%s", mensaje_deadlock);
-				printf("\n%s", mensaje_deadlock);
-
-				free(mensaje_deadlock);
+				log_info(logger, "%s", string_dinamico);
+				printf("\n%s", string_dinamico);
+				liberar_string_dinamico();
 			}
 		}
 		list_iterator_destroy(iterador_procesos_a_analizar);
@@ -1685,8 +1683,56 @@ bool hay_deadlock()
 	{
 		log_info(logger, "NO HAY DEADLOCK");
 	}
+	// FIN LOG/IMPRIMIR DEADLOCK
 
 	list_destroy(procesos_a_analizar);
-
 	return en_deadlock;
+}
+
+void crear_string_dinamico()
+{
+	pthread_mutex_lock(&mutex_string_dinamico);
+	string_dinamico = malloc(sizeof(char));
+	strcpy(string_dinamico, "");
+}
+
+void agregar_string_a_string_dinamico(char *string)
+{
+	int tamanio_anterior = strlen(string_dinamico) + 1;
+	int tamanio_a_aumentar = strlen(string);
+	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
+	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
+	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string);
+	string_dinamico[nuevo_tamanio] = '\0';
+}
+
+void agregar_entero_a_string_dinamico(int entero)
+{
+	int cantidad_digitos_entero;
+	if (entero == 0)
+	{
+		cantidad_digitos_entero = 1;
+	}
+	else
+	{
+		cantidad_digitos_entero = floor(log10(abs(entero))) + 1;
+		if (entero < 0)
+		{
+			cantidad_digitos_entero++;
+		}
+	}
+	char entero_como_string[cantidad_digitos_entero + 1];
+	sprintf(entero_como_string, "%d", entero);
+	int tamanio_anterior = strlen(string_dinamico) + 1;
+	int tamanio_a_aumentar = strlen(entero_como_string);
+	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
+	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
+	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), entero_como_string);
+	string_dinamico[nuevo_tamanio] = '\0';
+}
+
+void liberar_string_dinamico()
+{
+	free(string_dinamico);
+	pthread_mutex_unlock(&mutex_string_dinamico);
 }

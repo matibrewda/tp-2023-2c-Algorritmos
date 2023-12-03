@@ -77,136 +77,136 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	// INICIAR SU FCB
-	char *ruta_fcb_completa = NULL;
-	asprintf(&ruta_fcb_completa, "%s/%s", configuracion_filesystem->path_fcb, "Notas1erParcialK9999.fcb");
-	FCB *fcb = crear_fcb(ruta_fcb_completa);
-	if (fcb != NULL)
-	{
-		log_info(logger, "Pude cargar el siguiente archivo fcb");
-		log_info(logger, "Nombre archivo: %s - Tamaño Archivo: %d - Inicio de bloque: %d", fcb->nombre_archivo, fcb->tamanio_archivo, fcb->bloque_inicial);
-	}
-	else
-	{
-		terminar_filesystem();
-		return EXIT_FAILURE;
-	}
+	// char *ruta_fcb_completa = NULL;
+	// asprintf(&ruta_fcb_completa, "%s/%s", configuracion_filesystem->path_fcb, "Notas1erParcialK9999.fcb");
+	// FCB *fcb = crear_fcb(ruta_fcb_completa);
+	// if (fcb != NULL)
+	// {
+	// 	log_info(logger, "Pude cargar el siguiente archivo fcb");
+	// 	log_info(logger, "Nombre archivo: %s - Tamaño Archivo: %d - Inicio de bloque: %d", fcb->nombre_archivo, fcb->tamanio_archivo, fcb->bloque_inicial);
+	// }
+	// else
+	// {
+	// 	terminar_filesystem();
+	// 	return EXIT_FAILURE;
+	// }
 
-	crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
+// 	crear_archivo(configuracion_filesystem->path_fcb, "EstoEsUnNuevoArchivo");
 
-	// INICIAR ARCHIVO DE BLOQUES V2
+// 	// INICIAR ARCHIVO DE BLOQUES V2
 
-	crearArchivoDeBloques("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
+// 	crearArchivoDeBloques("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
 
-	/* // INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES -- NO NECESARIO, POR EL MOMENTO NO MANEJO LA SWAP.
+// 	/* // INICIAR PARTICION SWAP EN ARCHIVO DE BLOQUES -- NO NECESARIO, POR EL MOMENTO NO MANEJO LA SWAP.
 
-	int blocks_file_checker = iniciarSWAP(logger, configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_swap);
-	if (blocks_file_checker == 0)
-	{
-		log_debug(logger, "FS BLOCKS FILE: BLOCKS FILE con particion SWAP iniciado correctamente.");
-	}
-	else
-		log_debug(logger, "FS BLOCKS FILE: No fue posible iniciar BLOCKS FILE.");
- */
+// 	int blocks_file_checker = iniciarSWAP(logger, configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_swap);
+// 	if (blocks_file_checker == 0)
+// 	{
+// 		log_debug(logger, "FS BLOCKS FILE: BLOCKS FILE con particion SWAP iniciado correctamente.");
+// 	}
+// 	else
+// 		log_debug(logger, "FS BLOCKS FILE: No fue posible iniciar BLOCKS FILE.");
+//  */
 
-	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
+// 	// INICIAR BLOQUE FAT Y PARTICION FAT EN ARCHIVO DE BLOQUES.
 
-	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
-	if (fat_checker == 0)
-	{
-		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.\n");
-	}
-	else
-		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.\n");
+// 	int fat_checker = iniciarFAT(logger, configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
+// 	if (fat_checker == 0)
+// 	{
+// 		log_debug(logger, "FS FAT: Tabla FAT iniciada correctamente.\n");
+// 	}
+// 	else
+// 		log_debug(logger, "FS FAT: No fue posible iniciar la tabla FAT.\n");
 
-	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
-	// Nombre: El nombre de archivo, utilizado como ID de archivo.
-	// Bloque inicial: El bloque logico inicial, se utilizará en la tabla FAT para buscar su bloque siguiente.
+// 	// DIRECTORIO: Es una tabla con una entrada por archivo. Cada entrada tiene:
+// 	// Nombre: El nombre de archivo, utilizado como ID de archivo.
+// 	// Bloque inicial: El bloque logico inicial, se utilizará en la tabla FAT para buscar su bloque siguiente.
 
-	DirectorioArray directorio = inicializarDirectorioArray(logger);
-	procesarArchivosEnDirectorio(&directorio, configuracion_filesystem->path_fcb);
+// 	DirectorioArray directorio = inicializarDirectorioArray(logger);
+// 	procesarArchivosEnDirectorio(&directorio, configuracion_filesystem->path_fcb);
 
-	// Utilizar el array de directorios como desees
-	for (size_t i = 0; i < directorio.cantidadDirectorios; i++)
-	{
-		printf("Nombre: %s, Bloque Inicial: %u\n", directorio.directorios[i].nombreArchivo, directorio.directorios[i].numBloqueInicial);
-	}
+// 	// Utilizar el array de directorios como desees
+// 	for (size_t i = 0; i < directorio.cantidadDirectorios; i++)
+// 	{
+// 		printf("Nombre: %s, Bloque Inicial: %u\n", directorio.directorios[i].nombreArchivo, directorio.directorios[i].numBloqueInicial);
+// 	}
 
-	// Liberar la memoria utilizada por el array de directorios, al final, al terminar filesystem.
+// 	// Liberar la memoria utilizada por el array de directorios, al final, al terminar filesystem.
 
-	// prueba asignar bloques
-	FATEntry *fat = abrirFAT(configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap);
+// 	// prueba asignar bloques
+// 	FATEntry *fat = abrirFAT(configuracion_filesystem->path_fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap);
 
-	// Prueba del contenido de cada ENTRADA FAT
+// 	// Prueba del contenido de cada ENTRADA FAT
 
-	printf("Mostrando tabla FAT inicial\n"); // Luego borrar esta linea!
-	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-	{
-		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-	}
+// 	printf("Mostrando tabla FAT inicial\n"); // Luego borrar esta linea!
+// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
+// 	{
+// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+// 	}
 
-	char *ruta = concatenarRutas(configuracion_filesystem->path_fcb, "Notas1erParcialK9999.fcb");
-	BLOQUE **bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
+// 	char *ruta = concatenarRutas(configuracion_filesystem->path_fcb, "Notas1erParcialK9999.fcb");
+// 	BLOQUE **bloques = leerBloquesDesdeArchivo(configuracion_filesystem->path_bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->tam_bloques);
 
-	printf("Mostrando tabla BLOQUES inicial\n"); // Luego borrar esta linea!
-	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-	{
-		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-	}
+// 	printf("Mostrando tabla BLOQUES inicial\n"); // Luego borrar esta linea!
+// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
+// 	{
+// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+// 	}
 
-	// Prueba de CREAR ARCHIVO
-	// Caso 1) No existe:
-	abrirArchivo(configuracion_filesystem->path_fcb, "ArchivoPepito");
-	// Caso 2) Existe:
-	abrirArchivo(configuracion_filesystem->path_fcb, "estadisticas");
+// 	// Prueba de CREAR ARCHIVO
+// 	// Caso 1) No existe:
+// 	abrirArchivo(configuracion_filesystem->path_fcb, "ArchivoPepito");
+// 	// Caso 2) Existe:
+// 	abrirArchivo(configuracion_filesystem->path_fcb, "estadisticas");
 
-	// modificarBloque (configuracion_filesystem->path_bloques,configuracion_filesystem->tam_bloques);
-	asignarBloques(configuracion_filesystem->path_fat, "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", ruta, bloques, fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
+// 	// modificarBloque (configuracion_filesystem->path_bloques,configuracion_filesystem->tam_bloques);
+// 	asignarBloques(configuracion_filesystem->path_fat, "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", ruta, bloques, fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
 
-	printf("Mostrando tabla FAT post modificacion\n"); // Luego borrar esta linea!
+// 	printf("Mostrando tabla FAT post modificacion\n"); // Luego borrar esta linea!
 
-	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-	{
-		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-	}
+// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
+// 	{
+// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+// 	}
 
-	printf("Mostrando tabla BLOQUES post modificacion\n"); // Luego borrar esta linea!
-	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-	{
-		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-	}
+// 	printf("Mostrando tabla BLOQUES post modificacion\n"); // Luego borrar esta linea!
+// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
+// 	{
+// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+// 	}
 
-	eliminarBloques(configuracion_filesystem->path_fat, ruta, configuracion_filesystem->path_bloques, fat, bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
+// 	eliminarBloques(configuracion_filesystem->path_fat, ruta, configuracion_filesystem->path_bloques, fat, bloques, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
 
-	printf("Mostrando tabla FAT post eliminacion de bloques\n");
-	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-	{
-		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-	}
+// 	printf("Mostrando tabla FAT post eliminacion de bloques\n");
+// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
+// 	{
+// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+// 	}
 
-	printf("Mostrando tabla BLOQUES post eliminacion de bloques\n");
-	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-	{
-		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-	}
+// 	printf("Mostrando tabla BLOQUES post eliminacion de bloques\n");
+// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
+// 	{
+// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+// 	}
 
-	// liberar memoria!
-	// PRUEBA DE TRUNCAR truncar_archivo
+// 	// liberar memoria!
+// 	// PRUEBA DE TRUNCAR truncar_archivo
 
-	asignarBloques(configuracion_filesystem->path_fat, "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb", bloques, fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
+// 	asignarBloques(configuracion_filesystem->path_fat, "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/BlocksFile/ARCHIVO_BLOQUES.bin", "/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb", bloques, fat, configuracion_filesystem->cant_bloques_total, configuracion_filesystem->cant_bloques_swap, configuracion_filesystem->tam_bloques);
 
-	truncar_archivo("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb", 2, configuracion_filesystem, fat, bloques);
+// 	truncar_archivo("/home/utnso/tp-2023-2c-Algorritmos/Filesystem/Fcbs/estadisticas.fcb", 2, configuracion_filesystem, fat, bloques);
 
-	printf("Mostrando tabla FAT post truncamiento\n");
-	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
-	{
-		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
-	}
+// 	printf("Mostrando tabla FAT post truncamiento\n");
+// 	for (size_t i = 0; i < (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap); ++i)
+// 	{
+// 		printf("Entrada FAT %zu: %d\n", i, fat[i].block_value);
+// 	}
 
-	printf("Mostrando tabla BLOQUES post truncamiento\n");
-	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
-	{
-		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
-	}
+// 	printf("Mostrando tabla BLOQUES post truncamiento\n");
+// 	for (size_t i = 0; i < configuracion_filesystem->cant_bloques_total; ++i)
+// 	{
+// 		printf("Entrada BLOQUES %zu: %s\n", i, bloques[i]->valorDeBloque);
+// 	}
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
@@ -237,8 +237,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Finalizacion
 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
-	liberarDirectorioArray(&directorio);
-	cerrarFAT(fat);
+	// liberarDirectorioArray(&directorio);
+	// cerrarFAT(fat);
 	return EXIT_SUCCESS;
 }
 

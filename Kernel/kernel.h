@@ -97,11 +97,9 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
 
 // Utilidades
 const char *nombre_estado_proceso(char codigo_estado_proceso);
-int obtener_nuevo_pid();
-void agregar_pid_a_aux_pids_cola(t_pcb *pcb);
+void agregar_pid_a_string_dinamico(t_pcb *pcb);
 void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola);
-void imprimir_proceso_en_consola(t_pcb *pcb);
-void imprimir_bloqueados_por_recurso_en_consola(t_recurso *recurso);
+void agregar_pid_recursos_bloqueados_a_string_dinamico(t_recurso *recurso);
 void listar_procesos();
 t_pcb *crear_pcb(char *path, int size, int prioridad);
 void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion);
@@ -110,6 +108,10 @@ t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex
 void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void push_cola_ready(t_pcb *pcb);
 void log_fin_de_proceso(t_pcb* pcb);
+void crear_string_dinamico();
+void agregar_string_a_string_dinamico(char *string);
+void agregar_entero_a_string_dinamico(int entero);
+void liberar_string_dinamico();
 
 // Recursos
 void crear_recursos();
