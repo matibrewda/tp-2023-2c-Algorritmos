@@ -23,6 +23,7 @@
 #include "swap.h"
 #include "bloque.h"
 #include "directorio.h"
+#include <sys/stat.h>
 
 #include <commons/collections/list.h>
 #include <commons/collections/queue.h>
@@ -52,6 +53,7 @@ void inicializar_archivo_de_bloques();
 void inicializar_fat();
 int abrir_archivo_fs(char *nombre_archivo);
 void crear_archivo_fs(char *nombre_archivo);
+void abrir_permisos_archivo(char* path_archivo);
 
 void truncar_archivo(char *path, int nuevo_tamano);
 uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo);

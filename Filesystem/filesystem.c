@@ -41,11 +41,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	fcbs = list_create();
-	crear_archivo_fs("test");
-	int tamanio = abrir_archivo_fs("test");
-	log_debug(logger, "El tamanio es %d", tamanio);
-
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	if (socket_kernel == -1)
 	{
@@ -232,6 +227,7 @@ void inicializar_fat()
 	}
 
 	fclose(archivo_tabla_fat);
+	abrir_permisos_archivo(configuracion_filesystem->path_fat);
 }
 
 void inicializar_archivo_de_bloques()
@@ -245,18 +241,18 @@ void inicializar_archivo_de_bloques()
 	ftruncate(archivo_bloques_file_descriptor, tamanio_bloques);
 
 	fclose(archivo_bloques);
+	abrir_permisos_archivo(configuracion_filesystem->path_bloques);
 }
 
 int abrir_archivo_fs(char *nombre_archivo)
 {
-	char* path_fcb = strcat(strcat(strcat(configuracion_filesystem->path_fcb, "/"), nombre_archivo), ".fcb");
-	log_debug(logger, "WTF2");
+	char path_fcb[200];
+	sprintf(path_fcb, "%s/%s.fcb", configuracion_filesystem->path_fcb, nombre_archivo);
 	FCB *fcb = abrir_fcb(path_fcb);
-	log_debug(logger, "WTF");
 	if (fcb == NULL)
 	{
 		// No existe el archivo
-		log_debug(logger, "No existe el archivo: %s", nombre_archivo);
+		log_debug(logger, "No existe el archivo %s (ruta %s)", nombre_archivo, path_fcb);
 		return -1;
 	}
 	else
@@ -265,8 +261,17 @@ int abrir_archivo_fs(char *nombre_archivo)
 		log_debug(logger, "Existe el archivo: %s", nombre_archivo);
 
 		// Agregar a la lista solo si no estaba antes
+		bool _filtro_fcb_por_nombre_archivo(FCB * fcb)
+		{
+			return strcmp(fcb->nombre_archivo, nombre_archivo) == 0;
+		};
 
-		list_add(fcbs, fcb);
+		FCB *fcb_existente = list_find(fcbs, (void *)_filtro_fcb_por_nombre_archivo);
+		if (fcb_existente == NULL)
+		{
+			list_add(fcbs, fcb);
+		}
+
 		return fcb->tamanio_archivo;
 	}
 }
@@ -277,23 +282,21 @@ void crear_archivo_fs(char *nombre_archivo)
 	FCB *fcb_archivo_nuevo = iniciar_fcb(nombre_archivo, 0, -1);
 	list_add(fcbs, fcb_archivo_nuevo);
 
-	char* path_fcb = strcat(strcat(strcat(configuracion_filesystem->path_fcb, "/"), nombre_archivo), ".fcb");
+	char path_fcb[200];
+	sprintf(path_fcb, "%s/%s.fcb", configuracion_filesystem->path_fcb, nombre_archivo);
 
-	t_config* config = malloc(sizeof(t_config));
-	config->path = strdup(path_fcb);
-	config->properties = dictionary_create();
+	FILE *archivo_fcb = fopen(path_fcb, "w+");
+	fprintf(archivo_fcb, "NOMBRE_ARCHIVO=%s\n", fcb_archivo_nuevo->nombre_archivo);
+	fprintf(archivo_fcb, "TAMANIO_ARCHIVO=%d\n", fcb_archivo_nuevo->tamanio_archivo);
+	fprintf(archivo_fcb, "BLOQUE_INICIAL=%d\n", fcb_archivo_nuevo->bloque_inicial);
+	fclose(archivo_fcb);
+	abrir_permisos_archivo(path_fcb);
+}
 
-	char buffer[256];
-	sprintf(buffer, "%d", fcb_archivo_nuevo->tamanio_archivo);
-
-	config_set_value(config, "NOMBRE_ARCHIVO", fcb_archivo_nuevo->nombre_archivo);
-	sprintf(buffer, "%d", fcb_archivo_nuevo->tamanio_archivo);
-	config_set_value(config, "TAMANIO_ARCHIVO", buffer);
-	sprintf(buffer, "%d", fcb_archivo_nuevo->bloque_inicial);
-	config_set_value(config, "BLOQUE_INICIAL", buffer);
-
-	config_save(config);
-	config_destroy(config);
+void abrir_permisos_archivo(char *path_archivo)
+{
+	char modo_todos_los_permisos[] = "0777";
+	chmod(path_archivo, strtol(modo_todos_los_permisos, 0, 8));
 }
 
 /* void ampliar_tamano_archivo(FCB *fcb , t_config *config,int nuevo_tamano) {
