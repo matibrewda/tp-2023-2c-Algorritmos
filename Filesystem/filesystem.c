@@ -11,6 +11,8 @@ int socket_kernel = -1;
 int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
+pthread_mutex_t mutex_archivo_bloques;
+
 bool *bitmap_bloques_libres_swap;
 t_list *fcbs; // Lista de FCBs de archivos que fueron abiertos
 
@@ -62,6 +64,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
+	pthread_mutex_init(&mutex_archivo_bloques, NULL);
 	fcbs = list_create();
 	inicializar_archivo_de_bloques();
 	inicializar_fat();
@@ -111,16 +114,18 @@ void *comunicacion_memoria()
 		switch (operacion_recibida_memoria)
 		{
 		case SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM:
-			int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria);
-			t_list* bloques_reservados = reservar_bloques_en_swap(cantidad_de_bloques_a_reservar);
+			int cantidad_de_bloques_a_reservar;
+			int pid_pedido_bloques;
+			leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria, &cantidad_de_bloques_a_reservar, &pid_pedido_bloques);
+			t_list *bloques_reservados = reservar_bloques_en_swap(cantidad_de_bloques_a_reservar);
 			bool pude_reservar_todos = bloques_reservados != NULL;
-			//t_paquete* paquete_respuesta_pedirr_bloques_a_fs = crear_paquete_respuest_pedir
+			// t_paquete* paquete_respuesta_pedirr_bloques_a_fs = crear_paquete_respuest_pedir
 			list_destroy(bloques_reservados);
 			break;
 		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
-
+			leer_paquete_solicitud_lib(logger, conexion_con_memoria);
 			break;
-		case SOLICITUD_CONTENIDO_BLOQUE_EN_FILESYSTEM:
+		case SOLICITUD_LEER_PAGINA_EN_SWAP:
 
 			break;
 		case SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP:
@@ -237,6 +242,8 @@ void inicializar_fat()
 
 void inicializar_archivo_de_bloques()
 {
+	pthread_mutex_lock(&mutex_archivo_bloques);
+
 	log_debug(logger, "Inicializando archivo de bloques");
 
 	// Creo archivo para bloques con su correspondiente tamaño
@@ -253,6 +260,8 @@ void inicializar_archivo_de_bloques()
 	{
 		bitmap_bloques_libres_swap[i] = true;
 	}
+
+	pthread_mutex_unlock(&mutex_archivo_bloques);
 }
 
 int abrir_archivo_fs(char *nombre_archivo)
@@ -311,6 +320,7 @@ void dar_full_permisos_a_archivo(char *path_archivo)
 
 void *leer_bloque_swap(int numero_de_bloque)
 {
+	pthread_mutex_lock(&mutex_archivo_bloques);
 	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
@@ -318,17 +328,20 @@ void *leer_bloque_swap(int numero_de_bloque)
 	void *bloque = malloc(configuracion_filesystem->tam_bloques);
 	fread(bloque, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
 	fclose(archivo_bloques);
+	pthread_mutex_unlock(&mutex_archivo_bloques);
 	return bloque;
 }
 
 void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 {
+	pthread_mutex_lock(&mutex_archivo_bloques);
 	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
 	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
 	fclose(archivo_bloques);
+	pthread_mutex_unlock(&mutex_archivo_bloques);
 }
 
 t_list *buscar_bloques_libres_en_swap(int cantidad_de_bloques)
@@ -363,7 +376,7 @@ void liberar_bloques_en_swap(t_list *numeros_de_bloques_a_liberar)
 
 	while (list_iterator_has_next(iterador))
 	{
-		int* numero_de_bloque_a_liberar = list_iterator_next(iterador);
+		int *numero_de_bloque_a_liberar = list_iterator_next(iterador);
 		bitmap_bloques_libres_swap[*numero_de_bloque_a_liberar] = true;
 	}
 }
@@ -381,11 +394,11 @@ t_list *reservar_bloques_en_swap(int cantidad_de_bloques)
 	t_list_iterator *iterador = list_iterator_create(bloques_libres);
 	while (list_iterator_has_next(iterador))
 	{
-		int* numero_de_bloque_reservado = list_iterator_next(iterador);
+		int *numero_de_bloque_reservado = list_iterator_next(iterador);
 		bitmap_bloques_libres_swap[*numero_de_bloque_reservado] = false;
 
-		char* bloque_con_ceros = malloc(configuracion_filesystem->tam_bloques);
-		for(int i = 0 ; i < configuracion_filesystem->tam_bloques ; i++)
+		char *bloque_con_ceros = malloc(configuracion_filesystem->tam_bloques);
+		for (int i = 0; i < configuracion_filesystem->tam_bloques; i++)
 		{
 			bloque_con_ceros[i] = '\0';
 		}

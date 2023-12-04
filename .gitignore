@@ -58,5 +58,10 @@ Memoria/Logs/memoria.log
 Filesystem/Logs/filesystem.log
 *.log
 
+# FS
+Filesystem/fs/bloques.dat
+Filesystem/fs/fat.dat
+Filesystem/fs/fcbs/*
+
 # IDEs
 .vscode/

@@ -1,7 +1,6 @@
 #include "fat.h"
 #include "fcb.h"
 #include "bloque.h"
-#include "directorio.h"
 
 
 int32_t contarBloqueDisponibles(FATEntry fat[], size_t cantBloquesFAT) {

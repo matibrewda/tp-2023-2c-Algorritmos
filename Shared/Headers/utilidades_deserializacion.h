@@ -53,16 +53,15 @@ t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *
 int leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con_cpu);
 t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, int conexion_con_cpu);
 
-// Memoria recibe de FileSystem
-t_pedido_leer_archivo *leer_paquete_pedido_leer_archivo(t_log *logger, int conexion_con_filsystem);
-t_pedido_escribir_archivo *leer_paquete_pedido_escribir_archivo(t_log *logger, int conexion_con_filsystem);
+// Memoria recibe de Filesystem
 void* leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem, size_t tamanio_bloque);
 void leer_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(t_log *logger, int conexion_con_filesystem, char** nombre_archivo, int* puntero_archivo, int* direccion_fisica);
 t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_memoria_desde_filesystem(t_log *logger, int conexion_con_filesystem);
-t_list *leer_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, int conexion_con_filesystem);
+t_list *leer_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, int conexion_con_filesystem, int *pid);
 
 // Filesystem recibe de Memoria
-int leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria);
+void leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria, int* cantidad_de_bloques, int* pid);
+int leer_paquete_solicitud_liberar_bloque_a_fs(t_log *logger, int conexion_con_memoria);
 void leer_paquete_respuesta_leer_valor_en_memoria_desde_filesystem(t_log *logger, int conexion_con_memoria, char** nombre_archivo, int* puntero_archivo, u_int32_t* valor);
 
 // Filesystem recibe de Kernel

@@ -176,7 +176,14 @@ void *atender_cpu()
 
 		if (operacion_recibida_de_cpu == SOLICITUD_PEDIR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
 		{
-			enviar_info_de_memoria_inicial_para_cpu();
+			t_info_memoria *info_memoria = malloc(sizeof(t_info_memoria));
+			info_memoria->tamanio_memoria = configuracion_memoria->tam_memoria;
+			info_memoria->tamanio_pagina = configuracion_memoria->tam_pagina;
+
+			t_paquete *paquete = crear_paquete_respuesta_pedir_info_de_memoria_inicial_para_cpu(logger, info_memoria);
+			enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+
+			free(info_memoria);
 		}
 		else if (operacion_recibida_de_cpu == SOLICITUD_PEDIR_INSTRUCCION_A_MEMORIA)
 		{
@@ -213,19 +220,7 @@ void *atender_filesystem()
 		int operacion_recibida_de_filesystem = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
 		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_filesystem), NOMBRE_MODULO_FILESYSTEM);
 
-		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_ARCHIVO_MEMORIA)
-		{
-			t_pedido_leer_archivo *pedido_leer_archivo = leer_paquete_pedido_leer_archivo(logger, conexion_con_filesystem);
-			notificar_lectura_a_filesystem();
-			free(pedido_leer_archivo);
-		}
-		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_ARCHIVO_MEMORIA)
-		{
-			t_pedido_escribir_archivo *pedido_escribir_archivo = leer_paquete_pedido_escribir_archivo(logger, conexion_con_filesystem);
-			notificar_escritura_a_filesystem();
-			free(pedido_escribir_archivo);
-		}
-		else if (operacion_recibida_de_filesystem == SOLICITUD_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM)
+		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM)
 		{
 			char *nombre_archivo_a_escribir;
 			int puntero_archivo_a_escribir;
@@ -239,8 +234,29 @@ void *atender_filesystem()
 		{
 			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = leer_paquete_solicitud_escribir_valor_en_memoria_desde_filesystem(logger, conexion_con_filesystem);
 			escribir_valor_en_memoria(pedido_escribir_valor_en_memoria->direccion_fisica, pedido_escribir_valor_en_memoria->valor_a_escribir);
-			notificar_escritura_a_filesytem();
+			t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			free(pedido_escribir_valor_en_memoria);
+		}
+		else if (operacion_recibida_de_filesystem == RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM)
+		{
+			t_paquete *paquete = crear_paquete_respuesta_finalizar_proceso_en_memoria(logger);
+			enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
+		}
+		else if (operacion_recibida_de_filesystem == RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM)
+		{
+			int pid_reservando;
+			t_list *posiciones_swap = leer_paquete_respuesta_pedir_bloques_a_filesystem(logger, conexion_con_filesystem, &pid_reservando);
+
+			if (list_is_empty(posiciones_swap))
+			{
+				log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid_reservando);
+				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
+			}
+
+			crear_entrada_de_tabla_de_paginas_de_proceso(list_size(posiciones_swap), posiciones_swap, pid_reservando);
+			log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>", pid_reservando, list_size(posiciones_swap));
+			enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 		}
 	}
 }
@@ -309,20 +325,6 @@ uint32_t leer_valor_en_memoria(int direccion_fisica)
 	return valor_leido;
 }
 
-void enviar_info_de_memoria_inicial_para_cpu()
-{
-	log_debug(logger, "Comenzando la creacion de paquete para enviar informacion inicial de memoria a la CPU");
-
-	t_info_memoria *info_memoria = malloc(sizeof(t_info_memoria));
-	info_memoria->tamanio_memoria = configuracion_memoria->tam_memoria;
-	info_memoria->tamanio_pagina = configuracion_memoria->tam_pagina;
-
-	t_paquete *paquete = crear_paquete_respuesta_pedir_info_de_memoria_inicial_para_cpu(logger, info_memoria);
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-
-	free(info_memoria);
-}
-
 void inicializar_espacio_contiguo_de_memoria()
 {
 	memoria_real = malloc(configuracion_memoria->tam_memoria);
@@ -331,15 +333,14 @@ void inicializar_espacio_contiguo_de_memoria()
 void inicializar_lista_de_marcos_bitmap()
 {
 	cantidad_de_frames = configuracion_memoria->tam_memoria / configuracion_memoria->tam_pagina;
-	char* data = (char *)malloc(cantidad_de_frames / 8);
-    tabla_de_marcos = bitarray_create_with_mode(data, cantidad_de_frames / 8, MSB_FIRST);
+	char *data = (char *)malloc(cantidad_de_frames / 8);
+	tabla_de_marcos = bitarray_create_with_mode(data, cantidad_de_frames / 8, MSB_FIRST);
 }
 
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 {
 	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
 	log_info(logger, "El tamanio del proceso a iniciar es: %d", size);
-	log_info(logger, "La prioridad del proceso a iniciar es: %d", prioridad);
 	log_info(logger, "El PID del proceso a iniciar es: %d", pid);
 
 	char *ruta_archivo_completa = NULL;
@@ -375,28 +376,12 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 		cantidad_de_bloques++;
 	}
 
-	t_list *posiciones_swap = pedir_bloques_a_filesystem(cantidad_de_bloques);
-	if (list_is_empty(posiciones_swap))
-	{
-		log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid);
-		enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
-		return;
-	}
-
-	crear_entrada_de_tabla_de_paginas_de_proceso(cantidad_de_bloques, posiciones_swap, pid);
-	log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>",pid,cantidad_de_bloques);
-	enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
+	pedir_bloques_a_filesystem(pid, cantidad_de_bloques);
 }
 
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria)
 {
 	t_paquete *paquete = crear_paquete_respuesta_iniciar_proceso_en_memoria(logger, resultado_iniciar_proceso_en_memoria);
-	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
-}
-
-void enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel()
-{
-	t_paquete *paquete = crear_paquete_respuesta_finalizar_proceso_en_memoria(logger);
 	enviar_paquete(logger, conexion_con_kernel, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL);
 }
 
@@ -443,13 +428,13 @@ void finalizar_proceso_en_memoria(int pid)
 	cerrar_archivo_con_pid(pid);
 	int cantidad_de_bloques = cantidad_de_paginas_proceso(pid);
 	limpiar_entradas_tabla_de_paginas(pid);
-	log_info(logger, "Destruccion - PID: <%d> - Tamanio : <%d>",pid,cantidad_de_bloques);
-	enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
+	log_info(logger, "Destruccion - PID: <%d> - Tamanio : <%d>", pid, cantidad_de_bloques);
 	free(archivo_proceso);
 }
 
-int cantidad_de_paginas_proceso(int pid) {
-	return list_size_thread_safe(obtener_entradas_de_tabla_de_pagina_por_pid(pid),&mutex_entradas_tabla_de_paginas);
+int cantidad_de_paginas_proceso(int pid)
+{
+	return list_size_thread_safe(obtener_entradas_de_tabla_de_pagina_por_pid(pid), &mutex_entradas_tabla_de_paginas);
 }
 
 t_archivo_proceso *buscar_archivo_con_pid(int pid)
@@ -485,51 +470,49 @@ void cerrar_archivo_con_pid(int pid)
 	list_remove_and_destroy_by_condition_thread_safe(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso, &mutex_procesos_iniciados);
 }
 
-void notificar_lectura_a_filesystem()
-{
-	log_debug(logger, "Notificando a File System de lectura exitosa en memoria");
-	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LEER_ARCHIVO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-}
-
-void notificar_escritura_a_filesystem()
-{
-	log_debug(logger, "Notificando a File System de lectura exitosa en memoria");
-	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_ARCHIVO_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-}
-
-t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques)
+void pedir_bloques_a_filesystem(int pid, int cantidad_de_bloques)
 {
 	pthread_mutex_lock(&mutex_conexion_filesystem);
 
-	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, cantidad_de_bloques);
+	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, pid, cantidad_de_bloques);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
-	// Recibir
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM
-	t_list *posiciones_swap = leer_paquete_respuesta_pedir_bloques_a_filesystem(logger, conexion_con_filesystem);
-
 	pthread_mutex_unlock(&mutex_conexion_filesystem);
-
-	return posiciones_swap;
 }
 
 void limpiar_entradas_tabla_de_paginas(int pid)
 {
 	t_list *entradas_tabla_de_paginas = obtener_entradas_de_tabla_de_pagina_por_pid(pid);
-	for (int i = 0; i < list_size_thread_safe(entradas_tabla_de_paginas,&mutex_entradas_tabla_de_paginas); i++)
+	t_list *bloques_a_liberar = list_create();
+	t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas;
+
+	for (int i = 0; i < list_size_thread_safe(entradas_tabla_de_paginas, &mutex_entradas_tabla_de_paginas); i++)
 	{
-		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
+		entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
+
+		int *posicion_en_swap = malloc(sizeof(int));
+		*posicion_en_swap = entrada_tabla_de_paginas->posicion_en_swap;
+		list_add(bloques_a_liberar, posicion_en_swap);
+
 		eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
 		}
-		pedir_liberacion_de_bloque_a_filesystem(entrada_tabla_de_paginas->posicion_en_swap);
 		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
 	}
+
+	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, bloques_a_liberar);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	while (!list_is_empty(bloques_a_liberar))
+	{
+		int *a_liberar = list_remove(bloques_a_liberar, 0);
+		free(a_liberar);
+	}
+	list_destroy(bloques_a_liberar);
+
 	log_trace(logger, "Se limpian correctamente las entradas de tabla de paginas para el pid %d", pid);
 }
 
@@ -554,11 +537,10 @@ void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);
 }
 
-void pedir_liberacion_de_bloque_a_filesystem(int posicion_de_swap)
+void pedir_liberacion_de_bloques_a_filesystem(t_list *posiciones_en_swap)
 {
-	t_paquete *paquete = crear_paquete_liberar_bloque_en_filesystem(logger, posicion_de_swap);
+	t_paquete *paquete = crear_paquete_liberar_bloques_en_filesystem(logger, posiciones_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	// TODO esperar respuesta de liberacion de bloques?
 }
 
 // Función para inicializar la tabla de páginas por proceso
@@ -577,10 +559,6 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 
 void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina *victima)
 {
-	/*
-	- Busco el contenido del marco porque se supone que esta modificado
-	- Ese contenido lo tenemos que meter en un paquete y enviar a Filesystem para que actualice el bloque
-	*/
 	void *contenido_marco = buscar_contenido_marco(victima->marco);
 	t_paquete *paquete = crear_paquete_solicitud_escribir_pagina_en_swap(logger, contenido_marco, configuracion_memoria->tam_pagina, victima->posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -665,7 +643,7 @@ void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
 	pthread_mutex_lock(&mutex_conexion_filesystem);
 
-	t_paquete *paquete = crear_paquete_solicitud_contenido_de_bloque(logger, posicion_en_swap);
+	t_paquete *paquete = crear_paquete_solicitud_leer_pagina_swap(logger, posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
 	void *contenido_del_bloque = malloc(configuracion_memoria->tam_pagina);
@@ -682,7 +660,7 @@ void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
-	//log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco); TODO ver si este log va
+	// log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco); TODO ver si este log va
 	if (pagina == NULL)
 	{
 		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(false);
@@ -694,20 +672,19 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	int marco_desocupado;
 	if (obtener_primer_marco_desocupado(&marco_desocupado))
 	{
-    	// cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		// cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
 		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);
 		// Actualizar entrada tabla de paginas de la nueva pagina
 		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
-		log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco);
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 		ocupar_marco(marco_desocupado);
-		
 	}
 	else
 	{
 		int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
 		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
 		actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
-		log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco);
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 		ocupar_marco(marco_libre);
 	}
 
@@ -717,13 +694,13 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	return;
 }
 
-void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado)
+void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina *pagina, int marco_asignado)
 {
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->presencia = 1;
 	pagina->marco = marco_asignado;
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
-	
+
 	return;
 }
 
@@ -769,18 +746,18 @@ void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
 	// Establecer todos los bytes del marco en cero
 	memset(fuente, 0, configuracion_memoria->tam_pagina);
 	pthread_mutex_unlock(&mutex_memoria_real);
-    
+
 	liberar_marco(numero_de_marco);
 }
 
-void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_de_marco)
+void cargar_datos_de_pagina_en_memoria_real(void *contenido_pagina, int numero_de_marco)
 {
 	// Cargar datos de la nueva pagina a reemplazar en memoria real
-    void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
+	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
 	pthread_mutex_lock(&mutex_memoria_real);
 	// Copiar el contenido de contenido_pagina en fuente
-    memcpy(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
+	memcpy(fuente, contenido_pagina, configuracion_memoria->tam_pagina);
 	pthread_mutex_unlock(&mutex_memoria_real);
 }
 
@@ -816,38 +793,36 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 	{
 		numero_marco = pagina->marco;
 	}
-	log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco);
+	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 }
 
 // Marcos
-
 int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
 {
-    for (int i = 0; i < cantidad_de_frames; ++i)
-    {
-        if (!bitarray_test_bit_thread_safe(tabla_de_marcos, i, &mutex_tabla_de_marcos))
-        {
-            if (indice_marco_desocupado != NULL)
-            {
-                *indice_marco_desocupado = i;
-            }
-            return 1;
-        }
-    }
-    return 0;
+	for (int i = 0; i < cantidad_de_frames; ++i)
+	{
+		if (!bitarray_test_bit_thread_safe(tabla_de_marcos, i, &mutex_tabla_de_marcos))
+		{
+			if (indice_marco_desocupado != NULL)
+			{
+				*indice_marco_desocupado = i;
+			}
+			return 1;
+		}
+	}
+	return 0;
 }
-
 
 void ocupar_marco(int numero_de_marco)
 {
-    bitarray_set_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
+	bitarray_set_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
 }
 
 void liberar_marco(int numero_de_marco)
 {
-    bitarray_clean_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
+	bitarray_clean_bit_thread_safe(tabla_de_marcos, numero_de_marco, &mutex_tabla_de_marcos);
 }
 
 void destruir_listas()

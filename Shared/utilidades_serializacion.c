@@ -478,7 +478,7 @@ t_paquete *crear_paquete_con_opcode_y_sin_contenido(t_log *logger, op_code codig
     return paquete;
 }
 
-t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_de_bloques)
+t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int pid, int cantidad_de_bloques)
 {
     op_code codigo_operacion = SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -486,6 +486,7 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, pid, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, cantidad_de_bloques, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CANTIDAD DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -493,16 +494,31 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int cantidad_
     return paquete;
 }
 
-t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicion_swap)
+t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_list* lista_bloques_reservados, int pid)
 {
-    op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    op_code codigo_operacion = RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'LISTA BLOQUES + PID' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
-    log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-    agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_lista_de_enteros_a_paquete(logger, lista_bloques_reservados, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, pid, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'LISTA BLOQUES + PID' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list* bloques_swap)
+{
+    op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'LISTA BLOQUES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_lista_de_enteros_a_paquete(logger, bloques_swap, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
@@ -510,9 +526,9 @@ t_paquete *crear_paquete_liberar_bloque_en_filesystem(t_log *logger, int posicio
 }
 
 // Memoria a Filesystem
-t_paquete *crear_paquete_solicitud_contenido_de_bloque(t_log *logger, int posicion_swap)
+t_paquete *crear_paquete_solicitud_leer_pagina_swap(t_log *logger, int posicion_swap)
 {
-    op_code codigo_operacion = SOLICITUD_CONTENIDO_BLOQUE_EN_FILESYSTEM;
+    op_code codigo_operacion = SOLICITUD_LEER_PAGINA_EN_SWAP;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);

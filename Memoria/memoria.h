@@ -43,13 +43,9 @@ int reemplazar_pagina(int pid, int numero_de_pagina);
 void enviar_valor_leido_a_cpu(uint32_t valor_leido);
 void enviar_valor_leido_a_filesystem(uint32_t valor_leido, char* nombre_archivo, int puntero_archivo);
 void notificar_escritura_a_cpu();
-void notificar_escritura_a_filesytem();
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor);
 uint32_t leer_valor_en_memoria(int direccion_fisica);
 void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado);
-
-// Handshake con CPU
-void enviar_info_de_memoria_inicial_para_cpu();
 
 // Inicializacion de estructuras
 void inicializar_espacio_contiguo_de_memoria();
@@ -58,20 +54,17 @@ void inicializar_lista_de_marcos_bitmap();
 // Iniciar proceso
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
-t_list *pedir_bloques_a_filesystem(int cantidad_de_bloques);
-t_list *recibir_paquete_pedir_bloques_a_filesystem();
+void pedir_bloques_a_filesystem(int pid, int cantidad_de_bloques);
 void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid);
 
 // Finalizar proceso
 void finalizar_proceso_en_memoria(int pid);
-void pedir_liberacion_de_bloque_a_filesystem();
+void pedir_liberacion_de_bloques_a_filesystem(t_list* posiciones_en_swap);
 void limpiar_entradas_tabla_de_paginas(int pid);
 void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_entrada_de_tabla_de_paginas(int pid);
 
 // Notificacion filesystem
-void notificar_lectura_a_filesystem();
-void notificar_escritura_a_filesystem();
 void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima);
 
 // Busqueda
@@ -91,7 +84,6 @@ void* obtener_contenido_de_pagina_en_swap(int posicion_en_swap);
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);
-void enviar_paquete_respuesta_finalizar_proceso_en_memoria_a_kernel();
 void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_cargar_pagina_en_memoria);
 
 // Marcos
