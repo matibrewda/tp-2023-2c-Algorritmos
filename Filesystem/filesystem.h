@@ -48,19 +48,20 @@ t_list *archivos;
 void *comunicacion_kernel();
 void *comunicacion_memoria();
 
-int crear_archivo(char *nombreNuevoArchivo);
+void inicializar_archivo_de_bloques();
+void inicializar_fat();
+int abrir_archivo_fs(char *nombre_archivo);
+void crear_archivo_fs(char *nombre_archivo);
+
 void truncar_archivo(char *path, int nuevo_tamano);
 uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo);
 void solicitar_escribir_memoria(char *informacion);
 FCB *buscar_archivo(char *nombre_archivo);
-int abrirarchivo(char *nombre_archivo);
 void leer_bloque(uint32_t bloqueFAT);
 void escribir_bloque(uint32_t bloqueFAT, char *informacion);
-void inicializar_archivo_de_bloques();
-void inicializar_fat();
+
 void reducir_tamano_archivo(FCB *fcb, int nuevo_tamano);
 void ampliar_tamano_archivo(FCB *fcb, int nuevo_tamano);
-int crear_archivo(char *nombreNuevoArchivo);
 char *concatenarRutas(const char *rutaFat, const char *nombreFCB);
 
 // Terminar

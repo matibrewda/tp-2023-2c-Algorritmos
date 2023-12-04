@@ -159,7 +159,7 @@ u_int32_t buscarBloqueLibre(FATEntry fat[], size_t total_blocks) {
 void asignarBloques(char* pathFAT, char* pathBLOQUES, char* pathFCB, BLOQUE *bloques[],FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP, size_t tamanioBloque){
     
     size_t cantBloquesTotalesFAT = cantBloquesTotales - cantBLoquesSWAP;
-    FCB *fcb = crear_fcb(pathFCB);
+    FCB *fcb = abrir_fcb(pathFCB);
 
     int32_t espacioChecker = validarEspacioDisponible (fcb->tamanio_archivo,fat,cantBloquesTotalesFAT);
 
@@ -209,7 +209,7 @@ else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");
 }
 
 /* void eliminarBloques(char* pathFAT, char* pathFCB, FATEntry fat[],size_t cantBloquesTotales,size_t cantBLoquesSWAP){
-    FCB *fcb = crear_fcb(pathFCB);
+    FCB *fcb = abrir_fcb(pathFCB);
 
     // validar que no sea max uint
     int32_t numBloqueSiguiente = fat [fcb->bloque_inicial].block_value;
@@ -231,7 +231,7 @@ else printf("Archivo ya asignado o NO HAY ESPACIO total para incluirlo.");
  */
 
 void eliminarBloques(char* pathFAT, char* pathFCB, char* pathBLOQUES, FATEntry fat[], BLOQUE *bloques[],size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque) {
-    FCB *fcb = crear_fcb(pathFCB);
+    FCB *fcb = abrir_fcb(pathFCB);
     int32_t numBloqueActual;
     int32_t numBloqueSiguiente;
     int32_t cantBLoquesUsadosPorArchivo;
@@ -306,7 +306,7 @@ int32_t obtenerUltimoBloque(FATEntry fat[],FCB *fcb) {
 
 
 void sumarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat[], BLOQUE *bloques[], size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque, uint32_t bloquesASumar){
-    FCB *fcb = crear_fcb(pathFCB);
+    FCB *fcb = abrir_fcb(pathFCB);
     int32_t ultBloque = obtenerUltimoBloque(fat,fcb);
 
     printf("UltBloque: %i \n",ultBloque);
@@ -328,7 +328,7 @@ void sumarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat
 }
 
 void restarBloques (char* pathFAT, char* pathBLOQUES, char* pathFCB, FATEntry fat[], BLOQUE *bloques[], size_t cantBloquesTotales, size_t cantBLoquesSWAP,size_t tamanioBloque, uint32_t bloquesARestar){
-    FCB *fcb = crear_fcb(pathFCB);
+    FCB *fcb = abrir_fcb(pathFCB);
     int32_t vecesAIterarAlUltBloque = fcb->tamanio_archivo - bloquesARestar;
     printf("vecesAIterarAlUltBloque: %i\n",vecesAIterarAlUltBloque);
     int32_t bloqueEvaluado = fat[fcb->bloque_inicial].block_value;

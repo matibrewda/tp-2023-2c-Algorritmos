@@ -1,23 +1,22 @@
 
 #include "fcb.h"
 
-// Leer un FCB desde un archivo de configuración
-
-// Leer FCB desde archivo xxxxxxxx.fcb
-FCB *crear_fcb(char *ruta_archivo)
+FCB *abrir_fcb(char *ruta_archivo)
 {
-    if (ruta_archivo != NULL)
+    t_config *config = config_create(ruta_archivo);
+
+    if (config == NULL)
     {
-        t_config *config = config_create(ruta_archivo);
-        char *nombre_archivo = config_get_string_value(config, "NOMBRE_ARCHIVO");
-        uint32_t tamanio_archivo = config_get_int_value(config, "TAMANIO_ARCHIVO");
-        uint32_t bloque_inicial = config_get_int_value(config, "BLOQUE_INICIAL");
-        FCB *fcb = iniciar_fcb(nombre_archivo, tamanio_archivo, bloque_inicial);
-        config_destroy(config);
-        return fcb;
-    }
-    else
         return NULL;
+    }
+
+    char *nombre_archivo = config_get_string_value(config, "NOMBRE_ARCHIVO");
+    uint32_t tamanio_archivo = config_get_int_value(config, "TAMANIO_ARCHIVO");
+    uint32_t bloque_inicial = config_get_int_value(config, "BLOQUE_INICIAL");
+    FCB *fcb = iniciar_fcb(nombre_archivo, tamanio_archivo, bloque_inicial);
+
+    config_destroy(config);
+    return fcb;
 }
 
 // Crear un nuevo FCB
@@ -32,20 +31,25 @@ FCB *iniciar_fcb(char *nombre_archivo, uint32_t tamanio_archivo, uint32_t bloque
 
 // Guardar un FCB en un archivo de configuración
 
-void generar_archivo_fcb_vacio(const char* rutaCompleta) {
-    FILE* archivo = fopen(rutaCompleta, "w");
-    
-    if (archivo != NULL) {
+void generar_archivo_fcb_vacio(const char *rutaCompleta)
+{
+    FILE *archivo = fopen(rutaCompleta, "w");
+
+    if (archivo != NULL)
+    {
         fclose(archivo);
         printf("Archivo %s creado con éxito.\n", rutaCompleta);
-    } else {
+    }
+    else
+    {
         printf("Error al crear el archivo %s.\n", rutaCompleta);
     }
 }
 
-void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo){
+void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo)
+{
 
-    generar_archivo_fcb_vacio (ruta_archivo);
+    generar_archivo_fcb_vacio(ruta_archivo);
 
     t_config *config = config_create(ruta_archivo);
 
@@ -53,8 +57,8 @@ void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo){
     char bloque_inicial_str[12];  // Suficientemente grande para un uint32_t
     sprintf(tamanio_archivo_str, "%u", fcb->tamanio_archivo);
     sprintf(bloque_inicial_str, "%u", fcb->bloque_inicial); // Cambio %u a %d para valores negativos
-    
-     // Asigna los valores a la configuración
+
+    // Asigna los valores a la configuración
     config_set_value(config, "NOMBRE_ARCHIVO", fcb->nombre_archivo);
     config_set_value(config, "TAMANIO_ARCHIVO", tamanio_archivo_str);
     config_set_value(config, "BLOQUE_INICIAL", bloque_inicial_str);
@@ -66,16 +70,20 @@ void guardar_fcb_en_archivo(FCB *fcb, char *ruta_archivo){
     config_destroy(config);
 }
 
-uint32_t verificarSiExisteFCBdeArchivo(char* rutaCompleta) {
-   
-    // Intentar abrir el archivo
-    FILE* archivo = fopen(rutaCompleta, "r");
+uint32_t verificarSiExisteFCBdeArchivo(char *rutaCompleta)
+{
 
-    if (archivo != NULL) {
+    // Intentar abrir el archivo
+    FILE *archivo = fopen(rutaCompleta, "r");
+
+    if (archivo != NULL)
+    {
         // El archivo se abrió correctamente, cerramos el archivo y devolvemos 0
         fclose(archivo);
         return 0;
-    } else {
+    }
+    else
+    {
         // El archivo no se pudo abrir, devolvemos -1
         return -1;
     }
