@@ -17,5 +17,3 @@ compilar:
 	$(COMPILADOR) $(FUENTES_MODULO) $(FUENTES_SHARED) -o $(EJECUTABLE) $(LIBRERIAS) -Werror
 detener:
 	pkill -f $(NOMBRE_MODULO).o
-detener:
-	pkill -f $(NOMBRE_MODULO).o
