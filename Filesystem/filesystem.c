@@ -11,8 +11,7 @@ int socket_kernel = -1;
 int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
-// FCBs de archivos que fueron abiertos
-t_list *fcbs;
+t_list *fcbs; // Lista de FCBs de archivos que fueron abiertos
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -39,6 +38,35 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	{
 		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 		return EXIT_FAILURE;
+	}
+
+	fcbs = list_create();
+	inicializar_archivo_de_bloques();
+	inicializar_fat();
+	void *mi_bloque_a_escribir = malloc(configuracion_filesystem->tam_bloques);
+	char byte1 = 'L';
+	char byte2 = 'U';
+	char byte3 = 'Q';
+	char byte4 = 'I';
+	memcpy(mi_bloque_a_escribir, &byte1, sizeof(char));
+	memcpy(mi_bloque_a_escribir+1, &byte2, sizeof(char));
+	memcpy(mi_bloque_a_escribir+2, &byte3, sizeof(char));
+	memcpy(mi_bloque_a_escribir+3, &byte4, sizeof(char));
+
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
+	fseek(archivo_bloques, 0, SEEK_SET);
+	fwrite(&byte1, 1, 1, archivo_bloques);
+	fclose(archivo_bloques);
+
+	//escribir_bloque_swap(0, mi_bloque_a_escribir);
+	
+	
+	void *mi_bloque_leido = leer_bloque_swap(1);
+
+	for (int i = 0; i < configuracion_filesystem->tam_bloques; i++)
+	{
+		char un_byte = *(char*)(mi_bloque_a_escribir + i);
+		log_debug(logger, "Byte indice %d contenido %d", i, un_byte);
 	}
 
 	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
@@ -173,6 +201,7 @@ void *comunicacion_kernel()
 			uint32_t bloque_fat_leer = buscar_bloque_fat(nro_bloque, *nombre_leer);
 			leer_bloque(bloque_fat_leer);
 			break;
+
 		case SOLICITUD_ESCRIBIR_ARCHIVO_FS:
 			log_debug(logger, "entramos a f_write");
 			char **nombre_escribir;
@@ -227,7 +256,7 @@ void inicializar_fat()
 	}
 
 	fclose(archivo_tabla_fat);
-	abrir_permisos_archivo(configuracion_filesystem->path_fat);
+	dar_full_permisos_a_archivo(configuracion_filesystem->path_fat);
 }
 
 void inicializar_archivo_de_bloques()
@@ -241,7 +270,7 @@ void inicializar_archivo_de_bloques()
 	ftruncate(archivo_bloques_file_descriptor, tamanio_bloques);
 
 	fclose(archivo_bloques);
-	abrir_permisos_archivo(configuracion_filesystem->path_bloques);
+	dar_full_permisos_a_archivo(configuracion_filesystem->path_bloques);
 }
 
 int abrir_archivo_fs(char *nombre_archivo)
@@ -290,21 +319,13 @@ void crear_archivo_fs(char *nombre_archivo)
 	fprintf(archivo_fcb, "TAMANIO_ARCHIVO=%d\n", fcb_archivo_nuevo->tamanio_archivo);
 	fprintf(archivo_fcb, "BLOQUE_INICIAL=%d\n", fcb_archivo_nuevo->bloque_inicial);
 	fclose(archivo_fcb);
-	abrir_permisos_archivo(path_fcb);
+	dar_full_permisos_a_archivo(path_fcb);
 }
 
-void abrir_permisos_archivo(char *path_archivo)
+void dar_full_permisos_a_archivo(char *path_archivo)
 {
-	char modo_todos_los_permisos[] = "0777";
-	chmod(path_archivo, strtol(modo_todos_los_permisos, 0, 8));
+	chmod(path_archivo, strtol("0777", 0, 8));
 }
-
-/* void ampliar_tamano_archivo(FCB *fcb , t_config *config,int nuevo_tamano) {
-	fcb->tamanio_archivo = nuevo_tamano;
-	char nuevo_tamano_str[12]; // Suficientemente grande para un uint32_t
-	sprintf(nuevo_tamano_str, "%u", fcb->tamanio_archivo);
-	config_set_value(config, "TAMANIO_ARCHIVO", nuevo_tamano_str);
-} */
 
 void ampliar_tamano_archivo(FCB *fcb, int nuevo_tamano)
 {
@@ -404,6 +425,24 @@ void truncar_archivo(char *nombre, int nuevo_tamano)
 	return;
 }
 
+void *leer_bloque_swap(int numero_de_bloque)
+{
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
+	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
+	void *bloque = malloc(configuracion_filesystem->tam_bloques);
+	fread(bloque, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
+	fclose(archivo_bloques);
+	return bloque;
+}
+
+void escribir_bloque_swap(int numero_de_bloque, void* bloque)
+{
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "ab+");
+	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
+	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
+	fclose(archivo_bloques);
+}
+
 void escribir_bloque(uint32_t bloqueFAT, char *informacion)
 {
 	uint32_t bloque_real = configuracion_filesystem->cant_bloques_swap + bloqueFAT;
@@ -455,28 +494,4 @@ uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo)
 		bloque_a_leer = entrada_fat[bloque_a_leer];
 	}
 	return bloque_a_leer;
-}
-
-char *concatenarRutas(const char *rutaFat, const char *nombreFCB)
-{
-	// Asegúrate de tener suficiente espacio para ambas cadenas más el carácter nulo
-	size_t longitudTotal = strlen(rutaFat) + strlen(nombreFCB) + 1;
-
-	// Reserva memoria para la nueva cadena
-	char *rutaCompleta = (char *)malloc(longitudTotal);
-
-	// Verifica si la asignación de memoria fue exitosa
-	if (rutaCompleta == NULL)
-	{
-		perror("Error al asignar memoria");
-		exit(EXIT_FAILURE);
-	}
-
-	// Copia la primera cadena en la nueva cadena
-	strcpy(rutaCompleta, rutaFat);
-
-	// Concatena la segunda cadena en la nueva cadena
-	strcat(rutaCompleta, nombreFCB);
-
-	return rutaCompleta;
 }
