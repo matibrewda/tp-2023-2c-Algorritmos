@@ -12,7 +12,6 @@ int conexion_con_kernel = -1;
 int conexion_con_memoria = -1;
 
 bool *bitmap_bloques_libres_swap;
-
 t_list *fcbs; // Lista de FCBs de archivos que fueron abiertos
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
@@ -112,7 +111,11 @@ void *comunicacion_memoria()
 		switch (operacion_recibida_memoria)
 		{
 		case SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM:
-
+			int cantidad_de_bloques_a_reservar = leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria);
+			t_list* bloques_reservados = reservar_bloques_en_swap(cantidad_de_bloques_a_reservar);
+			bool pude_reservar_todos = bloques_reservados != NULL;
+			//t_paquete* paquete_respuesta_pedirr_bloques_a_fs = crear_paquete_respuest_pedir
+			list_destroy(bloques_reservados);
 			break;
 		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
 
@@ -309,6 +312,7 @@ void dar_full_permisos_a_archivo(char *path_archivo)
 void *leer_bloque_swap(int numero_de_bloque)
 {
 	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
 	void *bloque = malloc(configuracion_filesystem->tam_bloques);
@@ -320,6 +324,7 @@ void *leer_bloque_swap(int numero_de_bloque)
 void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 {
 	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
 	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
@@ -340,7 +345,6 @@ t_list *buscar_bloques_libres_en_swap(int cantidad_de_bloques)
 			*bloque_libre = i;
 			list_add(bloques_libres, bloque_libre);
 			bloques_libres_encontrados++;
-			log_debug(logger, "ENCONTRE BLOQUE LIBRE %d", *bloque_libre);
 		}
 	}
 

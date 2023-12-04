@@ -40,11 +40,15 @@
 #define RUTA_ARCHIVO_DE_LOGS "Logs/filesystem.log"
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
+// Comunicaciones
 void *comunicacion_kernel();
 void *comunicacion_memoria();
 
+// Inicializacion
 void inicializar_archivo_de_bloques();
 void inicializar_fat();
+
+// Manejo de archivos de usuario
 int abrir_archivo_fs(char *nombre_archivo);
 void crear_archivo_fs(char *nombre_archivo);
 
