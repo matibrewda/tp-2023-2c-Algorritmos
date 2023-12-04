@@ -1,6 +1,9 @@
 #ifndef CONSTANTES_H_
 #define CONSTANTES_H_
 
+// Otros
+#define EOF_FS UINT32_MAX
+
 // Nombres de instrucciones
 #define SET_NOMBRE_INSTRUCCION "SET"
 #define SUM_NOMBRE_INSTRUCCION "SUM"

@@ -13,6 +13,8 @@ int conexion_con_memoria = -1;
 
 pthread_mutex_t mutex_archivo_bloques;
 
+uint32_t cantidad_de_entradas_tabla_fat;
+uint32_t tamanio_archivo_tabla_fat;
 bool *bitmap_bloques_libres_swap;
 t_list *fcbs; // Lista de FCBs de archivos que fueron abiertos
 
@@ -65,6 +67,8 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	pthread_mutex_init(&mutex_archivo_bloques, NULL);
+	tamanio_archivo_tabla_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
+	cantidad_de_entradas_tabla_fat = configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap;
 	fcbs = list_create();
 	inicializar_archivo_de_bloques();
 	inicializar_fat();
@@ -123,7 +127,6 @@ void *comunicacion_memoria()
 			list_destroy(bloques_reservados);
 			break;
 		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
-			leer_paquete_solicitud_lib(logger, conexion_con_memoria);
 			break;
 		case SOLICITUD_LEER_PAGINA_EN_SWAP:
 
@@ -171,6 +174,14 @@ void *comunicacion_kernel()
 			enviar_paquete(logger, conexion_con_kernel, respuesta_crear_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			break;
 
+		case SOLICITUD_TRUNCAR_ARCHIVO_FS:
+			char *nombre_archivo_truncar;
+			int nuevo_tamanio_archivo;
+			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_truncar, &nuevo_tamanio_archivo);
+			log_info(logger, "Truncar Archivo: %s - Tamano: %d", nombre_archivo_truncar, nuevo_tamanio_archivo);
+			truncar_archivo_fs(nombre_archivo_truncar, nuevo_tamanio_archivo);
+			break;
+
 		case SOLICITUD_LEER_ARCHIVO_FS:
 			char **nombre_leer;
 			int *puntero_lectura;
@@ -193,15 +204,6 @@ void *comunicacion_kernel()
 			uint32_t bloque_fat = buscar_bloque_fat(nro_bloque_esc, *nombre_leer);
 			escribir_bloque(bloque_fat, informacion);
 
-			break;
-
-		case SOLICITUD_TRUNCAR_ARCHIVO_FS:
-
-			char **nombre_truncar;
-			int *nuevo_tamanio_archivo;
-			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, nombre_truncar, nuevo_tamanio_archivo);
-			log_debug(logger, "entro a f_truncate");
-			truncar_archivo(*nombre_truncar, *nuevo_tamanio_archivo);
 			break;
 
 		default:
@@ -227,7 +229,6 @@ void inicializar_fat()
 
 	log_debug(logger, "Tabla FAT NO existia, se escribiran 0s en TODA la tabla FAT");
 	archivo_tabla_fat = fopen(configuracion_filesystem->path_fat, "wb");
-	int cantidad_de_entradas_tabla_fat = configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap;
 
 	// Inicializar tabla FAT con 0s
 	uint32_t byte_en_cero = 0;
@@ -301,21 +302,27 @@ void crear_archivo_fs(char *nombre_archivo)
 	// Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
 	FCB *fcb_archivo_nuevo = iniciar_fcb(nombre_archivo, 0, -1);
 	list_add(fcbs, fcb_archivo_nuevo);
+	crear_archivo_fcb(fcb_archivo_nuevo);
+}
 
+void crear_archivo_fcb(FCB* fcb)
+{
 	char path_fcb[200];
-	sprintf(path_fcb, "%s/%s.fcb", configuracion_filesystem->path_fcb, nombre_archivo);
+	sprintf(path_fcb, "%s/%s.fcb", configuracion_filesystem->path_fcb, fcb->nombre_archivo);
 
 	FILE *archivo_fcb = fopen(path_fcb, "w+");
-	fprintf(archivo_fcb, "NOMBRE_ARCHIVO=%s\n", fcb_archivo_nuevo->nombre_archivo);
-	fprintf(archivo_fcb, "TAMANIO_ARCHIVO=%d\n", fcb_archivo_nuevo->tamanio_archivo);
-	fprintf(archivo_fcb, "BLOQUE_INICIAL=%d\n", fcb_archivo_nuevo->bloque_inicial);
+	fprintf(archivo_fcb, "NOMBRE_ARCHIVO=%s\n", fcb->nombre_archivo);
+	fprintf(archivo_fcb, "TAMANIO_ARCHIVO=%d\n", fcb->tamanio_archivo);
+	fprintf(archivo_fcb, "BLOQUE_INICIAL=%d\n", fcb->bloque_inicial);
 	fclose(archivo_fcb);
 	dar_full_permisos_a_archivo(path_fcb);
 }
 
 void dar_full_permisos_a_archivo(char *path_archivo)
 {
+	log_debug(logger, "Intentado otorgar todos los permisos al archivo %s", path_archivo);
 	chmod(path_archivo, strtol("0777", 0, 8));
+	log_debug(logger, "Otorgados todos los permisos al archivo %s", path_archivo);
 }
 
 void *leer_bloque_swap(int numero_de_bloque)
@@ -409,17 +416,73 @@ t_list *reservar_bloques_en_swap(int cantidad_de_bloques)
 	return bloques_libres;
 }
 
-void ampliar_tamano_archivo(FCB *fcb, int nuevo_tamano)
+void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio)
 {
-	// Actualizar tamaño en la estructura FCB
-	int bloques_a_agregar = (nuevo_tamano - (fcb->tamanio_archivo)) / configuracion_filesystem->tam_bloques;
-	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
-	uint32_t bloque_a_leer = fcb->bloque_inicial;
-	int fatfd = open(configuracion_filesystem->path_fat, O_RDWR);
-	uint32_t *entrada_fat = mmap(NULL, tamanio_FAT, PROT_READ | PROT_WRITE, MAP_SHARED, fatfd, 0);
+	bool _filtro_fcb_por_nombre_archivo(FCB * fcb)
+	{
+		return strcmp(fcb->nombre_archivo, nombre_archivo) == 0;
+	};
+
+	FCB *fcb = list_find(fcbs, (void *)_filtro_fcb_por_nombre_archivo);
+
+	if (nuevo_tamanio > fcb->tamanio_archivo)
+	{
+		fcb->bloque_inicial = ampliar_tamano_archivo(fcb, nuevo_tamanio);
+		fcb->tamanio_archivo = nuevo_tamanio;
+		crear_archivo_fcb(fcb);
+		return;
+	}
+	else if (nuevo_tamanio < fcb->tamanio_archivo)
+	{
+		fcb->bloque_inicial = reducir_tamano_archivo(fcb, nuevo_tamanio);
+		fcb->tamanio_archivo = nuevo_tamanio;
+		crear_archivo_fcb(fcb);
+		return;
+	}
+
+	// Si el nuevo tamaño es igual al actual, no se requiere acción.
+	return;
+}
+
+int ampliar_tamano_archivo(FCB *fcb, int nuevo_tamanio)
+{
+	int primer_bloque = fcb->bloque_inicial;
+	int ultimo_bloque;
+	int bloques_a_agregar = ceil((nuevo_tamanio - (fcb->tamanio_archivo)) / (double)(configuracion_filesystem->tam_bloques));
+	uint32_t * puntero_memoria_tabla_fat;
+	FILE* puntero_archivo_tabla_fat;
+	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
+
+	if (primer_bloque == -1)
+	{
+		primer_bloque = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
+		ultimo_bloque = primer_bloque;
+		bloques_a_agregar--;
+	}
+
+	int bloque_actual = primer_bloque;
+
+	while (entrada_fat[bloque_a_leer] != EOF_FS)
+	{
+		bloque_a_leer = entrada_fat[bloque_a_leer];
+	}
+	
+
+	cerrar_tabla_fat(puntero_memoria_tabla_fat, puntero_archivo_tabla_fat);
+	return primer_bloque;
+
+
+
+
+
+
+
+
+
+
 
 	// busco el ultimo bloque del archivo
-	while (entrada_fat[bloque_a_leer] != UINT32_MAX)
+	while (entrada_fat[bloque_a_leer] != EOF_FS)
 	{
 		bloque_a_leer = entrada_fat[bloque_a_leer];
 	}
@@ -439,12 +502,46 @@ void ampliar_tamano_archivo(FCB *fcb, int nuevo_tamano)
 	}
 	entrada_fat[ultimo_bloque] = UINT32_MAX;
 	munmap(entrada_fat, tamanio_FAT);
-	close(fatfd);
-	fcb->tamanio_archivo = nuevo_tamano;
-	// Actualizar tamaño en la configuración
 }
 
-void reducir_tamano_archivo(FCB *fcb, int nuevo_tamano)
+void abrir_tabla_fat(uint32_t **puntero_memoria_tabla_fat, FILE** puntero_archivo_tabla_fat)
+{
+	*puntero_archivo_tabla_fat = fopen(configuracion_filesystem->path_fat, "rb+");
+	int archivo_tabla_fat_file_descriptor = fileno(*puntero_archivo_tabla_fat);
+	*puntero_memoria_tabla_fat = mmap(NULL, tamanio_archivo_tabla_fat, PROT_READ | PROT_WRITE, MAP_SHARED, archivo_tabla_fat_file_descriptor, 0);
+}
+
+void cerrar_tabla_fat(uint32_t * puntero_tabla_fat, FILE* puntero_archivo_tabla_fat)
+{
+	munmap(puntero_tabla_fat, tamanio_archivo_tabla_fat);
+	fclose(puntero_archivo_tabla_fat);
+}
+
+int buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat)
+{
+	int bloque_libre = -1;
+
+	// Arranco en i = 1 porque el bloque 0 NUNCA se puede usar (boot)
+	for (int i = 1 ; i < cantidad_de_entradas_tabla_fat && bloque_libre == -1 ; i++)
+	{
+		if (puntero_tabla_fat[i] == 0)
+		{
+			bloque_libre = i;
+		}
+	}
+}
+
+int leer_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_fat)
+{
+	return puntero_tabla_fat[indice_fat];
+}
+
+void escribir_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
+{
+	puntero_tabla_fat[indice_donde_escribir] = indice_a_escribir;
+}
+
+int reducir_tamano_archivo(FCB *fcb, int nuevo_tamano)
 {
 	int bloques_a_quitar = ((fcb->tamanio_archivo) - nuevo_tamano) / configuracion_filesystem->tam_bloques;
 	fcb->tamanio_archivo = nuevo_tamano;
@@ -476,36 +573,6 @@ void reducir_tamano_archivo(FCB *fcb, int nuevo_tamano)
 	close(fatfd);
 }
 
-void truncar_archivo(char *nombre, int nuevo_tamano)
-{
-	// FCB *fcb = buscar_archivo(nombre);
-	FCB *fcb;
-	t_config *config;
-	log_debug(logger, "Truncar Archivo: Iniciado.");
-	// BUSCAR RUTA DEL ARCHIVO COMLETAR!!!
-	// Agarro la ruta del fcb existente y el nuevo tamaño para truncarlo.
-	if (fcb == NULL)
-	{
-		log_debug(logger, "Truncar Archivo: No existe el archivo: <%s>.", nombre);
-		return;
-	}
-	if (nuevo_tamano > fcb->tamanio_archivo)
-	{
-		log_info(logger, "Truncar Archivo: <%s> - Tamaño: <%d>", fcb->nombre_archivo, nuevo_tamano);
-		// Ampliar el tamaño del archivo
-		ampliar_tamano_archivo(fcb, nuevo_tamano);
-		return;
-	}
-	else if (nuevo_tamano < fcb->tamanio_archivo)
-	{
-		log_info(logger, "Truncar Archivo: <%s> - Tamaño: <%d>", fcb->nombre_archivo, nuevo_tamano);
-		// Reducir el tamaño del archivo
-		reducir_tamano_archivo(fcb, nuevo_tamano);
-		return;
-	}
-	// Si el nuevo tamaño es igual al actual, no se requiere acción.
-	return;
-}
 
 void escribir_bloque(uint32_t bloqueFAT, char *informacion)
 {

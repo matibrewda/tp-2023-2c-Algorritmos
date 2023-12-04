@@ -51,6 +51,9 @@ void inicializar_fat();
 // Manejo de archivos de usuario
 int abrir_archivo_fs(char *nombre_archivo);
 void crear_archivo_fs(char *nombre_archivo);
+void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio);
+int reducir_tamano_archivo(FCB *fcb, int nuevo_tamanio);
+int ampliar_tamano_archivo(FCB *fcb, int nuevo_tamanio);
 
 // Swap
 void *leer_bloque_swap(int numero_de_bloque);
@@ -61,16 +64,20 @@ t_list *reservar_bloques_en_swap(int cantidad_de_bloques);
 
 // ?
 t_list *archivos;
-void truncar_archivo(char *path, int nuevo_tamano);
 uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo);
 FCB *buscar_archivo(char *nombre_archivo);
 void leer_bloque(uint32_t bloqueFAT);
 void escribir_bloque(uint32_t bloqueFAT, char *informacion);
-void reducir_tamano_archivo(FCB *fcb, int nuevo_tamano);
-void ampliar_tamano_archivo(FCB *fcb, int nuevo_tamano);
+
 
 // Utilidades
 void dar_full_permisos_a_archivo(char *path_archivo);
+void crear_archivo_fcb(FCB* fcb);
+void abrir_tabla_fat(uint32_t **puntero_memoria_tabla_fat, FILE** puntero_archivo_tabla_fat);
+void cerrar_tabla_fat(uint32_t * puntero_tabla_fat, FILE* puntero_archivo_tabla_fat);
+int obtener_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_fat);
+int buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat);
+void escribir_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
 
 // Terminar
 void terminar_filesystem();
