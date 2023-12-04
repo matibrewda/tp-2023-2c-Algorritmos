@@ -45,27 +45,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-	if (socket_kernel == -1)
-	{
-		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
-		return EXIT_FAILURE;
-	}
-
-	conexion_con_memoria = crear_socket_cliente(logger, configuracion_filesystem->ip_memoria, configuracion_filesystem->puerto_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-	if (conexion_con_memoria == -1)
-	{
-		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
-		return EXIT_FAILURE;
-	}
-
-	conexion_con_kernel = esperar_conexion_de_cliente(logger, socket_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-	if (conexion_con_kernel == -1)
-	{
-		terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
-		return EXIT_FAILURE;
-	}
-
 	pthread_mutex_init(&mutex_archivo_bloques, NULL);
 	tamanio_archivo_tabla_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
 	cantidad_de_entradas_tabla_fat = configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap;
@@ -73,12 +52,43 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	inicializar_archivo_de_bloques();
 	inicializar_fat();
 
-	pthread_create(&hilo_kernel, NULL, comunicacion_kernel, NULL);
-	pthread_create(&hilo_memoria, NULL, comunicacion_memoria, NULL);
-	pthread_join(hilo_kernel, NULL);
-	pthread_join(hilo_memoria, NULL);
+	//abrir_archivo_fs("lucas");
+	//truncar_archivo_fs("lucas", 3);
 
-	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+	// socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+	// if (socket_kernel == -1)
+	// {
+	// 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+	// 	return EXIT_FAILURE;
+	// }
+
+	// conexion_con_memoria = crear_socket_cliente(logger, configuracion_filesystem->ip_memoria, configuracion_filesystem->puerto_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+	// if (conexion_con_memoria == -1)
+	// {
+	// 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+	// 	return EXIT_FAILURE;
+	// }
+
+	// conexion_con_kernel = esperar_conexion_de_cliente(logger, socket_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+	// if (conexion_con_kernel == -1)
+	// {
+	// 	terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
+	// 	return EXIT_FAILURE;
+	// }
+
+	// pthread_mutex_init(&mutex_archivo_bloques, NULL);
+	// tamanio_archivo_tabla_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
+	// cantidad_de_entradas_tabla_fat = configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap;
+	// fcbs = list_create();
+	// inicializar_archivo_de_bloques();
+	// inicializar_fat();
+
+	// pthread_create(&hilo_kernel, NULL, comunicacion_kernel, NULL);
+	// pthread_create(&hilo_memoria, NULL, comunicacion_memoria, NULL);
+	// pthread_join(hilo_kernel, NULL);
+	// pthread_join(hilo_memoria, NULL);
+
+	// terminar_filesystem(logger, argumentos_filesystem, configuracion_filesystem, socket_kernel, conexion_con_kernel, conexion_con_memoria);
 	return EXIT_SUCCESS;
 }
 
@@ -248,12 +258,12 @@ void inicializar_archivo_de_bloques()
 	log_debug(logger, "Inicializando archivo de bloques");
 
 	// Creo archivo para bloques con su correspondiente tamaño
-	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "wb+");
 	int archivo_bloques_file_descriptor = fileno(archivo_bloques);
 	int tamanio_bloques = configuracion_filesystem->cant_bloques_total * configuracion_filesystem->tam_bloques;
 	ftruncate(archivo_bloques_file_descriptor, tamanio_bloques);
-
 	fclose(archivo_bloques);
+
 	dar_full_permisos_a_archivo(configuracion_filesystem->path_bloques);
 
 	bitmap_bloques_libres_swap = malloc(sizeof(int) * configuracion_filesystem->cant_bloques_swap);
@@ -305,7 +315,7 @@ void crear_archivo_fs(char *nombre_archivo)
 	crear_archivo_fcb(fcb_archivo_nuevo);
 }
 
-void crear_archivo_fcb(FCB* fcb)
+void crear_archivo_fcb(FCB *fcb)
 {
 	char path_fcb[200];
 	sprintf(path_fcb, "%s/%s.fcb", configuracion_filesystem->path_fcb, fcb->nombre_archivo);
@@ -446,97 +456,84 @@ void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio)
 
 int ampliar_tamano_archivo(FCB *fcb, int nuevo_tamanio)
 {
-	int primer_bloque = fcb->bloque_inicial;
-	int ultimo_bloque;
+	log_info(logger, "AMPLIANDO...");
+	uint32_t primer_bloque = fcb->bloque_inicial;
 	int bloques_a_agregar = ceil((nuevo_tamanio - (fcb->tamanio_archivo)) / (double)(configuracion_filesystem->tam_bloques));
-	uint32_t * puntero_memoria_tabla_fat;
-	FILE* puntero_archivo_tabla_fat;
+	log_info(logger, "Necesito agregar %d bloques...", bloques_a_agregar);
+	uint32_t *puntero_memoria_tabla_fat;
+	FILE *puntero_archivo_tabla_fat;
 	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
 
 	if (primer_bloque == -1)
 	{
+		log_info(logger, "Buscando bloque libre...");
 		primer_bloque = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
-		ultimo_bloque = primer_bloque;
+		log_info(logger, "Encontre el bloque libre %d...", primer_bloque);
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, primer_bloque);
 		bloques_a_agregar--;
 	}
 
-	int bloque_actual = primer_bloque;
+	//---
+	log_info(logger, "Hasta aca seguro llegamos");
 
-	while (entrada_fat[bloque_a_leer] != EOF_FS)
+	uint32_t indice_bloque_actual = primer_bloque;
+
+	while (leer_entrada_fat_por_indice(puntero_memoria_tabla_fat,indice_bloque_actual) != EOF_FS)
 	{
-		bloque_a_leer = entrada_fat[bloque_a_leer];
+		indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
 	}
-	
+
+	while (bloques_a_agregar > 0)
+	{
+		u_int32_t indice_bloque_libre = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_libre, indice_bloque_actual);
+		indice_bloque_actual = indice_bloque_libre;
+		bloques_a_agregar--;
+	}
+
+	escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_bloque_actual);
 
 	cerrar_tabla_fat(puntero_memoria_tabla_fat, puntero_archivo_tabla_fat);
 	return primer_bloque;
-
-
-
-
-
-
-
-
-
-
-
-	// busco el ultimo bloque del archivo
-	while (entrada_fat[bloque_a_leer] != EOF_FS)
-	{
-		bloque_a_leer = entrada_fat[bloque_a_leer];
-	}
-
-	uint32_t ultimo_bloque = bloque_a_leer;
-	bloque_a_leer = 1;
-
-	while (bloques_a_agregar != 0)
-	{
-		if (entrada_fat[bloque_a_leer] == 0)
-		{
-			entrada_fat[ultimo_bloque] = bloque_a_leer;
-			ultimo_bloque = bloque_a_leer;
-			bloques_a_agregar--;
-		}
-		bloque_a_leer++;
-	}
-	entrada_fat[ultimo_bloque] = UINT32_MAX;
-	munmap(entrada_fat, tamanio_FAT);
 }
 
-void abrir_tabla_fat(uint32_t **puntero_memoria_tabla_fat, FILE** puntero_archivo_tabla_fat)
+void abrir_tabla_fat(uint32_t **puntero_memoria_tabla_fat, FILE **puntero_archivo_tabla_fat)
 {
+	log_info(logger, "Abriendo tabla fat...");
 	*puntero_archivo_tabla_fat = fopen(configuracion_filesystem->path_fat, "rb+");
 	int archivo_tabla_fat_file_descriptor = fileno(*puntero_archivo_tabla_fat);
 	*puntero_memoria_tabla_fat = mmap(NULL, tamanio_archivo_tabla_fat, PROT_READ | PROT_WRITE, MAP_SHARED, archivo_tabla_fat_file_descriptor, 0);
+	log_info(logger, "Abri tabla fat...");
 }
 
-void cerrar_tabla_fat(uint32_t * puntero_tabla_fat, FILE* puntero_archivo_tabla_fat)
+void cerrar_tabla_fat(uint32_t *puntero_tabla_fat, FILE *puntero_archivo_tabla_fat)
 {
 	munmap(puntero_tabla_fat, tamanio_archivo_tabla_fat);
 	fclose(puntero_archivo_tabla_fat);
 }
 
-int buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat)
+uint32_t buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat)
 {
 	int bloque_libre = -1;
 
 	// Arranco en i = 1 porque el bloque 0 NUNCA se puede usar (boot)
-	for (int i = 1 ; i < cantidad_de_entradas_tabla_fat && bloque_libre == -1 ; i++)
+	for (int i = 1; i < cantidad_de_entradas_tabla_fat && bloque_libre == -1; i++)
 	{
 		if (puntero_tabla_fat[i] == 0)
 		{
 			bloque_libre = i;
 		}
 	}
+
+	return bloque_libre;
 }
 
-int leer_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_fat)
+uint32_t leer_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_fat)
 {
 	return puntero_tabla_fat[indice_fat];
 }
 
-void escribir_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
+void escribir_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
 {
 	puntero_tabla_fat[indice_donde_escribir] = indice_a_escribir;
 }
@@ -572,7 +569,6 @@ int reducir_tamano_archivo(FCB *fcb, int nuevo_tamano)
 	munmap(entrada_fat, tamanio_FAT);
 	close(fatfd);
 }
-
 
 void escribir_bloque(uint32_t bloqueFAT, char *informacion)
 {

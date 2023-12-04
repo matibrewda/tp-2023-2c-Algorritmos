@@ -75,9 +75,9 @@ void dar_full_permisos_a_archivo(char *path_archivo);
 void crear_archivo_fcb(FCB* fcb);
 void abrir_tabla_fat(uint32_t **puntero_memoria_tabla_fat, FILE** puntero_archivo_tabla_fat);
 void cerrar_tabla_fat(uint32_t * puntero_tabla_fat, FILE* puntero_archivo_tabla_fat);
-int obtener_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_fat);
-int buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat);
-void escribir_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
+uint32_t buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat);
+void escribir_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir);
+uint32_t leer_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_fat);
 
 // Terminar
 void terminar_filesystem();
