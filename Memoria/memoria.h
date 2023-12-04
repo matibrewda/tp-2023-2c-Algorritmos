@@ -12,6 +12,7 @@
 #include <semaphore.h>
 #include <math.h>
 #include <stdint.h>
+#include <time.h>
 
 #include <commons/collections/list.h>
 #include <commons/collections/queue.h>
@@ -47,6 +48,7 @@ void notificar_escritura_a_filesytem();
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor);
 uint32_t leer_valor_en_memoria(int direccion_fisica);
 void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado);
+time_t obtener_tiempo_actual();
 
 // Handshake con CPU
 void enviar_info_de_memoria_inicial_para_cpu();
@@ -82,6 +84,7 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid);
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_presente(int marco);
 int cantidad_de_paginas_proceso(int pid);
+t_list *obtener_entradas_de_tabla_de_pagina_presentes();
 
 // Manejo de Paginas
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina);

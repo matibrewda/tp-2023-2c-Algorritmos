@@ -288,6 +288,7 @@ void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->modificado = 1;
+	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	// Retardo de respuesta!
@@ -303,7 +304,7 @@ uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
 	// TODO se debe lockear?
 	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
-
+	//TODO ver si cuando se lee un valor de memoria se tiene que actualizar el timstamp
 	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return valor_leido;
@@ -433,8 +434,6 @@ void finalizar_proceso_en_memoria(int pid)
 {
 	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
-
-	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 	if (archivo_proceso == NULL)
 	{
@@ -521,7 +520,9 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size_thread_safe(entradas_tabla_de_paginas,&mutex_entradas_tabla_de_paginas); i++)
 	{
 		t_entrada_de_tabla_de_pagina *entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
-		eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
+		if (configuracion_memoria->algoritmo_reemplazo== "FIFO"){
+			eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
+		}
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
@@ -535,7 +536,6 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 
 void eliminar_entrada_de_tabla_de_paginas(int pid)
 {
-	// TODO agregar mutex a tabla_de_paginas
 	bool _filtro_paginas_de_memoria_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
 	{
 		return pagina_de_memoria->pid == pid;
@@ -603,9 +603,39 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo()
 	return pagina_victima;
 }
 
+
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
 {
-	// TODO implementame PORFI
+	t_list *paginas_presentes = obtener_entradas_de_tabla_de_pagina_presentes();
+	
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
+
+    t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);
+
+    for (int i = 1; i < list_size(paginas_presentes); i++) {
+        t_entrada_de_tabla_de_pagina *pagina_actual = list_get(paginas_presentes, i);
+
+        // Comparar timestamps para encontrar la página con el timestamp más bajo (LRU)
+        if (pagina_actual->timestamp < pagina_victima_lru->timestamp) {
+            pagina_victima_lru = pagina_actual;
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
+
+    return pagina_victima_lru;
+}
+
+t_list *obtener_entradas_de_tabla_de_pagina_presentes()
+{
+	bool _filtro_paginas_de_memoria_presente()
+	{
+		return pagina_de_memoria->presencia == 1;
+	};
+
+	t_list *entradas_tabla_de_pagina = list_filter(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_pid);
+
+	return entradas_tabla_de_pagina;
 }
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
@@ -635,7 +665,6 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	if (entradas_tabla_de_pagina == NULL)
 	{
 		log_warning(logger, "No se encontraron entradas de tabla de pagina con el PID %d", pid);
-		// TODO ver que hay que retornar en este caso
 		return NULL;
 	}
 
@@ -654,12 +683,13 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 	if (pagina == NULL)
 	{
 		log_error(logger, "No existe un marco presente en memoria con el numero %d", marco);
-		// TODO ver que notificar aca, es Page Fault? Es un error?
 		return NULL;
 	}
 
 	return pagina;
 }
+
+
 
 void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 {
@@ -712,7 +742,11 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	}
 
 	free(contenido_en_swap);
-	queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
+	if (configuracion_memoria->algoritmo_reemplazo == "FIFO") {
+		queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
+	}
+
+
 	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 	return;
 }
@@ -722,10 +756,21 @@ void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, 
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->presencia = 1;
 	pagina->marco = marco_asignado;
+	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 	
 	return;
 }
+
+time_t obtener_tiempo_actual()
+{
+	time_t tiempo;
+	time(&tiempo);
+	localtime(&tiempo);
+
+	return tiempo;
+}
+
 
 void *buscar_contenido_marco(int numero_de_marco)
 {
@@ -796,7 +841,6 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 	if (pagina == NULL)
 	{
 		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
-		// TODO ver que notificar aca, es Page Fault? Es un error?
 		return NULL;
 	}
 
@@ -854,6 +898,7 @@ void destruir_listas()
 {
 	list_destroy(procesos_iniciados);
 	list_destroy(tabla_de_paginas);
+	queue_destroy(cola_fifo_entradas);
 	bitarray_destroy(tabla_de_marcos);
 	log_trace(logger, "Se destruyen todas las listas de manera correcta");
 }
