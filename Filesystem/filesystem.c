@@ -54,11 +54,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	crear_archivo_fs("lucas");
 	truncar_archivo_fs("lucas", 10); // Me reserva 5 bloques
-	truncar_archivo_fs("lucas", 7);	 // Me reserva 4 bloques
-	truncar_archivo_fs("lucas", 11); // Me reserva 5 bloques
-	truncar_archivo_fs("lucas", 8); // Me reserva 4 bloques
-	truncar_archivo_fs("lucas", 7); // Me reserva 4 bloques
-	truncar_archivo_fs("lucas", 8); // Me reserva 4 bloques
+	crear_archivo_fs("lucas2");
+	truncar_archivo_fs("lucas2", 5); // Me reserva 3 bloques
+	obtener_numero_de_bloque_fs("lucas2", 2);
 
 	// socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	// if (socket_kernel == -1)
@@ -195,6 +193,8 @@ void *comunicacion_kernel()
 			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_truncar, &nuevo_tamanio_archivo);
 			log_info(logger, "Truncar Archivo: %s - Tamano: %d", nombre_archivo_truncar, nuevo_tamanio_archivo);
 			truncar_archivo_fs(nombre_archivo_truncar, nuevo_tamanio_archivo);
+			t_paquete *respuesta_truncar_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_TRUNCAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+			enviar_paquete(logger, conexion_con_kernel, respuesta_crear_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			break;
 
 		case SOLICITUD_LEER_ARCHIVO_FS:
@@ -202,6 +202,8 @@ void *comunicacion_kernel()
 			int puntero_lectura;
 			int direccion_fisica_a_escribir;
 			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_leer, &puntero_lectura, &direccion_fisica_a_escribir);
+			uint32_t bloque_fs_a_leer = obtener_numero_de_bloque_fs(nombre_archivo_leer, puntero_lectura);
+			// TODO
 			log_info(logger, "Leer Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_leer, puntero_lectura, direccion_fisica_a_escribir);
 			break;
 
@@ -210,6 +212,8 @@ void *comunicacion_kernel()
 			int puntero_escritura;
 			int direccion_fisica_a_leer;
 			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_escribir, &puntero_escritura, &direccion_fisica_a_leer);
+			uint32_t bloque_fs_a_escribir = obtener_numero_de_bloque_fs(nombre_archivo_escribir, puntero_escritura);
+			// TODO
 			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
 			break;
 
@@ -607,50 +611,62 @@ FCB *abrir_fcb(char *ruta_archivo)
 	return fcb;
 }
 
-void escribir_bloque(uint32_t bloqueFAT, char *informacion)
+uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, int puntero_a_byte_de_archivo)
 {
-	uint32_t bloque_real = configuracion_filesystem->cant_bloques_swap + bloqueFAT;
-	int tamanio_archivo = configuracion_filesystem->cant_bloques_total * configuracion_filesystem->tam_bloques;
-	int byte_inicial = bloque_real * configuracion_filesystem->tam_bloques;
-	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
-	fseek(archivo_bloques, byte_inicial, SEEK_SET);
-	fwrite(informacion, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
-	fclose(archivo_bloques);
-}
+	uint32_t numero_logico_de_bloque_a_leer = floor(puntero_a_byte_de_archivo / (double)(configuracion_filesystem->tam_bloques));
 
-void leer_bloque(uint32_t bloqueFAT)
-{
-	uint32_t bloque_real = configuracion_filesystem->cant_bloques_swap + bloqueFAT;
-	int tamanio_archivo = configuracion_filesystem->cant_bloques_total * configuracion_filesystem->tam_bloques;
-	int byte_a_leer = bloque_real * configuracion_filesystem->tam_bloques;
-	char *informacion = malloc(configuracion_filesystem->tam_bloques);
-	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
-
-	fseek(archivo_bloques, byte_a_leer, SEEK_SET);
-	fread(informacion, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
-	log_debug(logger, "leo la siguiente info: %s", informacion);
-	fclose(archivo_bloques);
-	// solicitar_escribir_memoria(informacion);
-
-	/*int fdab = open(configuracion_filesystem->path_bloques, O_RDWR);
-	char *bloque = mmap(NULL,tamanio_archivo,PROT_READ | PROT_WRITE, MAP_SHARED ,fdab, 0);
-	char *informacion = bloque[bloque_real*configuracion_filesystem->tam_bloques];
-	*/
-	// ENVIAR A MEMORIA DESPUES
-}
-
-uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo)
-{
-	// FCB *fcb = buscar_archivo(nombre_archivo);
-	FCB *fcb;
-	uint32_t bloque_a_leer = fcb->bloque_inicial;
-	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
-	int fatfd = open(configuracion_filesystem->path_fat, O_RDWR);
-	uint32_t *entrada_fat = mmap(NULL, tamanio_FAT, PROT_READ | PROT_WRITE, MAP_SHARED, fatfd, 0);
-	for (uint32_t i = 0; i < nro_bloque; i++)
+	bool _filtro_fcb_por_nombre_archivo(FCB * fcb)
 	{
-		log_info(logger, "Acceso FAT - Entrada: <%d> - Valor: <%d>", i, entrada_fat[bloque_a_leer]);
-		bloque_a_leer = entrada_fat[bloque_a_leer];
+		return strcmp(fcb->nombre_archivo, nombre_archivo) == 0;
+	};
+
+	FCB *fcb = list_find(fcbs, (void *)_filtro_fcb_por_nombre_archivo);
+	uint32_t indice_primer_bloque = fcb->bloque_inicial;
+	uint32_t *puntero_memoria_tabla_fat;
+	FILE *puntero_archivo_tabla_fat;
+	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
+
+	uint32_t indice_bloque = indice_primer_bloque;
+	for (int i = 0; i < numero_logico_de_bloque_a_leer - 1; i++)
+	{
+		indice_bloque = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque);
 	}
-	return bloque_a_leer;
+	uint32_t indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque);
+	uint32_t numero_real_de_bloque_a_leer = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque);
+
+	log_info(logger, "Se leera el bloque %d de FS", numero_real_de_bloque_a_leer);
+
+	cerrar_tabla_fat(puntero_memoria_tabla_fat, puntero_archivo_tabla_fat);
+
+	return numero_real_de_bloque_a_leer;
+}
+
+void *leer_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char *nombre_archivo)
+{
+	pthread_mutex_lock(&mutex_archivo_bloques);
+	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
+
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
+	fseek(archivo_bloques, (numero_de_bloque_fs + configuracion_filesystem->cant_bloques_swap - 1) * configuracion_filesystem->tam_bloques, SEEK_SET);
+	void *bloque = malloc(configuracion_filesystem->tam_bloques);
+	fread(bloque, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
+	fclose(archivo_bloques);
+
+	pthread_mutex_unlock(&mutex_archivo_bloques);
+	return bloque;
+}
+
+void escribir_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char *nombre_archivo, void *bloque)
+{
+	pthread_mutex_lock(&mutex_archivo_bloques);
+	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
+
+	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
+	fseek(archivo_bloques, (numero_de_bloque_fs + configuracion_filesystem->cant_bloques_swap - 1) * configuracion_filesystem->tam_bloques, SEEK_SET);
+	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
+	fclose(archivo_bloques);
+
+	pthread_mutex_unlock(&mutex_archivo_bloques);
 }

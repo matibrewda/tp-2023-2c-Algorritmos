@@ -27,7 +27,8 @@
         "main.h": "c",
         "math.h": "c",
         "utilidades_archivos.h": "c",
-        "stat.h": "c"
+        "stat.h": "c",
+        "stdint.h": "c"
     }
 
 }
