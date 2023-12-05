@@ -161,7 +161,9 @@ void *atender_kernel()
 		else if (operacion_recibida_de_kernel == SOLICITUD_CARGAR_PAGINA_EN_MEMORIA)
 		{
 			t_pedido_pagina_en_memoria *pedido_cargar_pagina = leer_paquete_solicitud_pedido_pagina_en_memoria(logger, conexion_con_cpu, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
-			cargar_pagina_en_memoria(pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
+			t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
+			t_paquete *paquete = crear_paquete_solicitud_leer_pagina_swap(logger, pagina->posicion_en_swap, pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
+			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			free(pedido_cargar_pagina);
 		}
 	}
@@ -267,6 +269,17 @@ void *atender_filesystem()
 				log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>", pid_reservando, list_size(posiciones_swap));
 				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 			}
+		}
+		else if (operacion_recibida_de_filesystem == RESPUESTA_LEER_PAGINA_EN_SWAP)
+		{
+			int numero_pagina;
+			int pid;
+			void *contenido_pagina_en_swap = leer_paquete_respuesta_leer_pagina_en_swap(logger, conexion_con_filesystem, &numero_pagina, &pid);
+			cargar_pagina_de_swap_en_memoria(pid, numero_pagina, contenido_pagina_en_swap);
+		}
+		else if (operacion_recibida_de_filesystem == RESPUESTA_ESCRIBIR_PAGINA_EN_SWAP)
+		{
+			enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 		}
 	}
 }
@@ -535,23 +548,25 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo()
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
 {
 	t_list *paginas_presentes = obtener_entradas_de_tabla_de_pagina_presentes();
-	
+
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 
-    t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);
+	t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);
 
-    for (int i = 1; i < list_size(paginas_presentes); i++) {
-        t_entrada_de_tabla_de_pagina *pagina_actual = list_get(paginas_presentes, i);
+	for (int i = 1; i < list_size(paginas_presentes); i++)
+	{
+		t_entrada_de_tabla_de_pagina *pagina_actual = list_get(paginas_presentes, i);
 
-        // Comparar timestamps para encontrar la página con el timestamp más bajo (LRU)
-        if (pagina_actual->timestamp < pagina_victima_lru->timestamp) {
-            pagina_victima_lru = pagina_actual;
-        }
-    }
+		// Comparar timestamps para encontrar la página con el timestamp más bajo (LRU)
+		if (pagina_actual->timestamp < pagina_victima_lru->timestamp)
+		{
+			pagina_victima_lru = pagina_actual;
+		}
+	}
 
-    pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
-    return pagina_victima_lru;
+	return pagina_victima_lru;
 }
 
 t_list *obtener_entradas_de_tabla_de_pagina_presentes()
@@ -616,63 +631,40 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 	return pagina;
 }
 
-void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
-{
-	pthread_mutex_lock(&mutex_conexion_filesystem);
-
-	t_paquete *paquete = crear_paquete_solicitud_leer_pagina_swap(logger, posicion_en_swap);
-	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-
-	void *contenido_del_bloque = malloc(configuracion_memoria->tam_pagina);
-
-	// Recibir
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM
-	contenido_del_bloque = leer_paquete_respuesta_leer_pagina_en_swap(logger, conexion_con_filesystem);
-
-	pthread_mutex_unlock(&mutex_conexion_filesystem);
-
-	return contenido_del_bloque;
-}
-
-void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
+void cargar_pagina_de_swap_en_memoria(int pid, int numero_de_pagina, void *contenido_en_swap)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
-	// log_info(logger,"Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>",pid,pagina->numero_de_pagina,pagina->marco); TODO ver si este log va
-	if (pagina == NULL)
-	{
-		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(false);
-		return;
-	}
-
-	void *contenido_en_swap = obtener_contenido_de_pagina_en_swap(pagina->posicion_en_swap);
 
 	int marco_desocupado;
 	if (obtener_primer_marco_desocupado(&marco_desocupado))
 	{
-		// cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		// Cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
 		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);
 		// Actualizar entrada tabla de paginas de la nueva pagina
 		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
 		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 		ocupar_marco(marco_desocupado);
+		free(contenido_en_swap);
+		if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
+		{
+			queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
+		}
+
+		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
+		return;
 	}
-	else
-	{
-		int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
-		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
-		actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
-		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
-		ocupar_marco(marco_libre);
-	}
+
+	int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
+	cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
+	actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
+	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
+	ocupar_marco(marco_libre);
 
 	free(contenido_en_swap);
 	if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
 	{
 		queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
 	}
-
-	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
-	return;
 }
 
 void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina *pagina, int marco_asignado)

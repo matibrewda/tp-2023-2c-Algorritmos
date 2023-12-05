@@ -475,7 +475,7 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int pid, int 
 }
 
 // Filesystem a memoria
-t_paquete *crear_paquete_respuesta_leer_pagina_swap(t_log *logger, void* contenido_pagina, int tamanio_pagina)
+t_paquete *crear_paquete_respuesta_leer_pagina_swap(t_log *logger, void* contenido_pagina, int tamanio_pagina, int numero_pagina, int pid)
 {
     op_code codigo_operacion = RESPUESTA_LEER_PAGINA_EN_SWAP;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -484,6 +484,8 @@ t_paquete *crear_paquete_respuesta_leer_pagina_swap(t_log *logger, void* conteni
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
     agregar_void_a_paquete(logger, paquete, contenido_pagina, tamanio_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, numero_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, pid, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
@@ -577,7 +579,7 @@ t_paquete *crear_paquete_respuesta_leer_marco_de_memoria(t_log *logger, char* no
 }
 
 // Memoria a Filesystem
-t_paquete *crear_paquete_solicitud_leer_pagina_swap(t_log *logger, int posicion_swap)
+t_paquete *crear_paquete_solicitud_leer_pagina_swap(t_log *logger, int posicion_swap, int pid, int numero_de_pagina)
 {
     op_code codigo_operacion = SOLICITUD_LEER_PAGINA_EN_SWAP;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -587,6 +589,8 @@ t_paquete *crear_paquete_solicitud_leer_pagina_swap(t_log *logger, int posicion_
     // RESPETAR EL ORDEN -> SERIALIZACION!
     log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
     agregar_int_a_paquete(logger, paquete, posicion_swap, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, pid, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, numero_de_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 

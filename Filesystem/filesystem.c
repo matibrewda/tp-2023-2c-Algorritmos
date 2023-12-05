@@ -135,9 +135,11 @@ void *comunicacion_memoria()
 			break;
 		case SOLICITUD_LEER_PAGINA_EN_SWAP:
 			int posicion_swap_a_leer;
-			leer_paquete_solicitud_leer_pagina_swap(logger, conexion_con_memoria, &posicion_swap_a_leer);
+			int numero_de_pagina;
+			int pid;
+			leer_paquete_solicitud_leer_pagina_swap(logger, conexion_con_memoria, &posicion_swap_a_leer, &numero_de_pagina, &pid);
 			void* pagina_en_swap = leer_bloque_swap(posicion_swap_a_leer);
-			t_paquete *paquete_respuesta_leer_pagina_en_swap = crear_paquete_respuesta_leer_pagina_swap(logger, pagina_en_swap, configuracion_filesystem->tam_bloques);
+			t_paquete *paquete_respuesta_leer_pagina_en_swap = crear_paquete_respuesta_leer_pagina_swap(logger, pagina_en_swap, configuracion_filesystem->tam_bloques, numero_de_pagina, pid);
 			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_leer_pagina_en_swap, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 		case SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP:

@@ -75,7 +75,7 @@ int cantidad_de_paginas_proceso(int pid);
 t_list *obtener_entradas_de_tabla_de_pagina_presentes();
 
 // Manejo de Paginas
-void cargar_pagina_en_memoria(int pid, int numero_de_pagina);
+void cargar_pagina_de_swap_en_memoria(int pid, int numero_de_pagina, void *contenido_en_swap);
 int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina);
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina);
 void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap);
