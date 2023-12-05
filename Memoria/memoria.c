@@ -231,7 +231,8 @@ void *atender_filesystem()
 			int puntero_archivo_a_escribir;
 			int direccion_fisica;
 			leer_paquete_solicitud_leer_marco_de_memoria(logger, conexion_con_filesystem, &direccion_fisica, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir);
-			void *contenido_marco; // TODO: LEER MARCO ENTERO  (void* contenido_marco <- direccion_fisica)
+			int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
+			void *contenido_marco = buscar_contenido_marco(numero_de_marco);
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -240,7 +241,8 @@ void *atender_filesystem()
 			void *contenido_bloque;
 			int direccion_fisica;
 			leer_paquete_solicitud_escribir_bloque_en_memoria(logger, conexion_con_filesystem, &direccion_fisica, &contenido_bloque);
-			// TODO: ESCRIBIR BLOQUE ENTERO (void* contenido_bloque -> direccion_fisica)
+			int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
+			cargar_datos_de_pagina_en_memoria_real(contenido_bloque, numero_de_marco);
 			t_paquete *respuesta_escribir_bloque_en_memoria = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			enviar_paquete(logger, conexion_con_filesystem, respuesta_escribir_bloque_en_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -512,7 +514,6 @@ void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina *victima)
 	void *contenido_marco = buscar_contenido_marco(victima->marco);
 	t_paquete *paquete = crear_paquete_solicitud_escribir_pagina_en_swap(logger, contenido_marco, configuracion_memoria->tam_pagina, victima->posicion_en_swap);
 	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	// TODO esperamos respuesta?
 }
 
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina)
