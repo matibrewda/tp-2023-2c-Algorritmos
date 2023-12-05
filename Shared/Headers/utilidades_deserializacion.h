@@ -61,7 +61,7 @@ void leer_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int conexion_co
 
 // Filesystem recibe de Memoria
 void leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria, int* cantidad_de_bloques, int* pid);
-int leer_paquete_solicitud_liberar_bloque_a_fs(t_log *logger, int conexion_con_memoria);
+t_list* leer_paquete_solicitud_liberar_bloques_de_fs(t_log *logger, int conexion_con_memoria);
 void leer_paquete_respuesta_leer_marco_de_memoria(t_log *logger, int conexion_con_memoria, void **contenido_marco, char **nombre_archivo, int *puntero_archivo);
 
 // Filesystem recibe de Kernel

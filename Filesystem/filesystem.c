@@ -118,17 +118,20 @@ void *comunicacion_memoria()
 		switch (operacion_recibida_memoria)
 		{
 		case SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM:
-			// TODO
 			int cantidad_de_bloques_a_reservar;
 			int pid_pedido_bloques;
 			leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria, &cantidad_de_bloques_a_reservar, &pid_pedido_bloques);
 			t_list *bloques_reservados = reservar_bloques_en_swap(cantidad_de_bloques_a_reservar);
 			bool pude_reservar_todos = bloques_reservados != NULL;
-			// t_paquete* paquete_respuesta_pedirr_bloques_a_fs = crear_paquete_respuest_pedir
+			t_paquete* paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_filesystem(logger, bloques_reservados, pid_pedido_bloques);
+			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			list_destroy(bloques_reservados);
 			break;
 		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
-			// TODO
+			t_list *bloques_a_liberar = leer_paquete_solicitud_liberar_bloques_de_fs(logger, conexion_con_memoria);
+			liberar_bloques_en_swap(bloques_a_liberar);
+			t_paquete *respuesta_librear_bloques = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			enviar_paquete(logger, conexion_con_memoria, respuesta_librear_bloques, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 		case SOLICITUD_LEER_PAGINA_EN_SWAP:
 			// TODO

@@ -526,6 +526,7 @@ t_paquete *crear_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int dire
     return paquete;
 }
 
+// Memoria a Filesystem
 t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list *bloques_swap)
 {
     op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;

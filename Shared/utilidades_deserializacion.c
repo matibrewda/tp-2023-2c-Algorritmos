@@ -505,6 +505,27 @@ void leer_paquete_respuesta_leer_marco_de_memoria(t_log *logger, int conexion_co
 }
 
 // Filesystem recibe de Memoria
+t_list* leer_paquete_solicitud_liberar_bloques_de_fs(t_log *logger, int conexion_con_memoria)
+{
+	op_code codigo_operacion = SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'NUMEROS DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	t_list* bloques_a_liberar;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	bloques_a_liberar = leer_lista_de_enteros_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'NUMEROS DE BLOQUES' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	return bloques_a_liberar;
+}
+
+// Filesystem recibe de Memoria
 void leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria, int *cantidad_de_bloques, int *pid)
 {
 	op_code codigo_operacion = SOLICITUD_PEDIR_BLOQUES_A_FILESYSTEM;

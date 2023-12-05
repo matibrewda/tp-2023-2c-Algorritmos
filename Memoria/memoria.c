@@ -303,13 +303,13 @@ void inicializar_lista_de_marcos_bitmap()
 
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 {
-	log_info(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
-	log_info(logger, "El tamanio del proceso a iniciar es: %d", size);
-	log_info(logger, "El PID del proceso a iniciar es: %d", pid);
+	log_debug(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
+	log_debug(logger, "El tamanio del proceso a iniciar es: %d", size);
+	log_debug(logger, "El PID del proceso a iniciar es: %d", pid);
 
 	char *ruta_archivo_completa = NULL;
-	int error_archivo = asprintf(&ruta_archivo_completa, "%s/%s", configuracion_memoria->path_instrucciones, path);
 
+	int error_archivo = asprintf(&ruta_archivo_completa, "%s/%s", configuracion_memoria->path_instrucciones, path);
 	if (error_archivo == -1)
 	{
 		log_error(logger, "Error al calcular ruta completa para archivo de pseudocodigo (para PID: %d)", pid);
@@ -318,7 +318,6 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	}
 
 	FILE *archivo = abrir_archivo(logger, ruta_archivo_completa);
-
 	if (archivo == NULL)
 	{
 		log_error(logger, "No se pudo abrir archivo de pseudocodigo (para PID: %d)", pid);
@@ -329,10 +328,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	t_archivo_proceso *iniciar_proceso = malloc(sizeof(t_archivo_proceso));
 	iniciar_proceso->archivo = archivo;
 	iniciar_proceso->pid = pid;
-
-	log_trace(logger, "Intento agregar proceso PID: %d a la lista", pid);
 	list_add_thread_safe(procesos_iniciados, iniciar_proceso, &mutex_procesos_iniciados);
-	log_trace(logger, "Agregado proceso PID: %d a la lista", pid);
 
 	int cantidad_de_bloques = size / configuracion_memoria->tam_pagina;
 	if (size % configuracion_memoria->tam_pagina != 0)
@@ -340,7 +336,10 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 		cantidad_de_bloques++;
 	}
 
-	pedir_bloques_a_filesystem(pid, cantidad_de_bloques);
+	pthread_mutex_lock(&mutex_conexion_filesystem);
+	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, pid, cantidad_de_bloques);
+	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+	pthread_mutex_unlock(&mutex_conexion_filesystem);
 }
 
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria)
@@ -361,17 +360,11 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 
-	if (archivo_proceso == NULL)
-	{
-		return;
-	}
-
 	char *linea_instruccion = buscar_linea(logger, archivo_proceso->archivo, pc);
 
 	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", linea_instruccion);
 	t_paquete *paquete = crear_paquete_respuesta_pedir_instruccion_a_memoria(logger, linea_instruccion);
 
-	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
@@ -380,15 +373,8 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 
 void finalizar_proceso_en_memoria(int pid)
 {
-	// aca hay algun error (falta alguna validacion o algo asi)
 	log_info(logger, "El PID del proceso a finalizar es: %d", pid);
-
-	// todo buscar dentro de lista de procesos iniciados y cerrar archivo y hacer un free de la estructura
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
-	if (archivo_proceso == NULL)
-	{
-		return;
-	}
 	cerrar_archivo_con_pid(pid);
 	int cantidad_de_bloques = cantidad_de_paginas_proceso(pid);
 	limpiar_entradas_tabla_de_paginas(pid);
@@ -432,16 +418,6 @@ void cerrar_archivo_con_pid(int pid)
 	}
 
 	list_remove_and_destroy_by_condition_thread_safe(procesos_iniciados, (void *)_filtro_archivo_proceso_por_id, (void *)_finalizar_archivo_proceso, &mutex_procesos_iniciados);
-}
-
-void pedir_bloques_a_filesystem(int pid, int cantidad_de_bloques)
-{
-	pthread_mutex_lock(&mutex_conexion_filesystem);
-
-	t_paquete *paquete = crear_paquete_pedir_bloques_a_filesystem(logger, pid, cantidad_de_bloques);
-	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-
-	pthread_mutex_unlock(&mutex_conexion_filesystem);
 }
 
 void limpiar_entradas_tabla_de_paginas(int pid)
