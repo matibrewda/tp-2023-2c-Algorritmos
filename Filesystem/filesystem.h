@@ -49,7 +49,7 @@ void crear_archivo_fs(char *nombre_archivo);
 void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio);
 int reducir_tamanio_archivo(FCB *fcb, int nuevo_tamanio);
 int ampliar_tamanio_archivo(FCB *fcb, int nuevo_tamanio);
-uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, int puntero_a_byte_de_archivo);
+uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, u_int32_t numero_de_bloque_archivo);
 void *leer_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char* nombre_archivo);
 void escribir_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char* nombre_archivo, void* bloque);
 
