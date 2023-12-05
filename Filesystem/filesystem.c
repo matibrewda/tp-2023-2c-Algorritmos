@@ -123,29 +123,38 @@ void *comunicacion_memoria()
 			leer_paquete_solicitud_pedir_bloques_a_fs(logger, conexion_con_memoria, &cantidad_de_bloques_a_reservar, &pid_pedido_bloques);
 			t_list *bloques_reservados = reservar_bloques_en_swap(cantidad_de_bloques_a_reservar);
 			bool pude_reservar_todos = bloques_reservados != NULL;
-			t_paquete* paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_filesystem(logger, bloques_reservados, pid_pedido_bloques);
+			t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_filesystem(logger, bloques_reservados, pid_pedido_bloques);
 			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			list_destroy(bloques_reservados);
 			break;
 		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
 			t_list *bloques_a_liberar = leer_paquete_solicitud_liberar_bloques_de_fs(logger, conexion_con_memoria);
 			liberar_bloques_en_swap(bloques_a_liberar);
-			t_paquete *respuesta_librear_bloques = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-			enviar_paquete(logger, conexion_con_memoria, respuesta_librear_bloques, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			t_paquete *paquete_respuesta_liberar_bloques = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_liberar_bloques, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 		case SOLICITUD_LEER_PAGINA_EN_SWAP:
-			// TODO
+			int posicion_swap_a_leer;
+			leer_paquete_solicitud_leer_pagina_swap(logger, conexion_con_memoria, &posicion_swap_a_leer);
+			void* pagina_en_swap = leer_bloque_swap(posicion_swap_a_leer);
+			t_paquete *paquete_respuesta_leer_pagina_en_swap = crear_paquete_respuesta_leer_pagina_swap(logger, pagina_en_swap, configuracion_filesystem->tam_bloques);
+			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_leer_pagina_en_swap, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 		case SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP:
-			// TODO
+			void* contenido_pagina;
+			int posicion_swap_a_escribir;
+			leer_paquete_solicitud_escribir_pagina_en_swap(logger, conexion_con_memoria, &contenido_pagina, &posicion_swap_a_escribir);
+			escribir_bloque_swap(posicion_swap_a_escribir, contenido_pagina);
+			t_paquete *paquete_respuesta_escribir_pagina_en_swap = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_PAGINA_EN_SWAP, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_escribir_pagina_en_swap, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 		case RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA:
 			t_paquete *respuesta_leer_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LEER_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			enviar_paquete(logger, conexion_con_kernel, respuesta_leer_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			break;
 		case RESPUESTA_LEER_MARCO_DE_MEMORIA:
-			void* contenido_marco;
-			char* nombre_archivo;
+			void *contenido_marco;
+			char *nombre_archivo;
 			int puntero_escritra;
 			leer_paquete_respuesta_leer_marco_de_memoria(logger, conexion_con_memoria, &contenido_marco, &nombre_archivo, &puntero_escritra);
 			uint32_t numero_de_bloque_archivo_a_escribir = floor(puntero_escritra / (double)(configuracion_filesystem->tam_bloques));
@@ -213,8 +222,8 @@ void *comunicacion_kernel()
 			log_info(logger, "Leer Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_leer, puntero_lectura, direccion_fisica_a_escribir);
 			uint32_t numero_de_bloque_archivo_a_leer = floor(puntero_lectura / (double)(configuracion_filesystem->tam_bloques));
 			uint32_t numero_de_bloque_fs_a_leer = obtener_numero_de_bloque_fs(nombre_archivo_leer, numero_de_bloque_archivo_a_leer);
-			void* bloque_fs = leer_bloque_fs(numero_de_bloque_fs_a_leer, numero_de_bloque_archivo_a_leer, nombre_archivo_leer);
-			t_paquete* paquete_solicitud_escribir_bloque_en_memoria = crear_paquete_solicitud_escribir_bloque_en_memoria(logger, direccion_fisica_a_escribir, bloque_fs, configuracion_filesystem->tam_bloques);
+			void *bloque_fs = leer_bloque_fs(numero_de_bloque_fs_a_leer, numero_de_bloque_archivo_a_leer, nombre_archivo_leer);
+			t_paquete *paquete_solicitud_escribir_bloque_en_memoria = crear_paquete_solicitud_escribir_bloque_en_memoria(logger, direccion_fisica_a_escribir, bloque_fs, configuracion_filesystem->tam_bloques);
 			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_escribir_bloque_en_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 
@@ -224,7 +233,7 @@ void *comunicacion_kernel()
 			int direccion_fisica_a_leer;
 			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_escribir, &puntero_escritura, &direccion_fisica_a_leer);
 			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
-			t_paquete* paquete_solicitud_leer_marco_de_memoria = crear_paquete_solicitud_leer_marco_de_memoria(logger, direccion_fisica_a_escribir, nombre_archivo_escribir, puntero_escritura);
+			t_paquete *paquete_solicitud_leer_marco_de_memoria = crear_paquete_solicitud_leer_marco_de_memoria(logger, direccion_fisica_a_escribir, nombre_archivo_escribir, puntero_escritura);
 			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_marco_de_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 

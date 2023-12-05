@@ -475,6 +475,22 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int pid, int 
 }
 
 // Filesystem a memoria
+t_paquete *crear_paquete_respuesta_leer_pagina_swap(t_log *logger, void* contenido_pagina, int tamanio_pagina)
+{
+    op_code codigo_operacion = RESPUESTA_LEER_PAGINA_EN_SWAP;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_void_a_paquete(logger, paquete, contenido_pagina, tamanio_pagina, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Filesystem a memoria
 t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_list *lista_bloques_reservados, int pid)
 {
     op_code codigo_operacion = RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM;

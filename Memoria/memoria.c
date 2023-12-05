@@ -231,7 +231,7 @@ void *atender_filesystem()
 			int puntero_archivo_a_escribir;
 			int direccion_fisica;
 			leer_paquete_solicitud_leer_marco_de_memoria(logger, conexion_con_filesystem, &direccion_fisica, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir);
-			void* contenido_marco; // TODO: LEER MARCO ENTERO
+			void* contenido_marco; // TODO: LEER MARCO ENTERO  (void* contenido_marco <- direccion_fisica)
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -240,7 +240,7 @@ void *atender_filesystem()
 			void* contenido_bloque;
 			int direccion_fisica;
 			leer_paquete_solicitud_escribir_bloque_en_memoria(logger, conexion_con_filesystem, &direccion_fisica, &contenido_bloque);
-			// TODO: ESCRIBIR BLOQUE ENTERO
+			// TODO: ESCRIBIR BLOQUE ENTERO (void* contenido_bloque -> direccion_fisica)
 			t_paquete *respuesta_escribir_bloque_en_memoria = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			enviar_paquete(logger, conexion_con_filesystem, respuesta_escribir_bloque_en_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -590,7 +590,7 @@ void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap)
 
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM
-	contenido_del_bloque = leer_paquete_respuesta_contenido_bloque(logger, conexion_con_filesystem, configuracion_memoria->tam_pagina);
+	contenido_del_bloque = leer_paquete_respuesta_leer_pagina_en_swap(logger, conexion_con_filesystem);
 
 	pthread_mutex_unlock(&mutex_conexion_filesystem);
 

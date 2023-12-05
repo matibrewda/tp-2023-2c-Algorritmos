@@ -399,9 +399,9 @@ t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_mem
 }
 
 // Memoria recibe de Filesystem
-void *leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filsystem, size_t tamanio_bloque)
+void *leer_paquete_respuesta_leer_pagina_en_swap(t_log *logger, int conexion_con_filsystem)
 {
-	op_code codigo_operacion = RESPUESTA_CONTENIDO_BLOQUE_EN_FILESYSTEM;
+	op_code codigo_operacion = RESPUESTA_LEER_PAGINA_EN_SWAP;
 	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CONTENIDO DEL BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 
 	int tamanio_buffer;
@@ -409,6 +409,8 @@ void *leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_fi
 	void *buffer_con_offset = buffer;
 
 	void *contenido_del_bloque;
+
+	size_t tamanio_bloque;
 
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
 	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, &(contenido_del_bloque), &tamanio_bloque, codigo_operacion);
@@ -480,6 +482,45 @@ void leer_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int conexion_co
 	free(buffer);
 
 	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+}
+
+// Filesystem recibe de Memoria
+void leer_paquete_solicitud_leer_pagina_swap(t_log *logger, int conexion_con_memoria, int* posicion_swap)
+{
+	op_code codigo_operacion = SOLICITUD_LEER_PAGINA_EN_SWAP;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, posicion_swap, codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+}
+
+// Filesystem recibe de Memoria
+void leer_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, int conexion_con_memoria, void** contenido_marco, int* posicion_swap)
+{
+	op_code codigo_operacion = SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP;
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'POSICION SWAP Y CONTENIDO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+	int tamanio_buffer;
+	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
+	void *buffer_con_offset = buffer;
+
+	size_t tamanio;
+
+	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, contenido_marco, &tamanio, codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, posicion_swap, codigo_operacion);
+
+	free(buffer);
+
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'POSICION SWAP Y CONTENIDO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
 // Filesystem recibe de Memoria

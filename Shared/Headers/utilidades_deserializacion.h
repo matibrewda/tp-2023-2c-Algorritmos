@@ -54,7 +54,7 @@ int leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con
 t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, int conexion_con_cpu);
 
 // Memoria recibe de Filesystem
-void* leer_paquete_respuesta_contenido_bloque(t_log *logger, int conexion_con_filesystem, size_t tamanio_bloque);
+void *leer_paquete_respuesta_leer_pagina_en_swap(t_log *logger, int conexion_con_filsystem);
 t_list *leer_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, int conexion_con_filesystem, int *pid);
 void leer_paquete_solicitud_escribir_bloque_en_memoria(t_log *logger, int conexion_con_filesystem, int* direccion_fisica, void** contenido_bloque);
 void leer_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int conexion_con_filesystem, int* direccion_fisica, char** nombre_archivo, int* puntero_archivo);
@@ -63,6 +63,8 @@ void leer_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int conexion_co
 void leer_paquete_solicitud_pedir_bloques_a_fs(t_log *logger, int conexion_con_memoria, int* cantidad_de_bloques, int* pid);
 t_list* leer_paquete_solicitud_liberar_bloques_de_fs(t_log *logger, int conexion_con_memoria);
 void leer_paquete_respuesta_leer_marco_de_memoria(t_log *logger, int conexion_con_memoria, void **contenido_marco, char **nombre_archivo, int *puntero_archivo);
+void leer_paquete_solicitud_leer_pagina_swap(t_log *logger, int conexion_con_memoria, int* posicion_swap);
+void leer_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, int conexion_con_memoria, void** contenido_marco, int* posicion_swap);
 
 // Filesystem recibe de Kernel
 char* leer_paquete_solicitud_abrir_archivo_fs(t_log *logger, int conexion_con_kernel);
