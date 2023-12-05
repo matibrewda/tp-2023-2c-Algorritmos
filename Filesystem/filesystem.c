@@ -198,18 +198,19 @@ void *comunicacion_kernel()
 			break;
 
 		case SOLICITUD_LEER_ARCHIVO_FS:
-			char **nombre_leer;
-			int *puntero_lectura;
-			int *direccion_fisica_a_escribir;
-			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, nombre_leer, puntero_lectura, direccion_fisica_a_escribir);
+			char *nombre_archivo_leer;
+			int puntero_lectura;
+			int direccion_fisica_a_escribir;
+			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_leer, &puntero_lectura, &direccion_fisica_a_escribir);
+			log_info(logger, "Leer Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_leer, puntero_lectura, direccion_fisica_a_escribir);
 			break;
 
 		case SOLICITUD_ESCRIBIR_ARCHIVO_FS:
-			char **nombre_escribir;
-			int *puntero_archivo_a_escribir;
-			int *direccion_fisica_a_leer;
-			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, nombre_escribir, puntero_archivo_a_escribir, direccion_fisica_a_leer);
-
+			char *nombre_archivo_escribir;
+			int puntero_escritura;
+			int direccion_fisica_a_leer;
+			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_escribir, &puntero_escritura, &direccion_fisica_a_leer);
+			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
 			break;
 
 		default:
