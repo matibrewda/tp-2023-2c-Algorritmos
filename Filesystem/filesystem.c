@@ -56,6 +56,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	truncar_archivo_fs("lucas", 10); // Me reserva 5 bloques
 	truncar_archivo_fs("lucas", 7);	 // Me reserva 4 bloques
 	truncar_archivo_fs("lucas", 11); // Me reserva 5 bloques
+	truncar_archivo_fs("lucas", 8); // Me reserva 4 bloques
+	truncar_archivo_fs("lucas", 7); // Me reserva 4 bloques
+	truncar_archivo_fs("lucas", 8); // Me reserva 4 bloques
 
 	// socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	// if (socket_kernel == -1)
@@ -449,10 +452,17 @@ void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio)
 
 int ampliar_tamanio_archivo(FCB *fcb, int nuevo_tamanio)
 {
+	log_debug(logger, "Ampliando archivo %s de %d bytes a %d bytes", fcb->nombre_archivo, fcb->tamanio_archivo, nuevo_tamanio);
 	uint32_t indice_primer_bloque = fcb->bloque_inicial;
 	int cantidad_de_bloques_actual = ceil(fcb->tamanio_archivo / (double)(configuracion_filesystem->tam_bloques));
 	int nueva_cantidad_de_bloques = ceil(nuevo_tamanio / (double)(configuracion_filesystem->tam_bloques));
+	if (cantidad_de_bloques_actual == nueva_cantidad_de_bloques)
+	{
+		return indice_primer_bloque;
+	}
 	int bloques_a_agregar = nueva_cantidad_de_bloques - cantidad_de_bloques_actual;
+
+	log_debug(logger, "Se agregaran %d bloques para pasar de %d bloques a %d bloques", bloques_a_agregar, cantidad_de_bloques_actual, nueva_cantidad_de_bloques);
 	uint32_t *puntero_memoria_tabla_fat;
 	FILE *puntero_archivo_tabla_fat;
 	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
@@ -466,17 +476,18 @@ int ampliar_tamanio_archivo(FCB *fcb, int nuevo_tamanio)
 
 	uint32_t indice_bloque_actual = indice_primer_bloque;
 
+	// Buscar ultimo bloque
 	while (leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual) != EOF_FS)
 	{
 		indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
 	}
 
-	while (bloques_a_agregar - 1 > 0)
+	while (bloques_a_agregar > 0)
 	{
 		uint32_t indice_bloque_libre = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
 		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_libre, indice_bloque_actual);
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_bloque_libre);
 		indice_bloque_actual = indice_bloque_libre;
-		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_bloque_actual);
 		bloques_a_agregar--;
 	}
 
@@ -486,33 +497,37 @@ int ampliar_tamanio_archivo(FCB *fcb, int nuevo_tamanio)
 
 int reducir_tamanio_archivo(FCB *fcb, int nuevo_tamanio)
 {
+	log_debug(logger, "Reduciendo archivo %s de %d bytes a %d bytes", fcb->nombre_archivo, fcb->tamanio_archivo, nuevo_tamanio);
 	uint32_t indice_primer_bloque = fcb->bloque_inicial;
 	int cantidad_de_bloques_actual = ceil(fcb->tamanio_archivo / (double)(configuracion_filesystem->tam_bloques));
 	int nueva_cantidad_de_bloques = ceil(nuevo_tamanio / (double)(configuracion_filesystem->tam_bloques));
 	int bloques_a_quitar = cantidad_de_bloques_actual - nueva_cantidad_de_bloques;
+
+	if (cantidad_de_bloques_actual == nueva_cantidad_de_bloques)
+	{
+		return indice_primer_bloque;
+	}
+
+	log_debug(logger, "Se quitaran %d bloques para pasar de %d bloques a %d bloques", bloques_a_quitar, cantidad_de_bloques_actual, nueva_cantidad_de_bloques);
 	uint32_t *puntero_memoria_tabla_fat;
 	FILE *puntero_archivo_tabla_fat;
 	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
 
-	uint32_t indice_bloque_actual = indice_primer_bloque;
-
+	uint32_t indice_nuevo_ultimo_bloque = indice_primer_bloque;
 	for (int i = 0; i < nueva_cantidad_de_bloques - 1; i++)
 	{
-		indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
+		indice_nuevo_ultimo_bloque = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_nuevo_ultimo_bloque);
 	}
 
-	for (int i = 0; i < bloques_a_quitar + 1; i++)
+	log_debug(logger, "Indice del nuevo ultimo bloque es %d", indice_nuevo_ultimo_bloque);
+
+	uint32_t indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_nuevo_ultimo_bloque);
+	escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_nuevo_ultimo_bloque);
+
+	for (int i = 0; i < bloques_a_quitar; i++)
 	{
 		uint32_t indice_proximo_bloque = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
-		if (i == 0)
-		{
-			escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_bloque_actual);
-		}
-		else
-		{
-			escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, 0, indice_bloque_actual);
-		}
-
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, 0, indice_bloque_actual);
 		indice_bloque_actual = indice_proximo_bloque;
 	}
 
