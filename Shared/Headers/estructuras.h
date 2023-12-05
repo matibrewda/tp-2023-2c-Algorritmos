@@ -15,7 +15,7 @@ typedef struct
     bool quantum_finalizado;
     int id_hilo_quantum;
     int motivo_finalizacion;
-    char* ultimo_recurso_pedido;
+    char *ultimo_recurso_pedido;
 
     // Registros del CPU
     int program_counter;
@@ -113,7 +113,7 @@ typedef struct
     bool finalizado;
     int *recursos_asignados;
     int *solicitudes_actuales;
-    char* ultimo_recurso_pedido;
+    char *ultimo_recurso_pedido;
 } t_pcb_analisis_deadlock;
 
 typedef struct
@@ -121,7 +121,6 @@ typedef struct
     t_pcb *pcb;
     int tiempo_sleep;
 } t_bloqueo_sleep;
-
 
 typedef struct
 {
@@ -131,14 +130,9 @@ typedef struct
 
 typedef struct
 {
-    char *contenido;
-    int largo; // TODO ver si es necesario
-} t_contenido_pagina;
-
-typedef struct {
-    char* nombre_archivo;  // Nombre del archivo (puntero a char)
-    uint32_t tamanio_archivo;  // Tamaño del archivo en bytes
-    uint32_t bloque_inicial;   // Número de bloque inicial
+    char *nombre_archivo;     // Nombre del archivo (puntero a char)
+    uint32_t tamanio_archivo; // Tamaño del archivo en bytes
+    uint32_t bloque_inicial;  // Número de bloque inicial
 } FCB;
 
 #endif /* ESTRUCTURAS_H_ */

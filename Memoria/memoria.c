@@ -469,7 +469,6 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 
 void eliminar_entrada_de_tabla_de_paginas(int pid)
 {
-	// TODO agregar mutex a tabla_de_paginas
 	bool _filtro_paginas_de_memoria_pid(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
 	{
 		return pagina_de_memoria->pid == pid;
@@ -568,7 +567,6 @@ t_list *obtener_entradas_de_tabla_de_pagina_presentes()
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
 {
-	// TODO no va a cambiar dinamicamente, no hace falta chequearlo siempre que se quiera reemplazar una pagina
 	if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
 	{
 		return encontrar_pagina_victima_fifo();
@@ -593,7 +591,6 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid)
 	if (entradas_tabla_de_pagina == NULL)
 	{
 		log_warning(logger, "No se encontraron entradas de tabla de pagina con el PID %d", pid);
-		// TODO ver que hay que retornar en este caso
 		return NULL;
 	}
 
@@ -612,7 +609,6 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_prese
 	if (pagina == NULL)
 	{
 		log_error(logger, "No existe un marco presente en memoria con el numero %d", marco);
-		// TODO ver que notificar aca, es Page Fault? Es un error?
 		return NULL;
 	}
 
@@ -766,7 +762,6 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 	if (pagina == NULL)
 	{
 		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
-		// TODO ver que notificar aca, es Page Fault? Es un error?
 		return NULL;
 	}
 
