@@ -16,7 +16,7 @@ pthread_mutex_t mutex_archivo_bloques;
 uint32_t cantidad_de_entradas_tabla_fat;
 uint32_t tamanio_archivo_tabla_fat;
 bool *bitmap_bloques_libres_swap;
-t_list *fcbs; // Lista de FCBs de archivos que fueron abiertos
+t_list *fcbs_abiertos;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -69,7 +69,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_archivo_bloques, NULL);
 	tamanio_archivo_tabla_fat = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
 	cantidad_de_entradas_tabla_fat = configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap;
-	fcbs = list_create();
+	fcbs_abiertos = list_create();
 	inicializar_archivo_de_bloques();
 	inicializar_fat();
 
@@ -189,10 +189,12 @@ void *comunicacion_kernel()
 			int puntero_lectura;
 			int direccion_fisica_a_escribir;
 			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_leer, &puntero_lectura, &direccion_fisica_a_escribir);
-			uint32_t numero_logico_de_bloque_a_leer = floor(puntero_lectura / (double)(configuracion_filesystem->tam_bloques));
-			uint32_t bloque_fs_a_leer = obtener_numero_de_bloque_fs(nombre_archivo_leer, numero_logico_de_bloque_a_leer);
-			// TODO
 			log_info(logger, "Leer Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_leer, puntero_lectura, direccion_fisica_a_escribir);
+			uint32_t numero_de_bloque_archivo_a_leer = floor(puntero_lectura / (double)(configuracion_filesystem->tam_bloques));
+			uint32_t numero_de_bloque_fs_a_leer = obtener_numero_de_bloque_fs(nombre_archivo_leer, numero_de_bloque_archivo_a_leer);
+			void* bloque_fs = leer_bloque_fs(numero_de_bloque_fs_a_leer, numero_de_bloque_archivo_a_leer, nombre_archivo_leer);
+			// TODO
+			
 			break;
 
 		case SOLICITUD_ESCRIBIR_ARCHIVO_FS:
@@ -200,10 +202,11 @@ void *comunicacion_kernel()
 			int puntero_escritura;
 			int direccion_fisica_a_leer;
 			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_escribir, &puntero_escritura, &direccion_fisica_a_leer);
+			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
 			uint32_t numero_logico_de_bloque_a_escribir = floor(puntero_escritura / (double)(configuracion_filesystem->tam_bloques));
 			uint32_t bloque_fs_a_escribir = obtener_numero_de_bloque_fs(nombre_archivo_escribir, numero_logico_de_bloque_a_escribir);
 			// TODO
-			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
+
 			break;
 
 		default:
@@ -287,10 +290,10 @@ int abrir_archivo_fs(char *nombre_archivo)
 			return strcmp(fcb->nombre_archivo, nombre_archivo) == 0;
 		};
 
-		FCB *fcb_existente = list_find(fcbs, (void *)_filtro_fcb_por_nombre_archivo);
+		FCB *fcb_existente = list_find(fcbs_abiertos, (void *)_filtro_fcb_por_nombre_archivo);
 		if (fcb_existente == NULL)
 		{
-			list_add(fcbs, fcb);
+			list_add(fcbs_abiertos, fcb);
 		}
 
 		return fcb->tamanio_archivo;
@@ -301,7 +304,7 @@ void crear_archivo_fs(char *nombre_archivo)
 {
 	// Crear un archivo FCB (en ejecucion) con tamaño 0 y sin bloque inicial. Coloco bloque inicial -1 para indicar que inicia SIN bloque inicial.
 	FCB *fcb_archivo_nuevo = iniciar_fcb(nombre_archivo, 0, -1);
-	list_add(fcbs, fcb_archivo_nuevo);
+	list_add(fcbs_abiertos, fcb_archivo_nuevo);
 	crear_archivo_fcb(fcb_archivo_nuevo);
 }
 
@@ -423,7 +426,7 @@ void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio)
 		return strcmp(fcb->nombre_archivo, nombre_archivo) == 0;
 	};
 
-	FCB *fcb = list_find(fcbs, (void *)_filtro_fcb_por_nombre_archivo);
+	FCB *fcb = list_find(fcbs_abiertos, (void *)_filtro_fcb_por_nombre_archivo);
 
 	if (nuevo_tamanio > fcb->tamanio_archivo)
 	{
@@ -607,7 +610,7 @@ uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, u_int32_t numero_de_b
 		return strcmp(fcb->nombre_archivo, nombre_archivo) == 0;
 	};
 
-	FCB *fcb = list_find(fcbs, (void *)_filtro_fcb_por_nombre_archivo);
+	FCB *fcb = list_find(fcbs_abiertos, (void *)_filtro_fcb_por_nombre_archivo);
 	uint32_t indice_primer_bloque = fcb->bloque_inicial;
 	uint32_t *puntero_memoria_tabla_fat;
 	FILE *puntero_archivo_tabla_fat;
