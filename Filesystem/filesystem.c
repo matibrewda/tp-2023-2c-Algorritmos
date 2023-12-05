@@ -52,8 +52,9 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	inicializar_archivo_de_bloques();
 	inicializar_fat();
 
-	//abrir_archivo_fs("lucas");
-	//truncar_archivo_fs("lucas", 3);
+	crear_archivo_fs("lucas");
+	truncar_archivo_fs("lucas", 5); // Me reserva 3 bloques
+	// truncar_archivo_fs("lucas", 1); // Me reserva 1 bloque
 
 	// socket_kernel = crear_socket_servidor(logger, configuracion_filesystem->puerto_escucha_kernel, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 	// if (socket_kernel == -1)
@@ -437,14 +438,14 @@ void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio)
 
 	if (nuevo_tamanio > fcb->tamanio_archivo)
 	{
-		fcb->bloque_inicial = ampliar_tamano_archivo(fcb, nuevo_tamanio);
+		fcb->bloque_inicial = ampliar_tamanio_archivo(fcb, nuevo_tamanio);
 		fcb->tamanio_archivo = nuevo_tamanio;
 		crear_archivo_fcb(fcb);
 		return;
 	}
 	else if (nuevo_tamanio < fcb->tamanio_archivo)
 	{
-		fcb->bloque_inicial = reducir_tamano_archivo(fcb, nuevo_tamanio);
+		fcb->bloque_inicial = reducir_tamanio_archivo(fcb, nuevo_tamanio);
 		fcb->tamanio_archivo = nuevo_tamanio;
 		crear_archivo_fcb(fcb);
 		return;
@@ -454,41 +455,60 @@ void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio)
 	return;
 }
 
-int ampliar_tamano_archivo(FCB *fcb, int nuevo_tamanio)
+int ampliar_tamanio_archivo(FCB *fcb, int nuevo_tamanio)
 {
-	log_info(logger, "AMPLIANDO...");
-	uint32_t primer_bloque = fcb->bloque_inicial;
+	uint32_t indice_primer_bloque = fcb->bloque_inicial;
 	int bloques_a_agregar = ceil((nuevo_tamanio - (fcb->tamanio_archivo)) / (double)(configuracion_filesystem->tam_bloques));
-	log_info(logger, "Necesito agregar %d bloques...", bloques_a_agregar);
 	uint32_t *puntero_memoria_tabla_fat;
 	FILE *puntero_archivo_tabla_fat;
 	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
 
-	if (primer_bloque == -1)
+	if (indice_primer_bloque == -1)
 	{
-		log_info(logger, "Buscando bloque libre...");
-		primer_bloque = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
-		log_info(logger, "Encontre el bloque libre %d...", primer_bloque);
-		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, primer_bloque);
+		indice_primer_bloque = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_primer_bloque);
 		bloques_a_agregar--;
 	}
 
-	//---
-	log_info(logger, "Hasta aca seguro llegamos");
+	uint32_t indice_bloque_actual = indice_primer_bloque;
 
-	uint32_t indice_bloque_actual = primer_bloque;
-
-	while (leer_entrada_fat_por_indice(puntero_memoria_tabla_fat,indice_bloque_actual) != EOF_FS)
+	while (leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual) != EOF_FS)
 	{
 		indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
 	}
 
 	while (bloques_a_agregar > 0)
 	{
-		u_int32_t indice_bloque_libre = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
+		uint32_t indice_bloque_libre = buscar_bloque_libre_en_fat(puntero_memoria_tabla_fat);
 		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_libre, indice_bloque_actual);
 		indice_bloque_actual = indice_bloque_libre;
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_bloque_actual);
 		bloques_a_agregar--;
+	}
+
+	cerrar_tabla_fat(puntero_memoria_tabla_fat, puntero_archivo_tabla_fat);
+	return indice_primer_bloque;
+}
+
+int reducir_tamanio_archivo(FCB *fcb, int nuevo_tamanio)
+{
+	uint32_t primer_bloque = fcb->bloque_inicial;
+	int bloques_a_quitar = ceil(((fcb->tamanio_archivo) - nuevo_tamanio) / (double)(configuracion_filesystem->tam_bloques));
+	int nueva_cantidad_de_bloques = ceil(nuevo_tamanio / (double)(configuracion_filesystem->tam_bloques));
+	uint32_t *puntero_memoria_tabla_fat;
+	FILE *puntero_archivo_tabla_fat;
+	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
+
+	uint32_t indice_bloque_actual = primer_bloque;
+	for (int i = 0 ; i < nueva_cantidad_de_bloques ; i++)
+	{
+		indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
+	}
+
+	for (int i = 0 ; i < bloques_a_quitar ; i++)
+	{
+		escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, 0, indice_bloque_actual);
+		indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque_actual);
 	}
 
 	escribir_entrada_fat_por_indice(puntero_memoria_tabla_fat, EOF_FS, indice_bloque_actual);
@@ -499,11 +519,9 @@ int ampliar_tamano_archivo(FCB *fcb, int nuevo_tamanio)
 
 void abrir_tabla_fat(uint32_t **puntero_memoria_tabla_fat, FILE **puntero_archivo_tabla_fat)
 {
-	log_info(logger, "Abriendo tabla fat...");
 	*puntero_archivo_tabla_fat = fopen(configuracion_filesystem->path_fat, "rb+");
 	int archivo_tabla_fat_file_descriptor = fileno(*puntero_archivo_tabla_fat);
 	*puntero_memoria_tabla_fat = mmap(NULL, tamanio_archivo_tabla_fat, PROT_READ | PROT_WRITE, MAP_SHARED, archivo_tabla_fat_file_descriptor, 0);
-	log_info(logger, "Abri tabla fat...");
 }
 
 void cerrar_tabla_fat(uint32_t *puntero_tabla_fat, FILE *puntero_archivo_tabla_fat)
@@ -519,7 +537,7 @@ uint32_t buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat)
 	// Arranco en i = 1 porque el bloque 0 NUNCA se puede usar (boot)
 	for (int i = 1; i < cantidad_de_entradas_tabla_fat && bloque_libre == -1; i++)
 	{
-		if (puntero_tabla_fat[i] == 0)
+		if (leer_entrada_fat_por_indice(puntero_tabla_fat, i) == 0)
 		{
 			bloque_libre = i;
 		}
@@ -530,44 +548,15 @@ uint32_t buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat)
 
 uint32_t leer_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_fat)
 {
-	return puntero_tabla_fat[indice_fat];
+	uint32_t entrada_fat = puntero_tabla_fat[indice_fat];
+	log_info(logger, "Acceso FAT - Entrada: %d - Valor: %d (LECTURA)", indice_fat, entrada_fat);
+	return entrada_fat;
 }
 
 void escribir_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
 {
+	log_info(logger, "Acceso FAT - Entrada: %d - Valor: %d (ESCRITURA)", indice_donde_escribir, indice_a_escribir);
 	puntero_tabla_fat[indice_donde_escribir] = indice_a_escribir;
-}
-
-int reducir_tamano_archivo(FCB *fcb, int nuevo_tamano)
-{
-	int bloques_a_quitar = ((fcb->tamanio_archivo) - nuevo_tamano) / configuracion_filesystem->tam_bloques;
-	fcb->tamanio_archivo = nuevo_tamano;
-	uint32_t tamanio_FAT = (configuracion_filesystem->cant_bloques_total - configuracion_filesystem->cant_bloques_swap) * sizeof(uint32_t);
-	uint32_t bloque_a_leer = fcb->bloque_inicial;
-	int fatfd = open(configuracion_filesystem->path_fat, O_RDWR);
-	uint32_t *entrada_fat = mmap(NULL, tamanio_FAT, PROT_READ | PROT_WRITE, MAP_SHARED, fatfd, 0);
-
-	// busco el ultimo bloque del archivo
-	while (entrada_fat[bloque_a_leer] != UINT32_MAX)
-	{
-		bloque_a_leer = entrada_fat[bloque_a_leer];
-	}
-	uint32_t ultimo_bloque = bloque_a_leer;
-	while (bloques_a_quitar != 0)
-	{
-		bloque_a_leer = 1;
-		while (entrada_fat[bloque_a_leer] != ultimo_bloque)
-			;
-		{
-			bloque_a_leer++;
-		}
-		entrada_fat[ultimo_bloque] = 0; // Libero el ultimo bloque
-		ultimo_bloque = bloque_a_leer;
-		bloques_a_quitar--;
-	}
-	entrada_fat[ultimo_bloque] = UINT32_MAX;
-	munmap(entrada_fat, tamanio_FAT);
-	close(fatfd);
 }
 
 void escribir_bloque(uint32_t bloqueFAT, char *informacion)

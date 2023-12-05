@@ -21,9 +21,7 @@
 #include <commons/collections/queue.h>
 #include <commons/config.h>
 
-#include "fat.h"
 #include "fcb.h"
-#include "bloque.h"
 
 #include "Source/Headers/argumentos_filesystem.h"
 #include "Source/Headers/configuracion_filesystem.h"
@@ -52,8 +50,8 @@ void inicializar_fat();
 int abrir_archivo_fs(char *nombre_archivo);
 void crear_archivo_fs(char *nombre_archivo);
 void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio);
-int reducir_tamano_archivo(FCB *fcb, int nuevo_tamanio);
-int ampliar_tamano_archivo(FCB *fcb, int nuevo_tamanio);
+int reducir_tamanio_archivo(FCB *fcb, int nuevo_tamanio);
+int ampliar_tamanio_archivo(FCB *fcb, int nuevo_tamanio);
 
 // Swap
 void *leer_bloque_swap(int numero_de_bloque);
