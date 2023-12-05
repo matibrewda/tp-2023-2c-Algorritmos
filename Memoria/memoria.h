@@ -40,15 +40,11 @@
 void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_de_marco);
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco);
 int reemplazar_pagina(int pid, int numero_de_pagina);
-void enviar_valor_leido_a_cpu(uint32_t valor_leido);
-void enviar_valor_leido_a_filesystem(uint32_t valor_leido, char* nombre_archivo, int puntero_archivo);
-void notificar_escritura_a_cpu();
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor);
 uint32_t leer_valor_en_memoria(int direccion_fisica);
 void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado);
 
 // Inicializacion de estructuras
-void inicializar_espacio_contiguo_de_memoria();
 void inicializar_lista_de_marcos_bitmap();
 
 // Iniciar proceso
@@ -91,7 +87,6 @@ int obtener_primer_marco_desocupado(int *indice_marco_desocupado);
 void* buscar_contenido_marco(int numero_de_marco);
 void ocupar_marco(int numero_de_marco);
 void liberar_marco(int numero_de_marco);
-int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica);
 
 // Terminar
 void destruir_listas();

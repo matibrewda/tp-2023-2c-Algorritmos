@@ -74,15 +74,15 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int pid, int 
 t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list* bloques_swap);
 t_paquete *crear_paquete_solicitud_leer_pagina_swap(t_log *logger, int posicion_swap);
 t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void* contenido_marco, size_t tamanio_bloque, int posicion_swap);
-
-t_paquete *crear_paquete_respuesta_leer_valor_en_memoria_desde_filesystem(t_log *logger, u_int32_t valor, char* nombre_archivo, int puntero_archivo);
+t_paquete *crear_paquete_respuesta_leer_marco_de_memoria(t_log *logger, char* nombre_archivo_a_escribir, int puntero_archivo_a_escribir, void* contenido_marco, size_t tamanio_marco);
 
 // Filesystem a Kernel
 t_paquete *crear_paquete_respuesta_abrir_archivo_fs(t_log *logger, bool existe_archivo, int tamanio_archivo);
 
 // Filesystem a Memoria
 t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_list* lista_bloques_reservados, int pid);
-t_paquete *crear_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(t_log *logger, char* nombre_archivo_a_escribir, int puntero_archivo_a_escribir, int direccion_fisica_a_leer);
+t_paquete *crear_paquete_solicitud_escribir_bloque_en_memoria(t_log *logger, int direccion_fisica, void *contenido_bloque, size_t tamanio_bloque);
+t_paquete *crear_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int direccion_fisica, char* nombre_archivo, int puntero_archivo);
 
 // Comunes
 t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_proceso_memoria *proceso_memoria);

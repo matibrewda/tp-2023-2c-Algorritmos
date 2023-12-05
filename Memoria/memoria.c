@@ -120,7 +120,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	tabla_de_paginas = list_create();
 
 	// Creacion de Estructuras
-	inicializar_espacio_contiguo_de_memoria();
+	memoria_real = malloc(configuracion_memoria->tam_memoria);
 	inicializar_lista_de_marcos_bitmap();
 
 	// Hilos
@@ -201,13 +201,18 @@ void *atender_cpu()
 		{
 			int direccion_fisica = leer_paquete_solicitud_leer_valor_en_memoria(logger, conexion_con_cpu);
 			uint32_t valor_leido = leer_valor_en_memoria(direccion_fisica);
-			enviar_valor_leido_a_cpu(valor_leido);
+			t_valor_leido_en_memoria *valor_leido_en_memoria = malloc(sizeof(t_valor_leido_en_memoria));
+			valor_leido_en_memoria->valor_leido = valor_leido;
+			t_paquete *paquete = crear_paquete_respuesta_leer_valor_en_memoria(logger, valor_leido_en_memoria);
+			enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+			free(valor_leido_en_memoria);
 		}
 		else if (operacion_recibida_de_cpu == SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA)
 		{
 			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = leer_paquete_solicitud_escribir_valor_en_memoria(logger, conexion_con_cpu);
 			escribir_valor_en_memoria(pedido_escribir_valor_en_memoria->direccion_fisica, pedido_escribir_valor_en_memoria->valor_a_escribir);
-			notificar_escritura_a_cpu();
+			t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
+			enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 			free(pedido_escribir_valor_en_memoria);
 		}
 	}
@@ -220,23 +225,24 @@ void *atender_filesystem()
 		int operacion_recibida_de_filesystem = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
 		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_filesystem), NOMBRE_MODULO_FILESYSTEM);
 
-		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM)
+		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_MARCO_DE_MEMORIA)
 		{
 			char *nombre_archivo_a_escribir;
 			int puntero_archivo_a_escribir;
 			int direccion_fisica;
-
-			leer_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(logger, conexion_con_filesystem, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir, &direccion_fisica);
-			uint32_t valor_leido = leer_valor_en_memoria(direccion_fisica);
-			enviar_valor_leido_a_filesystem(valor_leido, nombre_archivo_a_escribir, puntero_archivo_a_escribir);
-		}
-		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA)
-		{
-			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = leer_paquete_solicitud_escribir_valor_en_memoria_desde_filesystem(logger, conexion_con_filesystem);
-			escribir_valor_en_memoria(pedido_escribir_valor_en_memoria->direccion_fisica, pedido_escribir_valor_en_memoria->valor_a_escribir);
-			t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+			leer_paquete_solicitud_leer_marco_de_memoria(logger, conexion_con_filesystem, &direccion_fisica, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir);
+			void* contenido_marco; // TODO: LEER MARCO ENTERO
+			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-			free(pedido_escribir_valor_en_memoria);
+		}
+		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_BLOQUE_EN_MEMORIA)
+		{
+			void* contenido_bloque;
+			int direccion_fisica;
+			leer_paquete_solicitud_escribir_bloque_en_memoria(logger, conexion_con_filesystem, &direccion_fisica, &contenido_bloque);
+			// TODO: ESCRIBIR BLOQUE ENTERO
+			t_paquete *respuesta_escribir_bloque_en_memoria = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+			enviar_paquete(logger, conexion_con_filesystem, respuesta_escribir_bloque_en_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
 		else if (operacion_recibida_de_filesystem == RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM)
 		{
@@ -253,45 +259,14 @@ void *atender_filesystem()
 				log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid_reservando);
 				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
 			}
-
-			crear_entrada_de_tabla_de_paginas_de_proceso(list_size(posiciones_swap), posiciones_swap, pid_reservando);
-			log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>", pid_reservando, list_size(posiciones_swap));
-			enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
+			else
+			{
+				crear_entrada_de_tabla_de_paginas_de_proceso(list_size(posiciones_swap), posiciones_swap, pid_reservando);
+				log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>", pid_reservando, list_size(posiciones_swap));
+				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
+			}
 		}
 	}
-}
-
-void enviar_valor_leido_a_cpu(uint32_t valor_leido)
-{
-	log_debug(logger, "Comenzando la creacion de paquete para enviar valor leido en memoria a la CPU");
-
-	t_valor_leido_en_memoria *valor_leido_en_memoria = malloc(sizeof(t_valor_leido_en_memoria));
-	valor_leido_en_memoria->valor_leido = valor_leido;
-
-	t_paquete *paquete = crear_paquete_respuesta_leer_valor_en_memoria(logger, valor_leido_en_memoria);
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-
-	free(valor_leido_en_memoria);
-}
-
-void enviar_valor_leido_a_filesystem(uint32_t valor_leido, char *nombre_archivo, int puntero_archivo)
-{
-	log_debug(logger, "Comenzando la creacion de paquete para enviar valor leido en memoria al FILESYSTEM");
-
-	t_paquete *paquete = crear_paquete_respuesta_leer_valor_en_memoria_desde_filesystem(logger, valor_leido, nombre_archivo, puntero_archivo);
-	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-}
-
-void notificar_escritura_a_cpu()
-{
-	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-}
-
-void notificar_escritura_a_filesytem()
-{
-	t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
-	enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 }
 
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
@@ -300,34 +275,23 @@ void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 	*(uint32_t *)(memoria_real + direccion_fisica) = valor_a_escribir;
 	pthread_mutex_unlock(&mutex_memoria_real);
 
-	int numero_de_marco = obtener_numero_de_marco_desde_direccion_fisica(direccion_fisica);
+	int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->modificado = 1;
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
-	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
-}
-
-int obtener_numero_de_marco_desde_direccion_fisica(int direccion_fisica)
-{
-	return floor(direccion_fisica / configuracion_memoria->tam_pagina);
 }
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
 {
-	// TODO se debe lockear?
+	pthread_mutex_lock(&mutex_memoria_real);
 	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
+	pthread_mutex_unlock(&mutex_memoria_real);
 
-	// Retardo de respuesta!
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return valor_leido;
-}
-
-void inicializar_espacio_contiguo_de_memoria()
-{
-	memoria_real = malloc(configuracion_memoria->tam_memoria);
 }
 
 void inicializar_lista_de_marcos_bitmap()

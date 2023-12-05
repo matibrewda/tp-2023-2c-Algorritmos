@@ -413,26 +413,6 @@ t_paquete *crear_paquete_respuesta_abrir_archivo_fs(t_log *logger, bool existe_a
     return paquete;
 }
 
-
-// Filesystem a Memoria
-t_paquete *crear_paquete_solicitud_leer_valor_en_memoria_desde_filesystem(t_log *logger, char *nombre_archivo_a_escribir, int puntero_archivo_a_escribir, int direccion_fisica_a_leer)
-{
-    op_code codigo_operacion = SOLICITUD_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'INFO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-
-
-    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
-
-    // RESPETAR EL ORDEN -> SERIALIZACION!
-    agregar_string_a_paquete(logger, paquete, nombre_archivo_a_escribir, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
-    agregar_int_a_paquete(logger, paquete, puntero_archivo_a_escribir, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
-    agregar_int_a_paquete(logger, paquete, direccion_fisica_a_leer, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
-
-    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'INFO MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-
-    return paquete;
-}
-
 // Comunes
 t_paquete *crear_paquete_proceso_memoria(t_log *logger, op_code codigo_operacion, char *nombre_proceso_origen, char *nombre_proceso_destino, t_proceso_memoria *proceso_memoria)
 {
@@ -494,7 +474,8 @@ t_paquete *crear_paquete_pedir_bloques_a_filesystem(t_log *logger, int pid, int 
     return paquete;
 }
 
-t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_list* lista_bloques_reservados, int pid)
+// Filesystem a memoria
+t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_list *lista_bloques_reservados, int pid)
 {
     op_code codigo_operacion = RESPUESTA_PEDIR_BLOQUES_A_FILESYSTEM;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'LISTA BLOQUES + PID' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -510,7 +491,42 @@ t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_l
     return paquete;
 }
 
-t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list* bloques_swap)
+// Filesystem a memoria
+t_paquete *crear_paquete_solicitud_escribir_bloque_en_memoria(t_log *logger, int direccion_fisica, void *contenido_bloque, size_t tamanio_bloque)
+{
+    op_code codigo_operacion = SOLICITUD_ESCRIBIR_BLOQUE_EN_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'DIR FISICA + CONTENIDO BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, direccion_fisica, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+    agregar_void_a_paquete(logger, paquete, contenido_bloque, tamanio_bloque, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'DIR FISICA + CONTENIDO BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+    return paquete;
+}
+
+// Filesystem a memoria
+t_paquete *crear_paquete_solicitud_leer_marco_de_memoria(t_log *logger, int direccion_fisica, char* nombre_archivo, int puntero_archivo)
+{
+    op_code codigo_operacion = SOLICITUD_LEER_MARCO_DE_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'DIR FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, direccion_fisica, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, puntero_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'DIR FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+    return paquete;
+}
+
+t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list *bloques_swap)
 {
     op_code codigo_operacion = SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'LISTA BLOQUES SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -521,6 +537,24 @@ t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list* bl
     agregar_lista_de_enteros_a_paquete(logger, bloques_swap, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    return paquete;
+}
+
+// Memoria a Filesystem
+t_paquete *crear_paquete_respuesta_leer_marco_de_memoria(t_log *logger, char* nombre_archivo_a_escribir, int puntero_archivo_a_escribir, void* contenido_marco, size_t tamanio_marco)
+{
+    op_code codigo_operacion = RESPUESTA_LEER_MARCO_DE_MEMORIA;
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO_MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+
+    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
+
+    // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger, paquete, puntero_archivo_a_escribir, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_string_a_paquete(logger, paquete, nombre_archivo_a_escribir, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+    agregar_void_a_paquete(logger, paquete, contenido_marco, tamanio_marco, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
+
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO_MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 
     return paquete;
 }
@@ -613,7 +647,7 @@ t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int dire
     return paquete;
 }
 
-// CPU/Filesystem a Memoria
+// CPU a Memoria
 t_paquete *crear_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria, char *nombre_modulo_origen)
 {
     op_code codigo_operacion = SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA;
@@ -642,24 +676,6 @@ t_paquete *crear_paquete_respuesta_leer_valor_en_memoria(t_log *logger, t_valor_
     agregar_int32_a_paquete(logger, paquete, valor_leido_en_memoria->valor_leido, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, codigo_operacion);
 
     log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'VALOR LEIDO EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-
-    return paquete;
-}
-
-// Memoria a Filesystem
-t_paquete *crear_paquete_respuesta_leer_valor_en_memoria_desde_filesystem(t_log *logger, u_int32_t valor, char *nombre_archivo, int puntero_archivo)
-{
-    op_code codigo_operacion = RESPUESTA_LEER_VALOR_EN_MEMORIA_DESDE_FILESYSTEM;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'VALOR LEIDO EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-
-    t_paquete *paquete = crear_paquete(logger, codigo_operacion);
-
-    // RESPETAR EL ORDEN -> SERIALIZACION!
-    agregar_string_a_paquete(logger, paquete, nombre_archivo, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
-    agregar_int_a_paquete(logger, paquete, puntero_archivo, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
-    agregar_int32_a_paquete(logger, paquete, valor, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
-
-    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'VALOR LEIDO EN MEMORIA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 
     return paquete;
 }
