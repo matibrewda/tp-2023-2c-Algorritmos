@@ -21,8 +21,6 @@
 #include <commons/collections/queue.h>
 #include <commons/config.h>
 
-#include "fcb.h"
-
 #include "Source/Headers/argumentos_filesystem.h"
 #include "Source/Headers/configuracion_filesystem.h"
 
@@ -60,13 +58,9 @@ t_list *buscar_bloques_libres_en_swap(int cantidad_de_bloques);
 void liberar_bloques_en_swap(t_list *numeros_de_bloques_a_liberar);
 t_list *reservar_bloques_en_swap(int cantidad_de_bloques);
 
-// ?
-t_list *archivos;
-uint32_t buscar_bloque_fat(int nro_bloque, char *nombre_archivo);
-FCB *buscar_archivo(char *nombre_archivo);
+
 void leer_bloque(uint32_t bloqueFAT);
 void escribir_bloque(uint32_t bloqueFAT, char *informacion);
-
 
 // Utilidades
 void dar_full_permisos_a_archivo(char *path_archivo);
@@ -76,6 +70,8 @@ void cerrar_tabla_fat(uint32_t * puntero_tabla_fat, FILE* puntero_archivo_tabla_
 uint32_t buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat);
 void escribir_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir);
 uint32_t leer_entrada_fat_por_indice(uint32_t * puntero_tabla_fat, uint32_t indice_fat);
+FCB* iniciar_fcb(char* nombre_archivo, uint32_t tamanio_archivo, uint32_t bloque_inicial);
+FCB* abrir_fcb(char* ruta_archivo);
 
 // Terminar
 void terminar_filesystem();
