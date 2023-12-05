@@ -534,7 +534,36 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo()
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
 {
-	// TODO implementame PORFI
+	t_list *paginas_presentes = obtener_entradas_de_tabla_de_pagina_presentes();
+	
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
+
+    t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);
+
+    for (int i = 1; i < list_size(paginas_presentes); i++) {
+        t_entrada_de_tabla_de_pagina *pagina_actual = list_get(paginas_presentes, i);
+
+        // Comparar timestamps para encontrar la página con el timestamp más bajo (LRU)
+        if (pagina_actual->timestamp < pagina_victima_lru->timestamp) {
+            pagina_victima_lru = pagina_actual;
+        }
+    }
+
+    pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
+
+    return pagina_victima_lru;
+}
+
+t_list *obtener_entradas_de_tabla_de_pagina_presentes()
+{
+	bool _filtro_paginas_de_memoria_presente(t_entrada_de_tabla_de_pagina * pagina_de_memoria)
+	{
+		return pagina_de_memoria->presencia == 1;
+	};
+
+	t_list *entradas_tabla_de_pagina = list_filter(tabla_de_paginas, (void *)_filtro_paginas_de_memoria_presente);
+
+	return entradas_tabla_de_pagina;
 }
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
@@ -544,7 +573,7 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
 	{
 		return encontrar_pagina_victima_fifo();
 	}
-	else if (strcmp(configuracion_memoria->algoritmo_reemplazo == "LRU") == 0)
+	else if (strcmp(configuracion_memoria->algoritmo_reemplazo, "LRU") == 0)
 	{
 		return encontrar_pagina_victima_lru();
 	}

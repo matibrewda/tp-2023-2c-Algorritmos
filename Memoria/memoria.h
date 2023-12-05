@@ -38,12 +38,12 @@
 #define LOG_LEVEL LOG_LEVEL_TRACE
 
 // ?????
-void cargar_datos_de_pagina_en_memoria_real(void* contenido_pagina, int numero_de_marco);
+void cargar_datos_de_pagina_en_memoria_real(void *contenido_pagina, int numero_de_marco);
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco);
 int reemplazar_pagina(int pid, int numero_de_pagina);
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor);
 uint32_t leer_valor_en_memoria(int direccion_fisica);
-void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina * pagina, int marco_asignado);
+void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina *pagina, int marco_asignado);
 time_t obtener_tiempo_actual();
 
 // Inicializacion de estructuras
@@ -56,13 +56,13 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 
 // Finalizar proceso
 void finalizar_proceso_en_memoria(int pid);
-void pedir_liberacion_de_bloques_a_filesystem(t_list* posiciones_en_swap);
+void pedir_liberacion_de_bloques_a_filesystem(t_list *posiciones_en_swap);
 void limpiar_entradas_tabla_de_paginas(int pid);
 void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex);
 void eliminar_entrada_de_tabla_de_paginas(int pid);
 
 // Notificacion filesystem
-void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina* victima);
+void escribir_pagina_en_swap(t_entrada_de_tabla_de_pagina *victima);
 
 // Busqueda
 t_archivo_proceso *buscar_archivo_con_pid(int pid);
@@ -72,13 +72,15 @@ t_list *obtener_entradas_de_tabla_de_pagina_por_pid(int pid);
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(int pid, int numero_de_pagina);
 t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_marco_presente(int marco);
 int cantidad_de_paginas_proceso(int pid);
-t_list* obtener_entradas_de_tabla_pagina_presentes();
+t_list *obtener_entradas_de_tabla_de_pagina_presentes();
 
 // Manejo de Paginas
 void cargar_pagina_en_memoria(int pid, int numero_de_pagina);
 int es_pagina_modificada(t_entrada_de_tabla_de_pagina *pagina);
 int es_pagina_presente(t_entrada_de_tabla_de_pagina *pagina);
-void* obtener_contenido_de_pagina_en_swap(int posicion_en_swap);
+void *obtener_contenido_de_pagina_en_swap(int posicion_en_swap);
+t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo();
+t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru();
 
 // Comunicacion con Kernel
 void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado_iniciar_proceso_en_memoria);
@@ -86,7 +88,7 @@ void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_c
 
 // Marcos
 int obtener_primer_marco_desocupado(int *indice_marco_desocupado);
-void* buscar_contenido_marco(int numero_de_marco);
+void *buscar_contenido_marco(int numero_de_marco);
 void ocupar_marco(int numero_de_marco);
 void liberar_marco(int numero_de_marco);
 
