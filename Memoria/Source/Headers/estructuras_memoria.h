@@ -15,7 +15,7 @@ typedef struct
     int presencia;
     int modificado;
     int posicion_en_swap;
-    // TODO agregar timestamp para LRU
+    time_t timestamp;
 } t_entrada_de_tabla_de_pagina;
 
 typedef struct

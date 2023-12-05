@@ -231,13 +231,13 @@ void *atender_filesystem()
 			int puntero_archivo_a_escribir;
 			int direccion_fisica;
 			leer_paquete_solicitud_leer_marco_de_memoria(logger, conexion_con_filesystem, &direccion_fisica, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir);
-			void* contenido_marco; // TODO: LEER MARCO ENTERO  (void* contenido_marco <- direccion_fisica)
+			void *contenido_marco; // TODO: LEER MARCO ENTERO  (void* contenido_marco <- direccion_fisica)
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
 		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_BLOQUE_EN_MEMORIA)
 		{
-			void* contenido_bloque;
+			void *contenido_bloque;
 			int direccion_fisica;
 			leer_paquete_solicitud_escribir_bloque_en_memoria(logger, conexion_con_filesystem, &direccion_fisica, &contenido_bloque);
 			// TODO: ESCRIBIR BLOQUE ENTERO (void* contenido_bloque -> direccion_fisica)
@@ -279,6 +279,7 @@ void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->modificado = 1;
+	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
@@ -289,6 +290,12 @@ uint32_t leer_valor_en_memoria(int direccion_fisica)
 	pthread_mutex_lock(&mutex_memoria_real);
 	uint32_t valor_leido = *(uint32_t *)(memoria_real + direccion_fisica);
 	pthread_mutex_unlock(&mutex_memoria_real);
+
+	int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
+	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
+	pagina->timestamp = obtener_tiempo_actual();
+	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 	return valor_leido;
@@ -434,7 +441,11 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 		*posicion_en_swap = entrada_tabla_de_paginas->posicion_en_swap;
 		list_add(bloques_a_liberar, posicion_en_swap);
 
-		eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
+		if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
+		{
+			eliminar_entrada_de_cola(pid, cola_fifo_entradas, &mutex_cola_fifo_entradas);
+		}
+
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
@@ -529,11 +540,11 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
 {
 	// TODO no va a cambiar dinamicamente, no hace falta chequearlo siempre que se quiera reemplazar una pagina
-	if (configuracion_memoria->algoritmo_reemplazo == "FIFO")
+	if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
 	{
 		return encontrar_pagina_victima_fifo();
 	}
-	else if (configuracion_memoria->algoritmo_reemplazo == "LRU")
+	else if (strcmp(configuracion_memoria->algoritmo_reemplazo == "LRU") == 0)
 	{
 		return encontrar_pagina_victima_lru();
 	}
@@ -629,7 +640,11 @@ void cargar_pagina_en_memoria(int pid, int numero_de_pagina)
 	}
 
 	free(contenido_en_swap);
-	queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
+	if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
+	{
+		queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
+	}
+
 	enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 	return;
 }
@@ -639,9 +654,18 @@ void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina *pagina, i
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->presencia = 1;
 	pagina->marco = marco_asignado;
+	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	return;
+}
+
+time_t obtener_tiempo_actual()
+{
+	time_t tiempo;
+	time(&tiempo);
+	localtime(&tiempo);
+	return tiempo;
 }
 
 void *buscar_contenido_marco(int numero_de_marco)
@@ -769,6 +793,7 @@ void destruir_listas()
 {
 	list_destroy(procesos_iniciados);
 	list_destroy(tabla_de_paginas);
+	queue_destroy(cola_fifo_entradas);
 	bitarray_destroy(tabla_de_marcos);
 	log_trace(logger, "Se destruyen todas las listas de manera correcta");
 }
