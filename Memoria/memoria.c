@@ -297,7 +297,7 @@ void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
-	usleep((configuracion_memoria->retardo_respuesta) * 1000);
+	usleep((configuracion_memoria->retardo_respuesta) / (double)1000);
 }
 
 uint32_t leer_valor_en_memoria(int direccion_fisica)
@@ -312,7 +312,7 @@ uint32_t leer_valor_en_memoria(int direccion_fisica)
 	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
-	usleep((configuracion_memoria->retardo_respuesta) * 1000);
+	usleep((configuracion_memoria->retardo_respuesta) / (double)1000);
 	return valor_leido;
 }
 
@@ -387,7 +387,7 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", linea_instruccion);
 	t_paquete *paquete = crear_paquete_respuesta_pedir_instruccion_a_memoria(logger, linea_instruccion);
 
-	usleep((configuracion_memoria->retardo_respuesta) * 1000);
+	usleep((configuracion_memoria->retardo_respuesta) / (double)1000);
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);

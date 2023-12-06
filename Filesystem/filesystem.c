@@ -177,7 +177,7 @@ void *comunicacion_kernel()
 {
 	while (true)
 	{
-		op_code operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
+		op_code operacion_recibida_kernel = esperar_operacion(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
 
 		switch (operacion_recibida_kernel)
 		{
@@ -358,7 +358,7 @@ void *leer_bloque_swap(int numero_de_bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
 	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
-	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) / (double)1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
 	void *bloque = malloc(configuracion_filesystem->tam_bloques);
@@ -372,7 +372,7 @@ void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
 	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
-	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) / (double)1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
 	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
@@ -589,7 +589,7 @@ uint32_t buscar_bloque_libre_en_fat(uint32_t *puntero_tabla_fat)
 
 uint32_t leer_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_fat)
 {
-	usleep((configuracion_filesystem->retardo_acceso_fat) * 1000);
+	usleep((configuracion_filesystem->retardo_acceso_fat) / (double)1000);
 	uint32_t entrada_fat = puntero_tabla_fat[indice_fat];
 	log_info(logger, "Acceso FAT - Entrada: %d - Valor: %d (LECTURA)", indice_fat, entrada_fat);
 	return entrada_fat;
@@ -597,7 +597,7 @@ uint32_t leer_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indic
 
 void escribir_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
 {
-	usleep((configuracion_filesystem->retardo_acceso_fat) * 1000);
+	usleep((configuracion_filesystem->retardo_acceso_fat) / (double)1000);
 	log_info(logger, "Acceso FAT - Entrada: %d - Valor: %d (ESCRITURA)", indice_donde_escribir, indice_a_escribir);
 	puntero_tabla_fat[indice_donde_escribir] = indice_a_escribir;
 }
@@ -661,7 +661,7 @@ void *leer_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_a
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
 	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
-	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) / (double)1000);
 
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
 	fseek(archivo_bloques, (numero_de_bloque_fs + configuracion_filesystem->cant_bloques_swap - 1) * configuracion_filesystem->tam_bloques, SEEK_SET);
@@ -677,7 +677,7 @@ void escribir_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloqu
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
 	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
-	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
+	usleep((configuracion_filesystem->retardo_acceso_bloques) / (double)1000);
 
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, (numero_de_bloque_fs + configuracion_filesystem->cant_bloques_swap) * configuracion_filesystem->tam_bloques, SEEK_SET);

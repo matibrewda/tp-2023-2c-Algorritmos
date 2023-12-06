@@ -370,7 +370,7 @@ void *contador_quantum(void *id_hilo_quantum)
 	int pid_proceso_a_interrumpir = pcb_ejecutando->pid;
 	int id_hilo = *((int *)id_hilo_quantum);
 
-	usleep((configuracion_kernel->quantum) * 1000);
+	usleep((configuracion_kernel->quantum) / (double)1000);
 
 	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid_proceso_a_interrumpir && pcb_ejecutando->id_hilo_quantum == id_hilo)
 	{
@@ -588,7 +588,7 @@ void *bloqueo_sleep(void *argumentos)
 
 	int pid_proceso_bloqueado = bloqueo_sleep->pcb->pid;
 
-	usleep((bloqueo_sleep->tiempo_sleep) * 1000);
+	usleep((bloqueo_sleep->tiempo_sleep) / (double)1000);
 
 	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 
