@@ -266,7 +266,7 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_error(t_log *logger, t_c
 // CPU a Kernel
 t_paquete *crear_paquete_solicitud_devolver_proceso_por_pagefault(t_log *logger, t_contexto_de_ejecucion *contexto_de_ejecucion, int numero_pagina)
 {
-    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_ERROR;
+    op_code codigo_operacion = SOLICITUD_DEVOLVER_PROCESO_POR_PAGEFAULT;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + NUMERO PAGINA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);

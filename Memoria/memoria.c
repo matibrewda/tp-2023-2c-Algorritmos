@@ -517,7 +517,9 @@ void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_lis
 		entrada_tabla_de_paginas->numero_de_pagina = i;
 		entrada_tabla_de_paginas->presencia = 0;
 		entrada_tabla_de_paginas->posicion_en_swap = (int)(*((int *)list_get_thread_safe(posiciones_swap, i, &mutex_entradas_tabla_de_paginas)));
+		entrada_tabla_de_paginas->pid = pid;
 		list_add_thread_safe(tabla_de_paginas, entrada_tabla_de_paginas, &mutex_entradas_tabla_de_paginas);
+		log_trace(logger, "Se crea la pagina numero %d con bit de presencia en %d y posicion en swap %d para proceso %d", entrada_tabla_de_paginas->numero_de_pagina, entrada_tabla_de_paginas->presencia, entrada_tabla_de_paginas->posicion_en_swap, entrada_tabla_de_paginas->pid);
 	}
 	log_trace(logger, "Se genera correctamente las %d entradas de tabla de paginas para el pid %d", cantidad_de_paginas, pid);
 }
@@ -752,11 +754,11 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 
 	t_entrada_de_tabla_de_pagina *pagina = list_find_thread_safe(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid, &mutex_entradas_tabla_de_paginas);
 
-	if (pagina == NULL)
-	{
-		log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
-		return NULL;
-	}
+	// if (pagina == NULL)
+	// {
+	// 	log_error(logger, "No existe una pagina de memoria con el numero %d y el PID %d", numero_de_pagina, pid);
+	// 	return NULL;
+	// }
 
 	return pagina;
 }
@@ -766,14 +768,15 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 	int numero_marco = -1;
 
-	if (pagina->presencia == 0)
-	{
-		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
-	}
-	else
-	{
-		numero_marco = pagina->marco;
-	}
+	if (pagina == NULL)
+		if (pagina->presencia == 0)
+		{
+			log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
+		}
+		else
+		{
+			numero_marco = pagina->marco;
+		}
 	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
