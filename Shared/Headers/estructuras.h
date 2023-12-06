@@ -132,6 +132,11 @@ typedef struct
 
 typedef struct
 {
+   int pid;
+} t_finalizar_proceso;
+
+typedef struct
+{
     t_pcb *pcb;
     int numero_pagina;
 } t_bloqueo_page_fault;

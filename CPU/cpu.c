@@ -654,27 +654,27 @@ void escribir_valor_a_registro(char *nombre_registro, uint32_t valor)
 	if (strcmp(nombre_registro, AX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_ax = valor;
-		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_debug(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, BX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_bx = valor;
-		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_debug(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, CX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_cx = valor;
-		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_debug(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, DX_NOMBRE_REGISTRO) == 0)
 	{
 		registro_dx = valor;
-		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_debug(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else if (strcmp(nombre_registro, PC_NOMBRE_REGISTRO) == 0)
 	{
 		program_counter = valor;
-		log_info(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
+		log_debug(logger, "Se le asigno al registro '%s' el valor %d.", nombre_registro, valor);
 	}
 	else
 	{

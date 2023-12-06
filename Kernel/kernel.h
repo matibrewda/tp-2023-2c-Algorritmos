@@ -91,6 +91,7 @@ void escribir_archivo_fs(char *nombre_archivo, int puntero_archivo, int direccio
 void consola();
 void iniciar_proceso(char *path, int size, int prioridad);
 void *hilo_iniciar_proceso(void *argumentos);
+void *hilo_finalizar_proceso(void *argumentos);
 void finalizar_proceso(int pid);
 void iniciar_planificacion();
 void detener_planificacion();

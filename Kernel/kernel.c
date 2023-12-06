@@ -859,7 +859,17 @@ void *hilo_iniciar_proceso(void *argumentos)
 
 void finalizar_proceso(int pid)
 {
-	t_pcb *pcb = buscar_pcb_con_pid(pid);
+	pthread_t finalizar_proceso_hilo;
+	t_finalizar_proceso *finalizar_proceso_parametros = malloc(sizeof(t_finalizar_proceso));
+	finalizar_proceso_parametros->pid = pid;
+	pthread_create(&finalizar_proceso_hilo, NULL, hilo_finalizar_proceso, (void *)finalizar_proceso_parametros);
+}
+
+void *hilo_finalizar_proceso(void *argumentos)
+{
+	t_finalizar_proceso *finalizar_proceso_parametros = (t_finalizar_proceso *)argumentos;
+
+	t_pcb *pcb = buscar_pcb_con_pid(finalizar_proceso_parametros->pid);
 
 	if (pcb != NULL)
 	{
