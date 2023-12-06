@@ -87,7 +87,7 @@ void enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(bool resultado
 void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_cargar_pagina_en_memoria);
 
 // Marcos
-int obtener_primer_marco_desocupado(int *indice_marco_desocupado);
+bool obtener_primer_marco_desocupado(int *indice_marco_desocupado);
 void *buscar_contenido_marco(int numero_de_marco);
 void ocupar_marco(int numero_de_marco);
 void liberar_marco(int numero_de_marco);

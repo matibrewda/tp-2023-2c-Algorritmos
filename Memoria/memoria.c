@@ -324,6 +324,10 @@ void inicializar_lista_de_marcos_bitmap()
 	cantidad_de_frames = configuracion_memoria->tam_memoria / configuracion_memoria->tam_pagina;
 	char *data = (char *)malloc(cantidad_de_frames / 8);
 	tabla_de_marcos = bitarray_create_with_mode(data, cantidad_de_frames / 8, MSB_FIRST);
+	for (int i = 0; i < cantidad_de_frames; i++)
+	{
+		bitarray_clean_bit_thread_safe(tabla_de_marcos, i, &mutex_tabla_de_marcos);
+	}
 }
 
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
@@ -786,20 +790,17 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 }
 
 // Marcos
-int obtener_primer_marco_desocupado(int *indice_marco_desocupado)
+bool obtener_primer_marco_desocupado(int *indice_marco_desocupado)
 {
-	for (int i = 0; i < cantidad_de_frames; ++i)
+	for (int i = 0; i < cantidad_de_frames; i++)
 	{
 		if (!bitarray_test_bit_thread_safe(tabla_de_marcos, i, &mutex_tabla_de_marcos))
 		{
-			if (indice_marco_desocupado != NULL)
-			{
-				*indice_marco_desocupado = i;
-			}
-			return 1;
+			*indice_marco_desocupado = i;
+			return true;
 		}
 	}
-	return 0;
+	return false;
 }
 
 void ocupar_marco(int numero_de_marco)
