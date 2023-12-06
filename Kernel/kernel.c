@@ -56,7 +56,7 @@ t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
-	setbuf(stdout, NULL); // Why? Era algo de consola esto.
+	setbuf(stdout, NULL);
 	atexit(terminar_kernel);
 
 	// Inicializacion
@@ -602,7 +602,7 @@ void *bloqueo_sleep(void *argumentos)
 	int pid_proceso_bloqueado = bloqueo_sleep->pcb->pid;
 
 	log_info(logger, "Sleep de %d segundos", bloqueo_sleep->tiempo_sleep);
-	usleep(bloqueo_sleep->tiempo_sleep*1000*1000);
+	usleep(bloqueo_sleep->tiempo_sleep * 1000 * 1000);
 
 	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 
@@ -841,7 +841,19 @@ void consola()
 
 void iniciar_proceso(char *path, int size, int prioridad)
 {
-	t_pcb *pcb = crear_pcb(path, size, prioridad);
+	pthread_t iniciar_proceso_hilo;
+	t_iniciar_proceso *iniciar_proceso_parametros = malloc(sizeof(t_iniciar_proceso));
+	iniciar_proceso_parametros->path = path;
+	iniciar_proceso_parametros->size = size;
+	iniciar_proceso_parametros->prioridad = prioridad;
+	pthread_create(&iniciar_proceso_hilo, NULL, hilo_iniciar_proceso, (void *)iniciar_proceso_parametros);
+}
+
+void *hilo_iniciar_proceso(void *argumentos)
+{
+	t_iniciar_proceso *iniciar_proceso_parametros = (t_iniciar_proceso *)argumentos;
+
+	t_pcb *pcb = crear_pcb(iniciar_proceso_parametros->path, iniciar_proceso_parametros->size, iniciar_proceso_parametros->prioridad);
 	transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_NEW);
 }
 
@@ -1761,7 +1773,7 @@ void signal_semaforo_grado_multiprogramacion()
 	// contador_semaforo_multiprogramacion++;
 	// if (diferencia_contador_semaforo_multiprogramacion > 0)
 	// {
-		sem_post(&semaforo_grado_max_multiprogramacion);
+	sem_post(&semaforo_grado_max_multiprogramacion);
 	// 	diferencia_contador_semaforo_multiprogramacion--;
 	// }
 	// pthread_mutex_unlock(&mutex_grado_multiprogramacion);
@@ -1782,7 +1794,7 @@ void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion
 		int diferencia = abs(nuevo_grado_max_multiprogramacion - grado_max_multiprogramacion_actual);
 		if (nuevo_grado_max_multiprogramacion > grado_max_multiprogramacion_actual)
 		{
-			for (int i = 0 ; i < diferencia ; i++)
+			for (int i = 0; i < diferencia; i++)
 			{
 				sem_post(&semaforo_grado_max_multiprogramacion);
 				contador_semaforo_multiprogramacion++;
@@ -1794,7 +1806,7 @@ void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion
 			{
 				diferencia_contador_semaforo_multiprogramacion += abs(contador_semaforo_multiprogramacion - diferencia);
 			}
-			
+
 			while (contador_semaforo_multiprogramacion > 0)
 			{
 				sem_wait(&semaforo_grado_max_multiprogramacion);

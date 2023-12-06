@@ -122,6 +122,14 @@ typedef struct
     int tiempo_sleep;
 } t_bloqueo_sleep;
 
+
+typedef struct
+{
+   char *path;
+   int size;
+   int prioridad;
+} t_iniciar_proceso;
+
 typedef struct
 {
     t_pcb *pcb;
@@ -130,9 +138,9 @@ typedef struct
 
 typedef struct
 {
-    char *nombre_archivo;     // Nombre del archivo (puntero a char)
-    uint32_t tamanio_archivo; // Tamaño del archivo en bytes
-    uint32_t bloque_inicial;  // Número de bloque inicial
+    char *nombre_archivo;
+    uint32_t tamanio_archivo;
+    uint32_t bloque_inicial;
 } FCB;
 
 #endif /* ESTRUCTURAS_H_ */
