@@ -357,7 +357,7 @@ void dar_full_permisos_a_archivo(char *path_archivo)
 void *leer_bloque_swap(int numero_de_bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
-	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
+	log_info(logger, "Acceso SWAP (LECTURA): %d", numero_de_bloque);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) / (double)1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
@@ -371,7 +371,7 @@ void *leer_bloque_swap(int numero_de_bloque)
 void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
-	log_info(logger, "Acceso SWAP: %d", numero_de_bloque);
+	log_info(logger, "Acceso SWAP (ESCRITURA): %d", numero_de_bloque);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) / (double)1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);

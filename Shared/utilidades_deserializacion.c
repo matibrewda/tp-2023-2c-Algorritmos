@@ -388,8 +388,8 @@ t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_mem
 	t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = malloc(sizeof(t_pedido_escribir_valor_en_memoria));
 
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_int32_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_escribir_valor_en_memoria->valor_a_escribir), codigo_operacion);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_escribir_valor_en_memoria->direccion_fisica), codigo_operacion);
+	leer_int32_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_escribir_valor_en_memoria->valor_a_escribir), codigo_operacion);
 
 	free(buffer);
 
@@ -410,10 +410,8 @@ void *leer_paquete_respuesta_leer_pagina_en_swap(t_log *logger, int conexion_con
 
 	void *contenido_del_bloque;
 
-	size_t tamanio_bloque;
-
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, &(contenido_del_bloque), &tamanio_bloque, codigo_operacion);
+	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, &(contenido_del_bloque), codigo_operacion);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, numero_pagina, codigo_operacion);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, pid, codigo_operacion);
 
@@ -456,11 +454,9 @@ void leer_paquete_solicitud_escribir_bloque_en_memoria(t_log *logger, int conexi
 	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &tamanio_buffer, conexion_con_filesystem, codigo_operacion);
 	void *buffer_con_offset = buffer;
 
-	size_t tamanio_bloque;
-
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, direccion_fisica, codigo_operacion);
-	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, contenido_bloque, &tamanio_bloque, codigo_operacion);
+	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, &buffer_con_offset, contenido_bloque, codigo_operacion);
 
 	free(buffer);
 
@@ -517,10 +513,8 @@ void leer_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, int conexion_
 	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
 	void *buffer_con_offset = buffer;
 
-	size_t tamanio;
-
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, contenido_marco, &tamanio, codigo_operacion);
+	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, contenido_marco, codigo_operacion);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, posicion_swap, codigo_operacion);
 
 	free(buffer);
@@ -538,12 +532,10 @@ void leer_paquete_respuesta_leer_marco_de_memoria(t_log *logger, int conexion_co
 	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &tamanio_buffer, conexion_con_memoria, codigo_operacion);
 	void *buffer_con_offset = buffer;
 
-	size_t tamanio_marco;
-
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, puntero_archivo, codigo_operacion);
 	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, nombre_archivo, codigo_operacion);
-	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, contenido_marco, &tamanio_marco, codigo_operacion);
+	leer_void_desde_buffer_de_paquete(logger, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA, &buffer_con_offset, contenido_marco, codigo_operacion);
 
 	free(buffer);
 

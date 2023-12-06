@@ -286,11 +286,14 @@ void *atender_filesystem()
 
 void escribir_valor_en_memoria(int direccion_fisica, uint32_t valor_a_escribir)
 {
+	log_debug(logger, "Escribiendo valor %d en direccion fisica %d", valor_a_escribir, direccion_fisica);
+
 	pthread_mutex_lock(&mutex_memoria_real);
 	*(uint32_t *)(memoria_real + direccion_fisica) = valor_a_escribir;
 	pthread_mutex_unlock(&mutex_memoria_real);
 
 	int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
+	log_debug(logger, "Numero de marco escrito %d", numero_de_marco);
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	pagina->modificado = 1;
@@ -768,15 +771,15 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 	int numero_marco = -1;
 
-	if (pagina == NULL)
-		if (pagina->presencia == 0)
-		{
-			log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
-		}
-		else
-		{
-			numero_marco = pagina->marco;
-		}
+	if (pagina->presencia == 0)
+	{
+		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
+	}
+	else
+	{
+		numero_marco = pagina->marco;
+	}
+
 	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);

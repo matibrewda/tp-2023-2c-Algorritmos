@@ -510,7 +510,7 @@ t_paquete *crear_paquete_respuesta_pedir_bloques_a_filesystem(t_log *logger, t_l
 }
 
 // Filesystem a memoria
-t_paquete *crear_paquete_solicitud_escribir_bloque_en_memoria(t_log *logger, int direccion_fisica, void *contenido_bloque, size_t tamanio_bloque)
+t_paquete *crear_paquete_solicitud_escribir_bloque_en_memoria(t_log *logger, int direccion_fisica, void *contenido_bloque, int tamanio_bloque)
 {
     op_code codigo_operacion = SOLICITUD_ESCRIBIR_BLOQUE_EN_MEMORIA;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'DIR FISICA + CONTENIDO BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
@@ -561,7 +561,7 @@ t_paquete *crear_paquete_liberar_bloques_en_filesystem(t_log *logger, t_list *bl
 }
 
 // Memoria a Filesystem
-t_paquete *crear_paquete_respuesta_leer_marco_de_memoria(t_log *logger, char* nombre_archivo_a_escribir, int puntero_archivo_a_escribir, void* contenido_marco, size_t tamanio_marco)
+t_paquete *crear_paquete_respuesta_leer_marco_de_memoria(t_log *logger, char* nombre_archivo_a_escribir, int puntero_archivo_a_escribir, void* contenido_marco, int tamanio_marco)
 {
     op_code codigo_operacion = RESPUESTA_LEER_MARCO_DE_MEMORIA;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'CONTENIDO_MARCO' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -598,7 +598,7 @@ t_paquete *crear_paquete_solicitud_leer_pagina_swap(t_log *logger, int posicion_
 }
 
 // Memoria a Filesystem
-t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void *contenido_marco, size_t tamanio_bloque, int posicion_swap)
+t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void *contenido_marco, int tamanio_bloque, int posicion_swap)
 {
     op_code codigo_operacion = SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP;
     log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
@@ -606,7 +606,7 @@ t_paquete *crear_paquete_solicitud_escribir_pagina_en_swap(t_log *logger, void *
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
-    log_debug(logger, "Agrego el contenido del marco con tamaño %zu a paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", tamanio_bloque, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+    log_debug(logger, "Agrego el contenido del marco con tamaño %d a paquete de codigo de operacion %s y contenido 'MARCO Y NUMERO DE BLOQUE' (Origen: %s - Destino %s).", tamanio_bloque, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
     agregar_void_a_paquete(logger, paquete, contenido_marco, tamanio_bloque, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, codigo_operacion);
 
     log_debug(logger, "Agrego la posicion en swap %d a paquete de codigo de operacion %s y contenido 'POSICION SWAP' (Origen: %s - Destino %s).", posicion_swap, nombre_opcode(codigo_operacion), NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
