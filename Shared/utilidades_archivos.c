@@ -70,7 +70,6 @@ char *buscar_linea(t_log *logger, FILE *archivo, int pc)
         linea_actual++;
     }
 
-    // todo revisar porque no entra a este if si le paso una linea que no existe
     if (fseek(archivo, byte_offset, SEEK_SET) != 0)
     {
         log_error(logger, "Error al buscar la línea %d en el archivo", pc);
