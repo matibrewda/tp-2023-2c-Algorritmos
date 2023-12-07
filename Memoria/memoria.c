@@ -265,8 +265,8 @@ void *atender_filesystem()
 			}
 			else
 			{
-				crear_entrada_de_tabla_de_paginas_de_proceso(list_size(posiciones_swap), posiciones_swap, pid_reservando);
-				log_info(logger, "Creacion - PID: <%d> - Tamanio : <%d>", pid_reservando, list_size(posiciones_swap));
+				crear_entradas_de_tabla_de_paginas_de_proceso(list_size(posiciones_swap), posiciones_swap, pid_reservando);
+				log_info(logger, "Creacion de tabla de paginas- PID: <%d> - Tamanio : <%d>", pid_reservando, list_size(posiciones_swap));
 				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
 			}
 		}
@@ -407,7 +407,7 @@ void finalizar_proceso_en_memoria(int pid)
 	cerrar_archivo_con_pid(pid);
 	int cantidad_de_bloques = cantidad_de_paginas_proceso(pid);
 	limpiar_entradas_tabla_de_paginas(pid);
-	log_info(logger, "Destruccion - PID: <%d> - Tamanio : <%d>", pid, cantidad_de_bloques);
+	log_info(logger, "Destruccion de tabla de paginas - PID: <%d> - Tamanio : <%d>", pid, cantidad_de_bloques);
 	free(archivo_proceso);
 }
 
@@ -458,7 +458,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size_thread_safe(entradas_tabla_de_paginas, &mutex_entradas_tabla_de_paginas); i++)
 	{
 		entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
-
+		log_info(logger,"Acceso a tabla de paginas: PID: <%d> - Pagina: <%d> - Marco <%d>",pid,entrada_tabla_de_paginas->numero_de_pagina,entrada_tabla_de_paginas->marco);
 		int *posicion_en_swap = malloc(sizeof(int));
 		*posicion_en_swap = entrada_tabla_de_paginas->posicion_en_swap;
 		list_add(bloques_a_liberar, posicion_en_swap);
@@ -471,6 +471,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
+			log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pid,(entrada_tabla_de_paginas->marco*configuracion_memoria->tam_pagina));
 		}
 		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
@@ -506,7 +507,7 @@ void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 		return pagina_de_memoria->pid == pid;
 	};
 
-	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);
+	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);//TODO VER SI EL LIST REMOVE SIRVE PARA COLAS
 }
 
 void pedir_liberacion_de_bloques_a_filesystem(t_list *posiciones_en_swap)
@@ -516,7 +517,7 @@ void pedir_liberacion_de_bloques_a_filesystem(t_list *posiciones_en_swap)
 }
 
 // Función para inicializar la tabla de páginas por proceso
-void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid)
+void crear_entradas_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid)
 {
 	for (int i = 0; i < cantidad_de_paginas; i++)
 	{
@@ -719,7 +720,7 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 	}
 
 	borrar_contenido_de_marco_en_memoria_real(victima->marco);
-
+	log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pid,(victima->marco*configuracion_memoria->tam_pagina));
 	// Actualizar entrada tabla de paginas de la victima
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	victima->presencia = 0;

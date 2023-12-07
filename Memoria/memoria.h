@@ -52,7 +52,7 @@ void inicializar_lista_de_marcos_bitmap();
 // Iniciar proceso
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid);
 void enviar_instruccion_a_cpu(int pid, int pc);
-void crear_entrada_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid);
+void crear_entradas_de_tabla_de_paginas_de_proceso(int cantidad_de_paginas, t_list *posiciones_swap, int pid);
 
 // Finalizar proceso
 void finalizar_proceso_en_memoria(int pid);
