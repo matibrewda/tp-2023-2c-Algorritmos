@@ -1321,6 +1321,7 @@ t_pcb *buscar_pcb_con_pid(int pid)
 
 		if (pcb != NULL)
 		{
+			pthread_mutex_unlock(&mutex_recursos);
 			return pcb;
 		}
 	}
@@ -1515,9 +1516,7 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 		{
 			return pcb->pid == pid;
 		};
-
 		list_remove_by_condition_thread_safe(recurso->pcbs_bloqueados->elements, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_bloqueados);
-
 		while (recurso_esta_asignado_a_pcb(recurso->nombre, pid))
 		{
 			desasignar_recurso_a_pcb(recurso->nombre, pid);
@@ -1544,7 +1543,6 @@ void log_fin_de_proceso(t_pcb *pcb)
 
 t_list *obtener_procesos_analisis_deadlock()
 {
-	pthread_mutex_lock(&mutex_recursos);
 	t_list *resultado = list_create();
 	t_pcb *pcb;
 	t_pcb_analisis_deadlock *pcb_a_analizar_existente;
@@ -1614,13 +1612,11 @@ t_list *obtener_procesos_analisis_deadlock()
 		}
 		list_iterator_destroy(iterador_pcbs_bloqueados);
 	}
-	pthread_mutex_unlock(&mutex_recursos);
 	return resultado;
 }
 
 int *obtener_vector_recursos_disponibles()
 {
-	pthread_mutex_lock(&mutex_recursos);
 	int cantidad_de_recursos = list_size(recursos);
 	int *recursos_disponibles = malloc(cantidad_de_recursos * sizeof(int));
 
@@ -1638,7 +1634,6 @@ int *obtener_vector_recursos_disponibles()
 		}
 	}
 
-	pthread_mutex_unlock(&mutex_recursos);
 	return recursos_disponibles;
 }
 
