@@ -24,10 +24,15 @@ typedef struct
     uint32_t registro_cx;
     uint32_t registro_dx;
 
-    // tabla de archivos abiertos
-    t_list *recursos_asignados;
-
+    t_list* tabla_archivos;
 } t_pcb;
+
+typedef struct
+{
+    char* nombre_archivo;
+    char modo_apertura;
+    int puntero;
+} t_archivo_abierto_proceso;
 
 typedef struct
 {
@@ -106,7 +111,7 @@ typedef struct
     pthread_mutex_t mutex_pcbs_bloqueados;
     pthread_mutex_t mutex_pcbs_asignados;
     bool es_archivo;
-    int puntero_archivo;
+    int tamanio_archivo;
 } t_recurso;
 
 typedef struct
@@ -123,7 +128,6 @@ typedef struct
     t_pcb *pcb;
     int tiempo_sleep;
 } t_bloqueo_sleep;
-
 
 typedef struct
 {

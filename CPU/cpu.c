@@ -414,6 +414,10 @@ void ciclo_de_ejecucion()
 			{
 				escribir_valor_a_registro(PC_NOMBRE_REGISTRO, nuevo_program_counter);
 			}
+			else
+			{
+				program_counter++;
+			}
 		}
 		else if (strcmp(nombre_instruccion, SLEEP_NOMBRE_INSTRUCCION) == 0)
 		{

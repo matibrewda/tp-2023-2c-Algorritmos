@@ -120,8 +120,10 @@ void signal_semaforo_grado_multiprogramacion();
 // Recursos
 void crear_recursos();
 t_recurso *crear_recurso(char *nombre, int instancias);
+t_recurso *crear_recurso_archivo(char *nombre_archivo);
 bool recurso_existe(char *nombre);
 t_recurso *buscar_recurso_por_nombre(char *nombre_recurso);
+t_archivo_abierto_proceso* buscar_archivo_abierto_proceso(char* nombre_archivo, int pid);
 bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid);
 void desasignar_recurso_a_pcb(char *nombre_recurso, int pid);
 void desasignar_todos_los_recursos_a_pcb(int pid);
