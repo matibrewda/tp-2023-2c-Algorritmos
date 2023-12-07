@@ -636,7 +636,7 @@ void *page_fault(void *argumentos)
 	int pid_proceso_page_fault = bloqueo_page_fault->pcb->pid;
 
 	bool exito = cargar_pagina_en_memoria(pid_proceso_page_fault, bloqueo_page_fault->numero_pagina);
-
+	pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_page_fault, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
 
 	if (pcb != NULL)
@@ -653,6 +653,7 @@ void *page_fault(void *argumentos)
 			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 		}
 	}
+	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////

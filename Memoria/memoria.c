@@ -785,7 +785,7 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 
 	if (pagina->presencia == 0)
 	{
-		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, numero_marco);
 		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
 	}
 	else
