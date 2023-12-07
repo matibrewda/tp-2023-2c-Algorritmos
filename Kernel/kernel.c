@@ -47,6 +47,7 @@ pthread_mutex_t mutex_conexion_filesystem;
 pthread_mutex_t mutex_id_hilo_quantum;
 pthread_mutex_t mutex_grado_multiprogramacion;
 pthread_mutex_t mutex_planificacion;
+pthread_mutex_t mutex_recursos;
 
 // Colas de planificacion
 t_queue *cola_new = NULL;
@@ -143,6 +144,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_id_hilo_quantum, NULL);
 	pthread_mutex_init(&mutex_grado_multiprogramacion, NULL);
 	pthread_mutex_init(&mutex_planificacion, NULL);
+	pthread_mutex_init(&mutex_recursos, NULL);
 
 	// Colas de planificacion
 	cola_new = queue_create();
@@ -1320,7 +1322,8 @@ t_pcb *buscar_pcb_con_pid(int pid)
 		return pcb;
 	}
 
-	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	pthread_mutex_lock(&mutex_recursos);
+	for (int i = 0; i < list_size(recursos); i++)
 	{
 		t_recurso *recurso = list_get(recursos, i);
 		pcb = buscar_pcb_con_pid_en_cola(pid, recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
@@ -1330,6 +1333,7 @@ t_pcb *buscar_pcb_con_pid(int pid)
 			return pcb;
 		}
 	}
+	pthread_mutex_unlock(&mutex_recursos);
 
 	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid)
 	{
@@ -1400,7 +1404,6 @@ void push_cola_ready(t_pcb *pcb)
 void crear_recursos()
 {
 	recursos = list_create();
-
 	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
 	{
 		list_add(recursos, crear_recurso(configuracion_kernel->recursos[i], configuracion_kernel->instancias_recursos[i]));
@@ -1421,6 +1424,9 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 
 	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
 	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
+
+	recurso->es_archivo = false;
+	recurso->puntero_archivo = -1;
 
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 
@@ -1460,6 +1466,7 @@ bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid)
 	return list_find_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_asignados) != NULL;
 }
 
+// TODO: que pasa con un archivo aca?
 void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 {
 	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
@@ -1486,7 +1493,8 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 
 void desasignar_todos_los_recursos_a_pcb(int pid)
 {
-	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	pthread_mutex_lock(&mutex_recursos);
+	for (int i = 0; i < list_size(recursos); i++)
 	{
 		t_recurso *recurso = list_get(recursos, i);
 
@@ -1502,6 +1510,7 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 			desasignar_recurso_a_pcb(recurso->nombre, pid);
 		}
 	}
+	pthread_mutex_unlock(&mutex_recursos);
 }
 
 void log_fin_de_proceso(t_pcb *pcb)
@@ -1522,6 +1531,7 @@ void log_fin_de_proceso(t_pcb *pcb)
 
 t_list *obtener_procesos_analisis_deadlock()
 {
+	pthread_mutex_lock(&mutex_recursos);
 	t_list *resultado = list_create();
 	t_pcb *pcb;
 	t_pcb_analisis_deadlock *pcb_a_analizar_existente;
@@ -1530,7 +1540,7 @@ t_list *obtener_procesos_analisis_deadlock()
 	t_list_iterator *iterador_pcbs_asignados;
 	t_list_iterator *iterador_pcbs_bloqueados;
 	int i, j;
-	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+	int cantidad_de_recursos = list_size(recursos);
 
 	bool _filtro_pcb_por_id(t_pcb * unpcb)
 	{
@@ -1591,13 +1601,14 @@ t_list *obtener_procesos_analisis_deadlock()
 		}
 		list_iterator_destroy(iterador_pcbs_bloqueados);
 	}
-
+	pthread_mutex_unlock(&mutex_recursos);
 	return resultado;
 }
 
 int *obtener_vector_recursos_disponibles()
 {
-	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
+	pthread_mutex_lock(&mutex_recursos);
+	int cantidad_de_recursos = list_size(recursos);
 	int *recursos_disponibles = malloc(cantidad_de_recursos * sizeof(int));
 
 	for (int i = 0; i < cantidad_de_recursos; i++)
@@ -1614,14 +1625,16 @@ int *obtener_vector_recursos_disponibles()
 		}
 	}
 
+	pthread_mutex_unlock(&mutex_recursos);
 	return recursos_disponibles;
 }
 
 bool hay_deadlock()
 {
+	pthread_mutex_lock(&mutex_recursos);
 	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK");
-	int cantidad_de_recursos = configuracion_kernel->cantidad_de_recursos;
-	int *recursos_totales = configuracion_kernel->instancias_recursos;
+	int cantidad_de_recursos = list_size(recursos);
+	int *recursos_totales = configuracion_kernel->instancias_recursos; // TODO FIX
 	int *recursos_disponibles = obtener_vector_recursos_disponibles();
 	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
 	bool finalice_alguno = true;
@@ -1731,6 +1744,7 @@ bool hay_deadlock()
 	// FIN LOG/IMPRIMIR DEADLOCK
 
 	list_destroy(procesos_a_analizar);
+	pthread_mutex_unlock(&mutex_recursos);
 	return en_deadlock;
 }
 
@@ -1784,23 +1798,23 @@ void liberar_string_dinamico()
 
 void wait_semaforo_grado_multiprogramacion()
 {
-	// pthread_mutex_lock(&mutex_grado_multiprogramacion);
-	// contador_semaforo_multiprogramacion--;
-	// pthread_mutex_unlock(&mutex_grado_multiprogramacion);
+	pthread_mutex_lock(&mutex_grado_multiprogramacion);
+	contador_semaforo_multiprogramacion--;
+	pthread_mutex_unlock(&mutex_grado_multiprogramacion);
 
 	sem_wait(&semaforo_grado_max_multiprogramacion);
 }
 
 void signal_semaforo_grado_multiprogramacion()
 {
-	// pthread_mutex_lock(&mutex_grado_multiprogramacion);
-	// contador_semaforo_multiprogramacion++;
-	// if (diferencia_contador_semaforo_multiprogramacion > 0)
-	// {
-	sem_post(&semaforo_grado_max_multiprogramacion);
-	// 	diferencia_contador_semaforo_multiprogramacion--;
-	// }
-	// pthread_mutex_unlock(&mutex_grado_multiprogramacion);
+	pthread_mutex_lock(&mutex_grado_multiprogramacion);
+	contador_semaforo_multiprogramacion++;
+	if (diferencia_contador_semaforo_multiprogramacion > 0)
+	{
+		sem_post(&semaforo_grado_max_multiprogramacion);
+		diferencia_contador_semaforo_multiprogramacion--;
+	}
+	pthread_mutex_unlock(&mutex_grado_multiprogramacion);
 }
 
 void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion)

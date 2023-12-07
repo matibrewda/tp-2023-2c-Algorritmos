@@ -98,13 +98,15 @@ typedef struct
 
 typedef struct
 {
-    char *nombre;
+    char *nombre; // Nombre de recurso o nombre de archivo
     int instancias_iniciales;
     int instancias_disponibles;
     t_queue *pcbs_bloqueados;
     t_list *pcbs_asignados;
     pthread_mutex_t mutex_pcbs_bloqueados;
     pthread_mutex_t mutex_pcbs_asignados;
+    bool es_archivo;
+    int puntero_archivo;
 } t_recurso;
 
 typedef struct
