@@ -110,8 +110,13 @@ typedef struct
     t_list *pcbs_asignados;
     pthread_mutex_t mutex_pcbs_bloqueados;
     pthread_mutex_t mutex_pcbs_asignados;
+
     bool es_archivo;
     int tamanio_archivo;
+    char lock_actual;
+    t_queue* pcbs_archivos;
+    pthread_mutex_t mutex_pcbs_archivos;
+
 } t_recurso;
 
 typedef struct

@@ -273,9 +273,20 @@ void *planificador_corto_plazo()
 			if (fs_opcode == FOPEN_OPCODE)
 			{
 				log_info(logger, "PID: %d - Abrir Archivo: %s", contexto_de_ejecucion->pid, nombre_archivo);
-				// 1) Existe archivo abierto en tabla de archivos global?
-				// Si existe, no tengo que mandar ni abrir ni crear a FS
-				// Si no existe, primero tengo que mandar un abrir a FS
+				t_recurso * recurso_archivo_a_abrir = buscar_recurso_por_nombre(nombre_archivo);
+				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo_a_abrir != NULL;
+				if (archivo_a_abrir_existe_y_estaba_abierto)
+				{
+					//TODO
+				}
+				else
+				{
+					// Si no existe, primero tengo que mandar un abrir a FS
+					// crear hilo como sleep para atender esto y ademas bloquear al proceso
+					// a la vuelta del abrir:
+					// si existia, crea el recurso archivo y lo mete en la lista de recursos
+					// si no existia, tiene que mandar otro hilo para crear archivo y hacer lo mismo
+				}	
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
 			{
@@ -285,8 +296,14 @@ void *planificador_corto_plazo()
 			else if (fs_opcode == FSEEK_OPCODE)
 			{
 				log_info(logger, "PID: %d - Actualizar puntero Archivo: %s - Puntero: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo);
-				// mantener_proceso_ejecutando = true;
-				//  t_recurso *recurso_archivo_para_seek = buscar(nombre_archivo);
+				mantener_proceso_ejecutando = true;
+				bool _filtro_archivo_abierto_proceso_por_nombre(t_archivo_abierto_proceso * archivo_abierto_proceso)
+				{
+					return strcmp(archivo_abierto_proceso->nombre_archivo, nombre_archivo) == 0;
+				};
+
+				t_archivo_abierto_proceso *archivo_abierto_proceso = list_find(pcb->tabla_archivos, (void *)_filtro_archivo_abierto_proceso_por_nombre);
+				archivo_abierto_proceso->puntero = posicion_puntero_archivo;
 			}
 			else if (fs_opcode == FTRUNCATE_OPCODE)
 			{
@@ -491,6 +508,7 @@ void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new);
+	// TODO: por cada free(pcb), destruir la lista y sus elementos de archivos abiertos
 	free(pcb);
 }
 
@@ -1408,17 +1426,19 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 
 	recurso->nombre = malloc(strlen(nombre));
 	strcpy(recurso->nombre, nombre);
-
 	recurso->instancias_iniciales = instancias;
 	recurso->instancias_disponibles = instancias;
 	recurso->pcbs_bloqueados = queue_create();
 	recurso->pcbs_asignados = list_create();
-
 	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
 	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
 	recurso->es_archivo = false;
-	recurso->tamanio_archivo = -1;
+    recurso->tamanio_archivo = -1;
+    recurso->lock_actual = '?';
+    recurso->pcbs_archivos = queue_create();
+    pthread_mutex_t mutex_pcbs_archivos;
+	pthread_mutex_init(&recurso->mutex_pcbs_archivos, NULL);
 
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 
@@ -1431,16 +1451,19 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo)
 
 	recurso->nombre = malloc(strlen(nombre_archivo));
 	strcpy(recurso->nombre, nombre_archivo);
-
 	recurso->instancias_iniciales = 1;
 	recurso->instancias_disponibles = 1;
 	recurso->pcbs_bloqueados = queue_create();
 	recurso->pcbs_asignados = list_create();
-
 	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
 	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
-	recurso->es_archivo = true;
+	recurso->es_archivo = false;
+    recurso->tamanio_archivo = -1;
+    recurso->lock_actual = '?';
+    recurso->pcbs_archivos = queue_create();
+    pthread_mutex_t mutex_pcbs_archivos;
+	pthread_mutex_init(&recurso->mutex_pcbs_archivos, NULL);
 
 	log_debug(logger, "Se crea el recurso archivo %s con %d instancias", nombre_archivo, 1);
 
