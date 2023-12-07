@@ -238,7 +238,7 @@ void *atender_filesystem()
 			leer_paquete_solicitud_leer_marco_de_memoria(logger, conexion_con_filesystem, &direccion_fisica, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir);
 			int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
 			void *contenido_marco = buscar_contenido_marco(numero_de_marco);
-			log_info(logger,"");//TODO acceso a espacio de usuario lectura
+			//log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <LEER> - Direccion fisica : <%d>",pid,direccion_fisica);//TODO ver como traer el pid
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -476,7 +476,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
-			log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pid,(entrada_tabla_de_paginas->marco*configuracion_memoria->tam_pagina));
+			log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <BORRAR> - Direccion fisica : <%d>",pid,(entrada_tabla_de_paginas->marco*configuracion_memoria->tam_pagina));
 		}
 		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
@@ -780,16 +780,18 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
-	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
+	
 	int numero_marco = -1;
 
 	if (pagina->presencia == 0)
 	{
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
 	}
 	else
 	{
 		numero_marco = pagina->marco;
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
 	}
 
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
