@@ -230,14 +230,17 @@ void *planificador_corto_plazo()
 
 	while (true)
 	{
-		sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
-		pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
-		if (pcb == NULL)
+		if (!mantener_proceso_ejecutando)
 		{
-			log_error(logger, "PCB ES NULL EN PLANIFICADOR CORTO PLAZO"); // TODO: eliminar si no hace falta
+			sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
+			pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
+			if (pcb == NULL)
+			{
+				continue;
+			}
 		}
 
-		// mantener_proceso_ejecutando = false;
+		mantener_proceso_ejecutando = false;
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
 
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
@@ -339,7 +342,7 @@ void *planificador_corto_plazo()
 				else
 				{
 					list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
-					// mantener_proceso_ejecutando = true;
+					mantener_proceso_ejecutando = true;
 				}
 			}
 		}
@@ -359,7 +362,7 @@ void *planificador_corto_plazo()
 			{
 				t_recurso *recurso_para_signal = buscar_recurso_por_nombre(nombre_recurso);
 				log_info(logger, "PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
-				// mantener_proceso_ejecutando = true;
+				mantener_proceso_ejecutando = true;
 				desasignar_recurso_a_pcb(nombre_recurso, pcb->pid);
 			}
 		}
