@@ -556,23 +556,23 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_fifo()
 
 t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
 {
-	t_list *paginas_presentes = obtener_entradas_de_tabla_de_pagina_presentes();
-
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
-
-	t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);
+	t_list *paginas_presentes = obtener_entradas_de_tabla_de_pagina_presentes();
+	t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);// toma la primer pagina de las presentes
 
 	for (int i = 1; i < list_size(paginas_presentes); i++)
 	{
 		t_entrada_de_tabla_de_pagina *pagina_actual = list_get(paginas_presentes, i);
-
+		log_trace(logger,"La pagina con mayor tiempo es la del PID %d y pagina %d con timestamp %ld",pagina_victima_lru->pid,pagina_victima_lru->numero_de_pagina,pagina_victima_lru->timestamp);
+		log_trace(logger,"La pagina con la que se compara es  PID %d y pagina %d con timestamp %ld",pagina_actual->pid,pagina_actual->numero_de_pagina,pagina_actual->timestamp);
 		// Comparar timestamps para encontrar la página con el timestamp más bajo (LRU)
 		if (pagina_actual->timestamp < pagina_victima_lru->timestamp)
 		{
 			pagina_victima_lru = pagina_actual;
 		}
+		log_trace(logger,"Por ahora la victima es PID %d y pagina %d",pagina_victima_lru->pid,pagina_victima_lru->numero_de_pagina);
 	}
-
+	log_trace(logger,"La victima es PID %d y pagina %d",pagina_victima_lru->pid,pagina_victima_lru->numero_de_pagina);
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	return pagina_victima_lru;
