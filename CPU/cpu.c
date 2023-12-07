@@ -426,7 +426,7 @@ void ciclo_de_ejecucion()
 			char *nombre_registro = strtok_r(saveptr, " ", &saveptr);
 			u_int32_t nuevo_program_counter = atoi(strtok_r(saveptr, " ", &saveptr));
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %d", pid_ejecutando, JNZ_NOMBRE_INSTRUCCION, nombre_registro, nuevo_program_counter);
-			if (leer_valor_de_registro(nombre_registro) == 0)
+			if (leer_valor_de_registro(nombre_registro) != 0)
 			{
 				escribir_valor_a_registro(PC_NOMBRE_REGISTRO, nuevo_program_counter);
 			}

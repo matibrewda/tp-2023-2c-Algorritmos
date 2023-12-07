@@ -1267,7 +1267,7 @@ t_pcb *crear_pcb(char *path, int size, int prioridad)
 
 	pcb->pid = ++proximo_pid;
 	pcb->estado = CODIGO_ESTADO_PROCESO_DESCONOCIDO;
-	pcb->program_counter = 1;
+	pcb->program_counter = 0;
 	pcb->registro_ax = 0;
 	pcb->registro_bx = 0;
 	pcb->registro_cx = 0;
