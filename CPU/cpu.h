@@ -46,7 +46,6 @@ void devolver_contexto_por_operacion_filesystem(fs_op_code fs_opcode, char *nomb
 
 // Comunicacion con Memoria
 void pedir_info_inicial_a_memoria();
-char *pedir_instruccion_a_memoria();
 int pedir_numero_de_marco_a_memoria(int numero_de_pagina);
 
 // Ciclo de ejecucion

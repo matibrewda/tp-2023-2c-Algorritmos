@@ -315,22 +315,6 @@ void pedir_info_inicial_a_memoria()
 	free(info_memoria);
 }
 
-char *pedir_instruccion_a_memoria()
-{
-	// Enviar
-	t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
-	pedido_instruccion->pc = program_counter;
-	pedido_instruccion->pid = pid_ejecutando;
-	t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
-	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
-
-	// Recibir
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
-	char *instruccion_string = leer_paquete_respuesta_pedir_instruccion_a_memoria(logger, conexion_con_memoria);
-
-	return instruccion_string;
-}
-
 int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 {
 	// Enviar
@@ -385,7 +369,7 @@ void ciclo_de_ejecucion()
 		// FETCH
 		log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
 		t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
-		pedido_instruccion->pc = program_counter;
+		pedido_instruccion->pc = program_counter + 1;
 		pedido_instruccion->pid = pid_ejecutando;
 		t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
 		free(pedido_instruccion);
