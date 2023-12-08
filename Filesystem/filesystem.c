@@ -213,7 +213,7 @@ void *comunicacion_kernel()
 			log_info(logger, "Truncar Archivo: %s - Tamano: %d", nombre_archivo_truncar, nuevo_tamanio_archivo);
 			truncar_archivo_fs(nombre_archivo_truncar, nuevo_tamanio_archivo);
 			t_paquete *respuesta_truncar_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_TRUNCAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
-			enviar_paquete(logger, conexion_con_kernel, respuesta_crear_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
+			enviar_paquete(logger, conexion_con_kernel, respuesta_truncar_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			break;
 
 		case SOLICITUD_LEER_ARCHIVO_FS:
