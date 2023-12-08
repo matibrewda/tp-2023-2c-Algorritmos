@@ -239,8 +239,13 @@ void *planificador_corto_plazo()
 
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 		actualizar_pcb(pcb, contexto_de_ejecucion);
-
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
+		
+		if (pcb_ejecutando == NULL) 
+		{
+			pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+			continue;
+		}
 
 		if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 		{
@@ -441,7 +446,6 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 	{
 		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
 		{
-
 			transicionar_proceso_de_executing_a_ready(pcb);
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_BLOCKED)
@@ -570,6 +574,7 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	free(pcb);
+	pcb_ejecutando = NULL;
 	if (en_deadlock)
 	{
 		hay_deadlock();
@@ -895,7 +900,14 @@ void *hilo_finalizar_proceso(void *argumentos)
 	{
 		if (pcb->estado == CODIGO_ESTADO_PROCESO_EXECUTING)
 		{
-			interrumpir_proceso_en_cpu(INTERRUPCION_POR_KILL);
+			if (planificacion_detenida)
+			{
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+			}
+			else
+			{
+				interrumpir_proceso_en_cpu(INTERRUPCION_POR_KILL);
+			}
 		}
 		else
 		{
