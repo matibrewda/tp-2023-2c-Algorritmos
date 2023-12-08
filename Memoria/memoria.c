@@ -390,7 +390,7 @@ void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_c
 
 void enviar_instruccion_a_cpu(int pid, int pc)
 {
-	log_info(logger, "El proceso pid=%d pide instruccion en pc=%d", pid, pc);
+	//log_info(logger, "El proceso pid=%d pide instruccion en pc=%d", pid, pc);
 
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 
@@ -463,7 +463,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 	for (int i = 0; i < list_size_thread_safe(entradas_tabla_de_paginas, &mutex_entradas_tabla_de_paginas); i++)
 	{
 		entrada_tabla_de_paginas = list_get_thread_safe(entradas_tabla_de_paginas, i, &mutex_entradas_tabla_de_paginas);
-		log_info(logger,"Acceso a tabla de paginas: PID: <%d> - Pagina: <%d> - Marco <%d>",pid,entrada_tabla_de_paginas->numero_de_pagina,entrada_tabla_de_paginas->marco);
+		log_info(logger,"Acceso a tabla de paginas: PID: <%d> - Pagina: <%d> - Presencia <%d> - Marco <%d>",pid,entrada_tabla_de_paginas->numero_de_pagina,entrada_tabla_de_paginas->presencia,entrada_tabla_de_paginas->marco);
 		int *posicion_en_swap = malloc(sizeof(int));
 		*posicion_en_swap = entrada_tabla_de_paginas->posicion_en_swap;
 		list_add(bloques_a_liberar, posicion_en_swap);
