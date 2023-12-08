@@ -162,7 +162,7 @@ void *atender_kernel()
 		{
 			t_pedido_pagina_en_memoria *pedido_cargar_pagina = leer_paquete_solicitud_pedido_pagina_en_memoria(logger, conexion_con_kernel, SOLICITUD_CARGAR_PAGINA_EN_MEMORIA, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_MEMORIA);
 			t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
-			//log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);//TODO traer pid y ver que ponerle en el marco
+			log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Precencia: <%d> - Marco: <%d>", pagina->pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
 			t_paquete *paquete = crear_paquete_solicitud_leer_pagina_swap(logger, pagina->posicion_en_swap, pedido_cargar_pagina->pid, pedido_cargar_pagina->numero_de_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			free(pedido_cargar_pagina);
@@ -238,7 +238,6 @@ void *atender_filesystem()
 			leer_paquete_solicitud_leer_marco_de_memoria(logger, conexion_con_filesystem, &direccion_fisica, &nombre_archivo_a_escribir, &puntero_archivo_a_escribir);
 			int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
 			void *contenido_marco = buscar_contenido_marco(numero_de_marco);
-			//log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <LEER> - Direccion fisica : <%d>",pid,direccion_fisica);//TODO ver como traer el pid
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -249,7 +248,8 @@ void *atender_filesystem()
 			leer_paquete_solicitud_escribir_bloque_en_memoria(logger, conexion_con_filesystem, &direccion_fisica, &contenido_bloque);
 			int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
 			cargar_datos_de_pagina_en_memoria_real(contenido_bloque, numero_de_marco);
-			//log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pid,(numero_de_marco*configuracion_memoria->tam_pagina));  //TODO ver como hacer que me llegue el pid
+			t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
+			log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pagina->pid,direccion_fisica);
 			t_paquete *respuesta_escribir_bloque_en_memoria = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			enviar_paquete(logger, conexion_con_filesystem, respuesta_escribir_bloque_en_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -512,7 +512,7 @@ void eliminar_entrada_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 		return pagina_de_memoria->pid == pid;
 	};
 
-	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);//TODO VER SI EL LIST REMOVE SIRVE PARA COLAS
+	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_paginas_de_memoria_pid, mutex);
 }
 
 void pedir_liberacion_de_bloques_a_filesystem(t_list *posiciones_en_swap)
@@ -653,27 +653,28 @@ void cargar_pagina_de_swap_en_memoria(int pid, int numero_de_pagina, void *conte
 	int marco_desocupado;
 	if (obtener_primer_marco_desocupado(&marco_desocupado))
 	{
-		// Cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
-		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);  
+		log_info(logger,"Lectura de Pagina en SWAP: SWAP IN - PID: <-> - Marco: <%d> - Page In: <%d>-<%d>",marco_desocupado,pid,numero_de_pagina);
 		// Actualizar entrada tabla de paginas de la nueva pagina
 		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
-		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
-		ocupar_marco(marco_desocupado);
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Presencia: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
+		//Cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);
+		log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pagina->pid,marco_desocupado*configuracion_memoria->tam_pagina); 
+		ocupar_marco(marco_desocupado); 
 		free(contenido_en_swap);
 		if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
 		{
 			queue_push_thread_safe(cola_fifo_entradas, pagina, &mutex_cola_fifo_entradas);
 		}
-
 		enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(true);
 		return;
 	}
 
 	int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
 	cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
-	actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
-	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
-	ocupar_marco(marco_libre);
+	log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <ESCRIBIR> - Direccion fisica : <%d>",pagina->pid,marco_libre*configuracion_memoria->tam_pagina);  
+	
+
 
 	free(contenido_en_swap);
 	if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
@@ -703,6 +704,9 @@ time_t obtener_tiempo_actual()
 
 void *buscar_contenido_marco(int numero_de_marco)
 {
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
+	log_info(logger,"Acceso a espacio de usuario: PID: <%d> - Accion: <LEER> - Direccion fisica : <%d>",pagina->pid,numero_de_marco*configuracion_memoria->tam_pagina);
+			
 	void *contenido_marco = malloc(configuracion_memoria->tam_pagina);
 	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
@@ -716,13 +720,15 @@ void *buscar_contenido_marco(int numero_de_marco)
 int reemplazar_pagina(int pid, int numero_de_pagina)
 {
 	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
+	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 	t_entrada_de_tabla_de_pagina *victima = encontrar_pagina_victima();
-
+	
+	log_info(logger,"Lectura de Pagina en SWAP: SWAP IN - PID: <%d> - Marco: <%d> - Page In: <%d>-<%d>",victima->pid,victima->marco,pagina->pid,pagina->numero_de_pagina);
 	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
 	if (es_pagina_presente(victima) == 1 && es_pagina_modificada(victima) == 1)
 	{
+		log_info(logger,"Escritura de Pagina en SWAP: SWAP OUT - PID: <%d> - Marco: <%d> - Page In: <%d>-<%d>",victima->pid,victima->marco,pagina->pid,pagina->numero_de_pagina);
 		escribir_pagina_en_swap(victima);
-
 	}
 
 	borrar_contenido_de_marco_en_memoria_real(victima->marco);
@@ -732,8 +738,16 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 	victima->presencia = 0;
 	victima->modificado = 0;
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
+	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Presencia: <%d> - Marco: <%d>", victima->pid, victima->numero_de_pagina,victima->presencia, victima->marco);
+	
+	int marco_libre = victima->marco;
+	actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
+	log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Presencia: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina,pagina->presencia, pagina->marco);
+	ocupar_marco(marco_libre);
 
-	return victima->marco;
+	log_info(logger, "Reemplazo pagina: REEMPLAZO - Marco: <%d> - Page Out: <%d>-<%d> - Page In: <%d>-<%d>", marco_libre, victima->pid, victima->numero_de_pagina, pagina->pid, pagina->numero_de_pagina);
+
+	return marco_libre;
 }
 
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco)
@@ -785,13 +799,13 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 
 	if (pagina->presencia == 0)
 	{
-		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, numero_marco);
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Presencia <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->presencia, numero_marco);
 		log_warning(logger, "La pagina de memoria con el numero %d y el PID %d no se encuentra en memoria, bit de presencia = 0", numero_de_pagina, pid);
 	}
 	else
 	{
 		numero_marco = pagina->marco;
-		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->marco);
+		log_info(logger, "Acceso a tabla de paginas PID : <%d> - Pagina: <%d> - Presencia <%d> - Marco: <%d>", pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
 	}
 
 	t_paquete *paquete = crear_paquete_respuesta_pedido_numero_de_marco(logger, numero_marco);
