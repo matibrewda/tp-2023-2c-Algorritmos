@@ -234,16 +234,12 @@ void *planificador_corto_plazo()
 			pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
 			if (pcb == NULL)
 			{
-				log_info(logger, "HOLA 2");
 				continue;
 			}
 		}
 
-		log_info(logger, "HOLA 1");
-
 		mantener_proceso_ejecutando = false;
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
-		log_info(logger, "HOLA 3");
 
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 		actualizar_pcb(pcb, contexto_de_ejecucion);
