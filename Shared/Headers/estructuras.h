@@ -121,11 +121,16 @@ typedef struct
 
     bool es_archivo;
     int tamanio_archivo;
-    int lock_actual;
-    t_queue* pcbs_archivos;
-    pthread_mutex_t mutex_pcbs_archivos;
-
+    t_pcb* pcb_lock_escritura;
+    t_list* pcbs_lock_lectura;
+    t_queue* pcbs_bloqueados_por_archivo;
 } t_recurso;
+
+typedef struct
+{
+    t_pcb* pcb;
+    int lock;
+} t_pcb_bloqueado_archivo;
 
 typedef struct
 {
