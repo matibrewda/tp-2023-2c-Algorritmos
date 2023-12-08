@@ -13,6 +13,9 @@ ejecutar: limpiar compilar
 limpiar:
 	rm -rf $(EJECUTABLE)
 	rm -rf $(LOGS)
+	rm -rf fs/bloques.dat
+	rm -rf fs/fat.dat
+	rm -rf fs/fcbs/*
 compilar:
 	$(COMPILADOR) $(FUENTES_MODULO) $(FUENTES_SHARED) -o $(EJECUTABLE) $(LIBRERIAS) -Werror
 detener:

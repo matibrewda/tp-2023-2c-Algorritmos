@@ -138,12 +138,12 @@ void *comunicacion_memoria()
 			int numero_de_pagina;
 			int pid;
 			leer_paquete_solicitud_leer_pagina_swap(logger, conexion_con_memoria, &posicion_swap_a_leer, &numero_de_pagina, &pid);
-			void* pagina_en_swap = leer_bloque_swap(posicion_swap_a_leer);
+			void *pagina_en_swap = leer_bloque_swap(posicion_swap_a_leer);
 			t_paquete *paquete_respuesta_leer_pagina_en_swap = crear_paquete_respuesta_leer_pagina_swap(logger, pagina_en_swap, configuracion_filesystem->tam_bloques, numero_de_pagina, pid);
 			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_leer_pagina_en_swap, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 		case SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP:
-			void* contenido_pagina;
+			void *contenido_pagina;
 			int posicion_swap_a_escribir;
 			leer_paquete_solicitud_escribir_pagina_en_swap(logger, conexion_con_memoria, &contenido_pagina, &posicion_swap_a_escribir);
 			escribir_bloque_swap(posicion_swap_a_escribir, contenido_pagina);
@@ -640,21 +640,20 @@ uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, u_int32_t numero_de_b
 	uint32_t indice_primer_bloque = fcb->bloque_inicial;
 	uint32_t *puntero_memoria_tabla_fat;
 	FILE *puntero_archivo_tabla_fat;
+
 	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
 
+	log_info(logger, "OBTENIENDO NUMERO DE BLOQUE FS DE ARCHIVO %s, BLOQUE LOGICO ARCHIVO NUMERO %d, BLOQUE INICIAL ES %d", nombre_archivo, numero_de_bloque_archivo, indice_primer_bloque);
+
 	uint32_t indice_bloque = indice_primer_bloque;
-	for (int i = 0; i < numero_de_bloque_archivo - 1; i++)
+	for (int i = 0; i < (int)numero_de_bloque_archivo; i++)
 	{
 		indice_bloque = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque);
 	}
-	uint32_t indice_bloque_actual = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque);
-	uint32_t numero_real_de_bloque_a_leer = leer_entrada_fat_por_indice(puntero_memoria_tabla_fat, indice_bloque);
-
-	log_info(logger, "Se leera el bloque %d de FS", numero_real_de_bloque_a_leer);
 
 	cerrar_tabla_fat(puntero_memoria_tabla_fat, puntero_archivo_tabla_fat);
 
-	return numero_real_de_bloque_a_leer;
+	return indice_bloque;
 }
 
 void *leer_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char *nombre_archivo)
