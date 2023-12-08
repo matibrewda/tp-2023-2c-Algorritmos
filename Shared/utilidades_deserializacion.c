@@ -354,32 +354,33 @@ t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *
 }
 
 // Memoria recibe de CPU
-int leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con_cpu)
+t_pedido_leer_valor_de_memoria *leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con_cpu)
 {
 	op_code codigo_operacion = SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA;
-	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	int tamanio_buffer;
 	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &tamanio_buffer, conexion_con_cpu, codigo_operacion);
 	void *buffer_con_offset = buffer;
 
-	int direccion_fisica;
+	t_pedido_leer_valor_de_memoria *pedido_leer_valor_de_memoria = malloc(sizeof(t_pedido_leer_valor_de_memoria));
 
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
-	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(direccion_fisica), codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_leer_valor_de_memoria->pid), codigo_operacion);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_leer_valor_de_memoria->direccion_fisica), codigo_operacion);
 
 	free(buffer);
 
-	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
-	return direccion_fisica;
+	return pedido_leer_valor_de_memoria;
 }
 
 // Memoria recibe de CPU
 t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, int conexion_con_cpu)
 {
 	op_code codigo_operacion = SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA;
-	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	int tamanio_buffer;
 	void *buffer = recibir_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &tamanio_buffer, conexion_con_cpu, codigo_operacion);
@@ -388,12 +389,13 @@ t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_mem
 	t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = malloc(sizeof(t_pedido_escribir_valor_en_memoria));
 
 	// RESPETAR EL ORDEN -> DESERIALIZACION!
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_escribir_valor_en_memoria->pid), codigo_operacion);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_escribir_valor_en_memoria->direccion_fisica), codigo_operacion);
 	leer_int32_desde_buffer_de_paquete(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, &buffer_con_offset, &(pedido_escribir_valor_en_memoria->valor_a_escribir), codigo_operacion);
 
 	free(buffer);
 
-	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+	log_debug(logger, "Exito en la lectura del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	return pedido_escribir_valor_en_memoria;
 }

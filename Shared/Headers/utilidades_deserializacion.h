@@ -50,7 +50,7 @@ uint32_t leer_paquete_respuesta_leer_valor_en_memoria(t_log *logger, int conexio
 
 // Memoria recibe de CPU
 t_pedido_instruccion *leer_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, int conexion_con_cpu);
-int leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con_cpu);
+t_pedido_leer_valor_de_memoria *leer_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int conexion_con_cpu);
 t_pedido_escribir_valor_en_memoria *leer_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, int conexion_con_cpu);
 
 // Memoria recibe de Filesystem

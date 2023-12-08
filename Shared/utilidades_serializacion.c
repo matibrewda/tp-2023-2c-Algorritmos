@@ -653,17 +653,19 @@ t_paquete *crear_paquete_solicitud_pedido_numero_de_marco(t_log *logger, t_pedid
 }
 
 // CPU a Memoria
-t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int direccion_fisica)
+t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, t_pedido_leer_valor_de_memoria *pedido_leer_valor_de_memoria)
 {
     op_code codigo_operacion = SOLICITUD_LEER_VALOR_EN_MEMORIA;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
-    agregar_int_a_paquete(logger, paquete, direccion_fisica, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+    agregar_int_a_paquete(logger,paquete, pedido_leer_valor_de_memoria->pid, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, pedido_leer_valor_de_memoria->direccion_fisica, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, codigo_operacion);
+    
 
-    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
     return paquete;
 }
@@ -672,15 +674,16 @@ t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int dire
 t_paquete *crear_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria, char *nombre_modulo_origen)
 {
     op_code codigo_operacion = SOLICITUD_ESCRIBIR_VALOR_EN_MEMORIA;
-    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_modulo_origen, NOMBRE_MODULO_MEMORIA);
+    log_debug(logger, "Comenzando la creacion del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_modulo_origen, NOMBRE_MODULO_MEMORIA);
 
     t_paquete *paquete = crear_paquete(logger, codigo_operacion);
 
     // RESPETAR EL ORDEN -> SERIALIZACION!
+    agregar_int_a_paquete(logger,paquete,pedido_escribir_valor_en_memoria->pid, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, pedido_escribir_valor_en_memoria->direccion_fisica, nombre_modulo_origen, NOMBRE_MODULO_MEMORIA, codigo_operacion);
     agregar_int32_a_paquete(logger, paquete, pedido_escribir_valor_en_memoria->valor_a_escribir, nombre_modulo_origen, NOMBRE_MODULO_MEMORIA, codigo_operacion);
 
-    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_modulo_origen, NOMBRE_MODULO_MEMORIA);
+    log_debug(logger, "Exito en la creacion del paquete de codigo de operacion %s y contenido 'PID + DIRECCION FISICA + VALOR' (Origen: %s - Destino %s).", nombre_opcode(codigo_operacion), nombre_modulo_origen, NOMBRE_MODULO_MEMORIA);
 
     return paquete;
 }

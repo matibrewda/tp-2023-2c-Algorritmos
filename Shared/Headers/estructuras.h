@@ -97,9 +97,16 @@ typedef struct
 
 typedef struct
 {
+    int pid;
     uint32_t valor_a_escribir;
     int direccion_fisica;
 } t_pedido_escribir_valor_en_memoria;
+
+typedef struct 
+{
+    int pid;
+    int direccion_fisica;
+}t_pedido_leer_valor_de_memoria;
 
 typedef struct
 {

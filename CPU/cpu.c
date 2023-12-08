@@ -332,10 +332,11 @@ int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 	return numero_de_marco;
 }
 
-void escribir_valor_en_memoria(int direccion_fisica, u_int32_t valor_a_escribir)
+void escribir_valor_en_memoria(int pid,int direccion_fisica, u_int32_t valor_a_escribir)
 {
 	// Enviar
 	t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = malloc(sizeof(t_pedido_escribir_valor_en_memoria));
+	pedido_escribir_valor_en_memoria->pid = pid;
 	pedido_escribir_valor_en_memoria->valor_a_escribir = valor_a_escribir;
 	pedido_escribir_valor_en_memoria->direccion_fisica = direccion_fisica;
 
@@ -346,10 +347,14 @@ void escribir_valor_en_memoria(int direccion_fisica, u_int32_t valor_a_escribir)
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria); // RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA
 }
 
-u_int32_t leer_valor_de_memoria(int direccion_fisica)
+u_int32_t leer_valor_de_memoria(int pid, int direccion_fisica)
 {
 	// Enviar
-	t_paquete *paquete_solicitud_leer_valor_en_memoria = crear_paquete_solicitud_leer_valor_en_memoria(logger, direccion_fisica);
+	t_pedido_leer_valor_de_memoria *pedido_leer_valor_de_memoria = malloc(sizeof(t_pedido_leer_valor_de_memoria));
+	pedido_leer_valor_de_memoria->pid = pid;
+	pedido_leer_valor_de_memoria->direccion_fisica = direccion_fisica;
+
+	t_paquete *paquete_solicitud_leer_valor_en_memoria = crear_paquete_solicitud_leer_valor_en_memoria(logger, pedido_leer_valor_de_memoria);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_valor_en_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
 	// Recibir
@@ -451,7 +456,7 @@ void ciclo_de_ejecucion()
 			int direccion_fisica = mmu(direccion_logica);
 			if (direccion_fisica != -1)
 			{
-				u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(direccion_fisica);
+				u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(pid_ejecutando,direccion_fisica);
 				escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
 				log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
 				program_counter++;
@@ -466,7 +471,7 @@ void ciclo_de_ejecucion()
 			if (direccion_fisica != -1)
 			{
 				u_int32_t valor_a_escribir_en_memoria = leer_valor_de_registro(nombre_registro);
-				escribir_valor_en_memoria(direccion_fisica, valor_a_escribir_en_memoria);
+				escribir_valor_en_memoria(pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
 				log_info(logger, "PID: %d - Accion: ESCRIBIR - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_a_escribir_en_memoria);
 				program_counter++;
 			}

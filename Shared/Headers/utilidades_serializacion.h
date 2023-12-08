@@ -55,7 +55,7 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_l
 t_paquete *crear_paquete_solicitud_pedir_instruccion_a_memoria(t_log *logger, t_pedido_instruccion *pedido_instruccion);
 t_paquete *crear_paquete_solicitud_pedir_info_de_memoria_inicial_para_cpu(t_log *logger);
 t_paquete *crear_paquete_solicitud_pedido_numero_de_marco(t_log *logger, t_pedido_pagina_en_memoria *pedido_pagina_en_memoria);
-t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, int direccion_fisica);
+t_paquete *crear_paquete_solicitud_leer_valor_en_memoria(t_log *logger, t_pedido_leer_valor_de_memoria *pedido_leer_valor_de_memoria);
 t_paquete *crear_paquete_solicitud_escribir_valor_en_memoria(t_log *logger, t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria, char* nombre_modulo_origen);
 
 // Memoria a Kernel
