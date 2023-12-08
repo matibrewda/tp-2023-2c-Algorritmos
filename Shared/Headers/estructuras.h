@@ -30,8 +30,9 @@ typedef struct
 typedef struct
 {
     char* nombre_archivo;
-    char modo_apertura;
     int puntero;
+    int modo_apertura;
+    int tamanio;
 } t_archivo_abierto_proceso;
 
 typedef struct
@@ -48,7 +49,7 @@ typedef struct
 {
     fs_op_code fs_opcode;
     char *nombre_archivo;
-    char *modo_apertura;
+    int modo_apertura;
     int posicion;
     int direccion_fisica;
     int tamanio;
@@ -113,7 +114,7 @@ typedef struct
 
     bool es_archivo;
     int tamanio_archivo;
-    char lock_actual;
+    int lock_actual;
     t_queue* pcbs_archivos;
     pthread_mutex_t mutex_pcbs_archivos;
 
@@ -133,6 +134,17 @@ typedef struct
     t_pcb *pcb;
     int tiempo_sleep;
 } t_bloqueo_sleep;
+
+typedef struct
+{
+    t_pcb *pcb;
+    char* nombre_archivo;
+    int codigo_operacion_archivo;
+    int modo_apertura;
+    int puntero;
+    int nuevo_tamanio;
+    int direccion_fisica;
+} t_operacion_archivo;
 
 typedef struct
 {

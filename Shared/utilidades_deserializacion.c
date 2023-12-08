@@ -178,7 +178,7 @@ t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_pagefault(t
 }
 
 // Kernel recibe de CPU
-t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode)
+t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char **nombre_archivo, int*modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode)
 {
 	log_debug(logger, "Comenzando la lectura del paquete de codigo de operacion %s y contenido 'CONTEXTO DE EJECUCION + OPERACION FILESYSTEM' (Origen: %s - Destino %s).", nombre_opcode(SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM), NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 
@@ -189,7 +189,7 @@ t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_f
 	t_contexto_de_ejecucion *contexto_de_ejecucion = leer_contexto_de_ejecucion_de_paquete(logger, conexion_con_cpu_dispatch, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, &buffer_con_offset);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, fs_opcode, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, nombre_archivo, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
-	leer_string_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, modo_apertura, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
+	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, modo_apertura, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, posicion_puntero_archivo, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, direccion_fisica, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);
 	leer_int_desde_buffer_de_paquete(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, &buffer_con_offset, nuevo_tamanio_archivo, SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM);

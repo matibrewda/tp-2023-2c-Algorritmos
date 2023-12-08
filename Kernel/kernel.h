@@ -69,9 +69,11 @@ void crear_hilo_sleep(t_pcb *pcb, int tiempo_sleep);
 void *bloqueo_sleep();
 void crear_hilo_page_fault(t_pcb *pcb, int numero_pagina);
 void *page_fault();
+void crear_hilo_operacion_archivo(t_pcb *pcb, int operacion_archivo, char *nombre_archivo, int modo_apertura, int puntero, int direccion_fisica, int nuevo_tamanio);
+void *operacion_archivo_h(void *argumentos);
 
 // Comunicacion con CPU
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode);
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, int*modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode);
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar);
 void interrumpir_proceso_en_cpu(int motivo_interrupcion);
 
@@ -118,7 +120,7 @@ void liberar_string_dinamico();
 // Recursos
 void crear_recursos();
 t_recurso *crear_recurso(char *nombre, int instancias);
-t_recurso *crear_recurso_archivo(char *nombre_archivo);
+t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tamanio);
 bool recurso_existe(char *nombre);
 t_recurso *buscar_recurso_por_nombre(char *nombre_recurso);
 t_archivo_abierto_proceso* buscar_archivo_abierto_proceso(char* nombre_archivo, int pid);

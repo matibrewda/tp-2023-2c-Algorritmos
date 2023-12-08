@@ -29,7 +29,7 @@ t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_wait(t_log 
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_signal(t_log *logger, int conexion_con_cpu_dispatch, char** nombre_recurso);
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_error(t_log *logger, int conexion_con_cpu_dispatch, int* codigo_error);
 t_contexto_de_ejecucion* leer_paquete_solicitud_devolver_proceso_por_pagefault(t_log *logger, int conexion_con_cpu_dispatch, int* numero_pagina);
-t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int* fs_opcode);
+t_contexto_de_ejecucion *leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_log *logger, int conexion_con_cpu_dispatch, char **nombre_archivo, int* modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int* fs_opcode);
 
 // Kernel recibe de Filesystem
 void leer_paquete_respuesta_abrir_archivo_fs(t_log *logger, int conexion_con_filesystem, int* existe, int* tamanio_archivo);
