@@ -12,9 +12,6 @@ bool planifico_con_prioridades = false;
 int id_hilo_quantum = 0;
 bool en_deadlock = false;
 int grado_max_multiprogramacion_actual;
-int contador_semaforo_multiprogramacion;
-int diferencia_contador_semaforo_multiprogramacion = 0;
-bool no_hacer_post_por_cambio_multiprogramacion = false;
 
 // Recursos
 t_list *recursos;
@@ -44,7 +41,6 @@ pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
 pthread_mutex_t mutex_conexion_filesystem;
 pthread_mutex_t mutex_id_hilo_quantum;
-pthread_mutex_t mutex_grado_multiprogramacion;
 pthread_mutex_t mutex_planificacion;
 pthread_mutex_t mutex_recursos;
 pthread_mutex_t mutex_detener_planificacion_corto_plazo;
@@ -117,7 +113,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Semaforos
 	grado_max_multiprogramacion_actual = configuracion_kernel->grado_multiprogramacion_inicial;
-	contador_semaforo_multiprogramacion = grado_max_multiprogramacion_actual;
 	sem_init(&semaforo_grado_max_multiprogramacion, false, configuracion_kernel->grado_multiprogramacion_inicial);
 	sem_init(&semaforo_hay_algun_proceso_en_cola_new, false, 0);
 	sem_init(&semaforo_hay_algun_proceso_en_cola_ready, false, 0);
@@ -132,7 +127,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_conexion_memoria, NULL);
 	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
 	pthread_mutex_init(&mutex_id_hilo_quantum, NULL);
-	pthread_mutex_init(&mutex_grado_multiprogramacion, NULL);
 	pthread_mutex_init(&mutex_planificacion, NULL);
 	pthread_mutex_init(&mutex_recursos, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_corto_plazo, NULL);
@@ -198,13 +192,13 @@ void *planificador_largo_plazo()
 
 	while (true)
 	{
-		wait_semaforo_grado_multiprogramacion();
+		sem_wait(&semaforo_grado_max_multiprogramacion);
 		sem_wait(&semaforo_hay_algun_proceso_en_cola_new);
 		pthread_mutex_lock(&mutex_detener_planificacion_largo_plazo);
 		pcb = queue_pop_thread_safe(cola_new, &mutex_cola_new);
 		if (pcb == NULL)
 		{
-			signal_semaforo_grado_multiprogramacion();
+			sem_post(&semaforo_grado_max_multiprogramacion);
 		}
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 		pthread_mutex_unlock(&mutex_detener_planificacion_largo_plazo);
@@ -273,11 +267,11 @@ void *planificador_corto_plazo()
 			if (fs_opcode == FOPEN_OPCODE)
 			{
 				log_info(logger, "PID: %d - Abrir Archivo: %s", contexto_de_ejecucion->pid, nombre_archivo);
-				t_recurso * recurso_archivo_a_abrir = buscar_recurso_por_nombre(nombre_archivo);
+				t_recurso *recurso_archivo_a_abrir = buscar_recurso_por_nombre(nombre_archivo);
 				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo_a_abrir != NULL;
 				if (archivo_a_abrir_existe_y_estaba_abierto)
 				{
-					//TODO
+					// TODO
 				}
 				else
 				{
@@ -286,7 +280,7 @@ void *planificador_corto_plazo()
 					// a la vuelta del abrir:
 					// si existia, crea el recurso archivo y lo mete en la lista de recursos
 					// si no existia, tiene que mandar otro hilo para crear archivo y hacer lo mismo
-				}	
+				}
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
 			{
@@ -545,7 +539,7 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 	{
 		hay_deadlock();
 	}
-	signal_semaforo_grado_multiprogramacion();
+	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
 void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
@@ -580,7 +574,7 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 	{
 		hay_deadlock();
 	}
-	signal_semaforo_grado_multiprogramacion();
+	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
 void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
@@ -603,7 +597,7 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 	{
 		hay_deadlock();
 	}
-	signal_semaforo_grado_multiprogramacion();
+	sem_post(&semaforo_grado_max_multiprogramacion);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -627,7 +621,7 @@ void *bloqueo_sleep(void *argumentos)
 
 	log_debug(logger, "Sleep de %d segundos", bloqueo_sleep->tiempo_sleep);
 	usleep(bloqueo_sleep->tiempo_sleep * 1000 * 1000);
-
+	pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 
 	if (pcb != NULL)
@@ -635,6 +629,7 @@ void *bloqueo_sleep(void *argumentos)
 		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
+	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
 }
 
 void crear_hilo_page_fault(t_pcb *pcb, int numero_pagina)
@@ -1435,10 +1430,10 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
 	recurso->es_archivo = false;
-    recurso->tamanio_archivo = -1;
-    recurso->lock_actual = '?';
-    recurso->pcbs_archivos = queue_create();
-    pthread_mutex_t mutex_pcbs_archivos;
+	recurso->tamanio_archivo = -1;
+	recurso->lock_actual = '?';
+	recurso->pcbs_archivos = queue_create();
+	pthread_mutex_t mutex_pcbs_archivos;
 	pthread_mutex_init(&recurso->mutex_pcbs_archivos, NULL);
 
 	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
@@ -1460,10 +1455,10 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo)
 	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
 	recurso->es_archivo = false;
-    recurso->tamanio_archivo = -1;
-    recurso->lock_actual = '?';
-    recurso->pcbs_archivos = queue_create();
-    pthread_mutex_t mutex_pcbs_archivos;
+	recurso->tamanio_archivo = -1;
+	recurso->lock_actual = '?';
+	recurso->pcbs_archivos = queue_create();
+	pthread_mutex_t mutex_pcbs_archivos;
 	pthread_mutex_init(&recurso->mutex_pcbs_archivos, NULL);
 
 	log_debug(logger, "Se crea el recurso archivo %s con %d instancias", nombre_archivo, 1);
@@ -1827,68 +1822,11 @@ void liberar_string_dinamico()
 	pthread_mutex_unlock(&mutex_string_dinamico);
 }
 
-void wait_semaforo_grado_multiprogramacion()
-{
-	pthread_mutex_lock(&mutex_grado_multiprogramacion);
-	contador_semaforo_multiprogramacion--;
-	pthread_mutex_unlock(&mutex_grado_multiprogramacion);
-
-	sem_wait(&semaforo_grado_max_multiprogramacion);
-}
-
-void signal_semaforo_grado_multiprogramacion()
-{
-	pthread_mutex_lock(&mutex_grado_multiprogramacion);
-	contador_semaforo_multiprogramacion++;
-	if (no_hacer_post_por_cambio_multiprogramacion)
-	{
-		sem_post(&semaforo_grado_max_multiprogramacion);
-		diferencia_contador_semaforo_multiprogramacion--;
-		if (diferencia_contador_semaforo_multiprogramacion <= 0)
-		{
-			no_hacer_post_por_cambio_multiprogramacion = false;
-		}
-	}
-	pthread_mutex_unlock(&mutex_grado_multiprogramacion);
-}
-
 void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion)
 {
-	if (nuevo_grado_max_multiprogramacion < 0)
-	{
-		log_error(logger, "No se puede setear un grado de multiprogramacion de %d", nuevo_grado_max_multiprogramacion);
-		return;
-	}
-
-	pthread_mutex_lock(&mutex_grado_multiprogramacion);
 	int grado_max_multiprogramacion_anterior = grado_max_multiprogramacion_actual;
-	if (nuevo_grado_max_multiprogramacion != grado_max_multiprogramacion_actual)
-	{
-		int diferencia = abs(nuevo_grado_max_multiprogramacion - grado_max_multiprogramacion_actual);
-		if (nuevo_grado_max_multiprogramacion > grado_max_multiprogramacion_actual)
-		{
-			for (int i = 0; i < diferencia; i++)
-			{
-				sem_post(&semaforo_grado_max_multiprogramacion);
-				contador_semaforo_multiprogramacion++;
-			}
-		}
-		else
-		{
-			if ((contador_semaforo_multiprogramacion - diferencia) < 0)
-			{
-				diferencia_contador_semaforo_multiprogramacion += abs(contador_semaforo_multiprogramacion - diferencia);
-				no_hacer_post_por_cambio_multiprogramacion = true;
-			}
-
-			while (contador_semaforo_multiprogramacion > 0)
-			{
-				sem_wait(&semaforo_grado_max_multiprogramacion);
-				contador_semaforo_multiprogramacion--;
-			}
-		}
-		grado_max_multiprogramacion_actual = nuevo_grado_max_multiprogramacion;
-	}
+	grado_max_multiprogramacion_actual = nuevo_grado_max_multiprogramacion;
 	log_info(logger, "Grado anterior: %d - Grado actual: %d", grado_max_multiprogramacion_anterior, grado_max_multiprogramacion_actual);
-	pthread_mutex_unlock(&mutex_grado_multiprogramacion);
+	sem_destroy(&semaforo_grado_max_multiprogramacion);
+	sem_init(&semaforo_grado_max_multiprogramacion, false, nuevo_grado_max_multiprogramacion - 1);
 }

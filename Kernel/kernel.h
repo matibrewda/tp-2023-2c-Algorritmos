@@ -114,8 +114,6 @@ void crear_string_dinamico();
 void agregar_string_a_string_dinamico(char *string);
 void agregar_entero_a_string_dinamico(int entero);
 void liberar_string_dinamico();
-void wait_semaforo_grado_multiprogramacion();
-void signal_semaforo_grado_multiprogramacion();
 
 // Recursos
 void crear_recursos();
