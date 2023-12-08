@@ -36,6 +36,7 @@ pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_bloqueados_sleep;
 pthread_mutex_t mutex_cola_bloqueados_pagefault;
+pthread_mutex_t mutex_cola_bloqueados_operaciones_archivos;
 pthread_mutex_t mutex_conexion_cpu_dispatch;
 pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
@@ -51,6 +52,7 @@ t_queue *cola_new = NULL;
 t_queue *cola_ready = NULL;
 t_queue *cola_bloqueados_sleep = NULL;
 t_queue *cola_bloqueados_pagefault = NULL;
+t_queue *cola_bloqueados_operaciones_archivos = NULL;
 t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
@@ -131,12 +133,14 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_recursos, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_corto_plazo, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_largo_plazo, NULL);
+	pthread_mutex_init(&mutex_cola_bloqueados_operaciones_archivos, NULL);
 
 	// Colas de planificacion
 	cola_new = queue_create();
 	cola_ready = queue_create();
 	cola_bloqueados_sleep = queue_create();
 	cola_bloqueados_pagefault = queue_create();
+	cola_bloqueados_operaciones_archivos = queue_create();
 
 	// Hilos
 	pthread_create(&hilo_planificador_largo_plazo, NULL, planificador_largo_plazo, NULL);
@@ -218,7 +222,7 @@ void *planificador_corto_plazo()
 	int fs_opcode = -1;
 	char *nombre_recurso = NULL;
 	char *nombre_archivo = NULL;
-	char *modo_apertura = NULL;
+	int modo_apertura = -1;
 	t_pcb *pcb;
 	bool mantener_proceso_ejecutando;
 
@@ -240,8 +244,8 @@ void *planificador_corto_plazo()
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 		actualizar_pcb(pcb, contexto_de_ejecucion);
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
-		
-		if (pcb_ejecutando == NULL) 
+
+		if (pcb_ejecutando == NULL)
 		{
 			pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
 			continue;
@@ -269,22 +273,41 @@ void *planificador_corto_plazo()
 		}
 		else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM)
 		{
+			bool _filtro_archivo_abierto_proceso_por_nombre(t_archivo_abierto_proceso * archivo_abierto_proceso)
+			{
+				return strcmp(archivo_abierto_proceso->nombre_archivo, nombre_archivo) == 0;
+			};
+			t_recurso *recurso_archivo = buscar_recurso_por_nombre(nombre_archivo);
+			t_archivo_abierto_proceso *archivo_abierto_proceso = list_find(pcb->tabla_archivos, (void *)_filtro_archivo_abierto_proceso_por_nombre);
+
 			if (fs_opcode == FOPEN_OPCODE)
 			{
 				log_info(logger, "PID: %d - Abrir Archivo: %s", contexto_de_ejecucion->pid, nombre_archivo);
-				t_recurso *recurso_archivo_a_abrir = buscar_recurso_por_nombre(nombre_archivo);
-				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo_a_abrir != NULL;
+
+				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo != NULL;
 				if (archivo_a_abrir_existe_y_estaba_abierto)
 				{
 					// TODO
 				}
 				else
 				{
-					// Si no existe, primero tengo que mandar un abrir a FS
-					// crear hilo como sleep para atender esto y ademas bloquear al proceso
-					// a la vuelta del abrir:
-					// si existia, crea el recurso archivo y lo mete en la lista de recursos
-					// si no existia, tiene que mandar otro hilo para crear archivo y hacer lo mismo
+					mantener_proceso_ejecutando = true;
+					int existe_archivo_a_abrir;
+					int tamanio_archivo_abierto;
+					abrir_archivo_fs(nombre_archivo, &existe_archivo_a_abrir, &tamanio_archivo_abierto);
+					if (!existe_archivo_a_abrir)
+					{
+						crear_archivo_fs(nombre_archivo);
+						tamanio_archivo_abierto = 0;
+						existe_archivo_a_abrir = true;
+					}
+					list_add(recursos, crear_recurso_archivo(nombre_archivo, modo_apertura, tamanio_archivo_abierto));
+					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
+					archivo_abierto_pcb->nombre_archivo = nombre_archivo;
+					archivo_abierto_pcb->puntero = 0;
+					archivo_abierto_pcb->modo_apertura = modo_apertura;
+					archivo_abierto_pcb->tamanio = 0;
+					list_add(pcb->tabla_archivos, archivo_abierto_pcb);
 				}
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
@@ -294,32 +317,40 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FSEEK_OPCODE)
 			{
-				log_info(logger, "PID: %d - Actualizar puntero Archivo: %s - Puntero: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo);
+				log_info(logger, "PID: %d - Actualizar puntero Archivo: %s - Puntero: %d - Puntero Anterior: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, archivo_abierto_proceso->puntero);
 				mantener_proceso_ejecutando = true;
-				bool _filtro_archivo_abierto_proceso_por_nombre(t_archivo_abierto_proceso * archivo_abierto_proceso)
-				{
-					return strcmp(archivo_abierto_proceso->nombre_archivo, nombre_archivo) == 0;
-				};
-
-				t_archivo_abierto_proceso *archivo_abierto_proceso = list_find(pcb->tabla_archivos, (void *)_filtro_archivo_abierto_proceso_por_nombre);
 				archivo_abierto_proceso->puntero = posicion_puntero_archivo;
 			}
 			else if (fs_opcode == FTRUNCATE_OPCODE)
 			{
 				log_info(logger, "PID: %d - Truncar Archivo: %s - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, nuevo_tamanio_archivo);
-				// TODO
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
+				crear_hilo_operacion_archivo(pcb, TRUNCAR_ARCHIVO, nombre_archivo, archivo_abierto_proceso->modo_apertura, -1, -1, nuevo_tamanio_archivo);
+				recurso_archivo->tamanio_archivo = nuevo_tamanio_archivo;
+				archivo_abierto_proceso->tamanio = nuevo_tamanio_archivo;
 			}
 			else if (fs_opcode == FWRITE_OPCODE)
 			{
-				int tamanio_archivo_a_escribir;
-				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, direccion_fisica, tamanio_archivo_a_escribir);
-				// TODO
+				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, direccion_fisica, archivo_abierto_proceso->tamanio);
+				if (archivo_abierto_proceso->modo_apertura != LOCK_ESCRITURA)
+				{
+					pcb->motivo_finalizacion = FINALIZACION_INVALID_WRITE;
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
+				}
+				else
+				{
+					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+					queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
+					crear_hilo_operacion_archivo(pcb, ESCRIBIR_ARCHIVO, nombre_archivo, modo_apertura, archivo_abierto_proceso->puntero, direccion_fisica, -1);
+				}
 			}
 			else if (fs_opcode == FREAD_OPCODE)
 			{
-				int tamanio_archivo_a_leer;
-				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, direccion_fisica, tamanio_archivo_a_leer);
-				// TODO
+				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, direccion_fisica, archivo_abierto_proceso->tamanio);
+				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
+				crear_hilo_operacion_archivo(pcb, LEER_ARCHIVO, nombre_archivo, modo_apertura, archivo_abierto_proceso->puntero, direccion_fisica, -1);
 			}
 		}
 		else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SLEEP)
@@ -422,7 +453,6 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 	{
 		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
 		{
-
 			transicionar_proceso_de_new_a_ready(pcb);
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
@@ -434,7 +464,6 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 	{
 		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXECUTING)
 		{
-
 			transicionar_proceso_de_ready_a_executing(pcb);
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
@@ -450,17 +479,14 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_BLOCKED)
 		{
-
 			transicionar_proceso_de_executing_a_bloqueado(pcb);
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
 		{
-
 			transicionar_proceso_de_executing_a_exit(pcb);
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXECUTING)
 		{
-
 			transicionar_proceso_de_executing_a_executing(pcb);
 		}
 	}
@@ -468,7 +494,6 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 	{
 		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
 		{
-
 			transicionar_proceso_de_bloqueado_a_ready(pcb);
 		}
 		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_EXIT)
@@ -632,6 +657,56 @@ void *bloqueo_sleep(void *argumentos)
 	if (pcb != NULL)
 	{
 		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
+		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
+	}
+	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+}
+
+void crear_hilo_operacion_archivo(t_pcb *pcb, int operacion_archivo, char *nombre_archivo, int modo_apertura, int puntero, int direccion_fisica, int nuevo_tamanio)
+{
+	log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_archivo);
+	log_info(logger, "PID: %d - Creando hilo para operacion archivo %d - Nombre? %s ModoApertura? %d Puntero? %d DireccionFisica? %d NuevoTamanio? %d", pcb->pid, operacion_archivo, nombre_archivo, modo_apertura, puntero, direccion_fisica, nuevo_tamanio);
+	pthread_t hilo_operacion_archivo;
+	t_operacion_archivo *operacion_archivo_parametros = malloc(sizeof(t_operacion_archivo));
+	operacion_archivo_parametros->pcb = pcb;
+	operacion_archivo_parametros->nombre_archivo = nombre_archivo;
+	operacion_archivo_parametros->codigo_operacion_archivo = operacion_archivo;
+	operacion_archivo_parametros->modo_apertura = modo_apertura;
+	operacion_archivo_parametros->puntero = puntero;
+	operacion_archivo_parametros->direccion_fisica = direccion_fisica;
+	operacion_archivo_parametros->nuevo_tamanio = nuevo_tamanio;
+
+	pthread_create(&hilo_operacion_archivo, NULL, operacion_archivo_h, (void *)operacion_archivo_parametros);
+}
+
+void *operacion_archivo_h(void *argumentos)
+{
+	log_info(logger, "EN HILO OPERACION ARCHIVO");
+	t_operacion_archivo *parametros_operacion_archivo = (t_operacion_archivo *)argumentos;
+
+	int pid_proceso_operacion_archivo = parametros_operacion_archivo->pcb->pid;
+	int existe_archivo_a_abrir;
+	int tamanio_archivo_abierto;
+	int lock = parametros_operacion_archivo->modo_apertura;
+
+	if (parametros_operacion_archivo->codigo_operacion_archivo == TRUNCAR_ARCHIVO)
+	{
+		truncar_archivo_fs(parametros_operacion_archivo->nombre_archivo, parametros_operacion_archivo->nuevo_tamanio);
+	}
+	else if (parametros_operacion_archivo->codigo_operacion_archivo == LEER_ARCHIVO)
+	{
+		leer_archivo_fs(parametros_operacion_archivo->nombre_archivo, parametros_operacion_archivo->puntero, parametros_operacion_archivo->direccion_fisica);
+	}
+	else if (parametros_operacion_archivo->codigo_operacion_archivo == ESCRIBIR_ARCHIVO)
+	{
+		escribir_archivo_fs(parametros_operacion_archivo->nombre_archivo, parametros_operacion_archivo->puntero, parametros_operacion_archivo->direccion_fisica);
+	}
+
+	pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
+	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_operacion_archivo, cola_bloqueados_operaciones_archivos, &mutex_cola_bloqueados_operaciones_archivos);
+	if (pcb != NULL)
+	{
+		eliminar_pcb_de_cola(pid_proceso_operacion_archivo, cola_bloqueados_operaciones_archivos, &mutex_cola_bloqueados_operaciones_archivos);
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
 	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
@@ -941,7 +1016,7 @@ void detener_planificacion()
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* CPU *///////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, char **modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode)
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, int *modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode)
 {
 	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
 
@@ -1112,44 +1187,54 @@ bool cargar_pagina_en_memoria(int pid, int numero_pagina)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 void abrir_archivo_fs(char *nombre_archivo, int *existe, int *tamanio_archivo)
 {
+	log_info(logger, "ABRIR ARCHIVO FS - ANTES DEL MUTEX - Nombre? %s", nombre_archivo);
 	pthread_mutex_lock(&mutex_conexion_filesystem);
-
+	log_info(logger, "ABRIR ARCHIVO FS - DESPUES DEL MUTEX - Nombre? %s", nombre_archivo);
 	// Enviar
+	log_info(logger, "ABRIR ARCHIVO FS - ANTES DE ENVIAR PAQUETE Nombre? %s", nombre_archivo);
 	t_paquete *paquete_solicitud_abrir_archivo_fs = crear_paquete_solicitud_abrir_archivo_fs(logger, nombre_archivo);
 	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_abrir_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
-
+	log_info(logger, "ABRIR ARCHIVO FS - DESPUES DE ENVIAR PAQUETE Nombre? %s", nombre_archivo);
+	log_info(logger, "ABRIR ARCHIVO FS - ANTES DE RECIBIR PAQUETE - Nombre? %s", nombre_archivo);
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_ABRIR_ARCHIVO_FS
 	leer_paquete_respuesta_abrir_archivo_fs(logger, conexion_con_filesystem, existe, tamanio_archivo);
+	log_info(logger, "ABRIR ARCHIVO FS - DESPUES DE RECIBIR PAQUETE - Nombre? %s Existe? %d Tamanio? %d", nombre_archivo, *existe, *tamanio_archivo);
 
 	pthread_mutex_unlock(&mutex_conexion_filesystem);
 }
 
 void crear_archivo_fs(char *nombre_archivo)
 {
+	log_info(logger, "CREAR ARCHIVO FS - ANTES DEL MUTEX - Nombre? %s", nombre_archivo);
 	pthread_mutex_lock(&mutex_conexion_filesystem);
-
+	log_info(logger, "CREAR ARCHIVO FS - DESPUES DEL MUTEX - Nombre? %s", nombre_archivo);
 	// Enviar
+	log_info(logger, "CREAR ARCHIVO FS - ANTES DE ENVIAR PAQUETE Nombre? %s", nombre_archivo);
 	t_paquete *paquete_solicitud_crear_archivo_fs = crear_paquete_solicitud_crear_archivo_fs(logger, nombre_archivo);
 	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_crear_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
-
+	log_info(logger, "CREAR ARCHIVO FS - DESPUES DE ENVIAR PAQUUETE Nombre? %s", nombre_archivo);
+	log_info(logger, "CREAR ARCHIVO FS - ANTES DE RECIBIR PAQUETE - Nombre? %s", nombre_archivo);
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_CREAR_ARCHIVO_FS
-
+	log_info(logger, "CREAR ARCHIVO FS - DESPUES DE RECIBIR PAQUETE - Nombre? %s", nombre_archivo);
 	pthread_mutex_unlock(&mutex_conexion_filesystem);
 }
 
 void truncar_archivo_fs(char *nombre_archivo, int nuevo_tamanio_archivo)
 {
+	log_info(logger, "TRUNCAR ARCHIVO FS - ANTES DEL MUTEX - Nombre? %s NuevoTamanio? %d", nombre_archivo, nuevo_tamanio_archivo);
 	pthread_mutex_lock(&mutex_conexion_filesystem);
-
+	log_info(logger, "TRUNCAR ARCHIVO FS - DESPUES DEL MUTEX - Nombre? %s NuevoTamanio? %d", nombre_archivo, nuevo_tamanio_archivo);
 	// Enviar
+	log_info(logger, "TRUNCAR ARCHIVO FS - ANTES DE ENVIAR PAQUETE - Nombre? %s NuevoTamanio? %d", nombre_archivo, nuevo_tamanio_archivo);
 	t_paquete *paquete_solicitud_truncar_archivo_fs = crear_paquete_solicitud_truncar_archivo_fs(logger, nombre_archivo, nuevo_tamanio_archivo);
 	enviar_paquete(logger, conexion_con_filesystem, paquete_solicitud_truncar_archivo_fs, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM);
-
+	log_info(logger, "TRUNCAR ARCHIVO FS - DESPUES DE ENVIAR PAQUETE - Nombre? %s NuevoTamanio? %d", nombre_archivo, nuevo_tamanio_archivo);
+	log_info(logger, "TRUNCAR ARCHIVO FS - ANTES DE RECIBIR PAQUETE - Nombre? %s NuevoTamanio? %d", nombre_archivo, nuevo_tamanio_archivo);
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem); // RESPUESTA_TRUNCAR_ARCHIVO_FS
-
+	log_info(logger, "TRUNCAR ARCHIVO FS - DESPUES DE RECIBIR PAQUETE - Nombre? %s NuevoTamanio? %d", nombre_archivo, nuevo_tamanio_archivo);
 	pthread_mutex_unlock(&mutex_conexion_filesystem);
 }
 
@@ -1269,6 +1354,7 @@ void listar_procesos()
 	crear_string_dinamico();
 	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_sleep);
 	queue_iterate_thread_safe(cola_bloqueados_pagefault, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_pagefault);
+	queue_iterate_thread_safe(cola_bloqueados_operaciones_archivos, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_operaciones_archivos);
 	list_iterate(recursos, (void (*)(void *)) & agregar_pid_recursos_bloqueados_a_string_dinamico);
 	if (strlen(string_dinamico))
 	{
@@ -1453,7 +1539,7 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 	return recurso;
 }
 
-t_recurso *crear_recurso_archivo(char *nombre_archivo)
+t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tamanio)
 {
 	t_recurso *recurso = malloc(sizeof(t_recurso));
 
@@ -1468,7 +1554,7 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo)
 
 	recurso->es_archivo = false;
 	recurso->tamanio_archivo = -1;
-	recurso->lock_actual = '?';
+	recurso->lock_actual = lock_actual;
 	recurso->pcbs_archivos = queue_create();
 	pthread_mutex_t mutex_pcbs_archivos;
 	pthread_mutex_init(&recurso->mutex_pcbs_archivos, NULL);

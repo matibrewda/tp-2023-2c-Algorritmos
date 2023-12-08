@@ -292,7 +292,7 @@ t_paquete *crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(t_l
     agregar_contexto_de_ejecucion_a_paquete(logger, contexto_de_ejecucion, paquete, codigo_operacion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL);
     agregar_int_a_paquete(logger, paquete, operacion_filesystem->fs_opcode, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_string_a_paquete(logger, paquete, operacion_filesystem->nombre_archivo, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
-    agregar_string_a_paquete(logger, paquete, operacion_filesystem->modo_apertura, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
+    agregar_int_a_paquete(logger, paquete, operacion_filesystem->modo_apertura, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, operacion_filesystem->posicion, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, operacion_filesystem->direccion_fisica, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
     agregar_int_a_paquete(logger, paquete, operacion_filesystem->tamanio, NOMBRE_MODULO_CPU, NOMBRE_MODULO_KERNEL, codigo_operacion);
