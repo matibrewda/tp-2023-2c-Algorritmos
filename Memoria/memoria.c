@@ -239,6 +239,7 @@ void *atender_filesystem()
 			void *contenido_marco = buscar_contenido_marco(numero_de_marco);
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
+			free(contenido_marco);
 		}
 		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_BLOQUE_EN_MEMORIA)
 		{

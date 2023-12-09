@@ -292,6 +292,12 @@ void *planificador_corto_plazo()
 				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo != NULL;
 				if (archivo_a_abrir_existe_y_estaba_abierto)
 				{
+					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
+					archivo_abierto_pcb->nombre_archivo = nombre_archivo;
+					archivo_abierto_pcb->puntero = 0;
+					archivo_abierto_pcb->modo_apertura = modo_apertura;
+					list_add(pcb->tabla_archivos, archivo_abierto_pcb);
+
 					if (modo_apertura == LOCK_ESCRITURA)
 					{
 						pthread_mutex_lock(&mutex_recursos);
@@ -339,7 +345,6 @@ void *planificador_corto_plazo()
 				}
 				else
 				{
-
 					mantener_proceso_ejecutando = true;
 					int existe_archivo_a_abrir;
 					int tamanio_archivo_abierto;
@@ -357,14 +362,13 @@ void *planificador_corto_plazo()
 					archivo_abierto_pcb->nombre_archivo = nombre_archivo;
 					archivo_abierto_pcb->puntero = 0;
 					archivo_abierto_pcb->modo_apertura = modo_apertura;
-					archivo_abierto_pcb->tamanio = 0;
 					list_add(pcb->tabla_archivos, archivo_abierto_pcb);
 				}
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
 			{
 				log_info(logger, "PID: %d - Cerrar Archivo: %s", contexto_de_ejecucion->pid, nombre_archivo);
-				
+
 				pthread_mutex_lock(&mutex_recursos);
 				desasignar_recurso_a_pcb(nombre_archivo, pcb->pid);
 				pthread_mutex_unlock(&mutex_recursos);
@@ -386,12 +390,11 @@ void *planificador_corto_plazo()
 				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
 				crear_hilo_operacion_archivo(pcb, TRUNCAR_ARCHIVO, nombre_archivo, archivo_abierto_proceso->modo_apertura, -1, -1, nuevo_tamanio_archivo);
 				recurso_archivo->tamanio_archivo = nuevo_tamanio_archivo;
-				archivo_abierto_proceso->tamanio = nuevo_tamanio_archivo;
 				pthread_mutex_unlock(&mutex_recursos);
 			}
 			else if (fs_opcode == FWRITE_OPCODE)
 			{
-				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, direccion_fisica, archivo_abierto_proceso->tamanio);
+				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
 				if (archivo_abierto_proceso->modo_apertura != LOCK_ESCRITURA)
 				{
 					pcb->motivo_finalizacion = FINALIZACION_INVALID_WRITE;
@@ -406,7 +409,7 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FREAD_OPCODE)
 			{
-				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, direccion_fisica, archivo_abierto_proceso->tamanio);
+				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
 				crear_hilo_operacion_archivo(pcb, LEER_ARCHIVO, nombre_archivo, modo_apertura, archivo_abierto_proceso->puntero, direccion_fisica, -1);
@@ -462,7 +465,7 @@ void *planificador_corto_plazo()
 			{
 				pthread_mutex_unlock(&mutex_recursos);
 				pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
-				
+
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 			}
 			else if (!recurso_esta_asignado_a_pcb(nombre_recurso, pcb->pid))
@@ -1615,8 +1618,8 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tama
 	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
 	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
-	recurso->es_archivo = false;
-	recurso->tamanio_archivo = -1;
+	recurso->es_archivo = true;
+	recurso->tamanio_archivo = tamanio;
 	recurso->pcbs_lock_lectura = list_create();
 	recurso->pcb_lock_escritura = NULL;
 
@@ -1682,6 +1685,8 @@ bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid)
 
 void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 {
+	int pid_lectura_filtro;
+
 	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
 		return pcb->pid == pid;
@@ -1697,17 +1702,30 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		return strcmp(nombre_recurso, archivo_abierto_proceso->nombre_archivo) == 0;
 	};
 
+	bool _filtro_pcb_bloqueado_archivo_por_modo_lectura(t_pcb_bloqueado_archivo * pcb_bloqueado_archivo)
+	{
+		return pcb_bloqueado_archivo->lock == LOCK_LECTURA;
+	};
+
+	bool _filtro_pcb_bloqueado_archivo_por_pid(t_pcb_bloqueado_archivo * pcb_bloqueado_archivo)
+	{
+		return pcb_bloqueado_archivo->pcb->pid == pid_lectura_filtro;
+	};
+
+	log_info(logger, "Desasignado %s a PID %d", nombre_recurso, pid);
+
 	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
 
 	if (recurso->es_archivo)
 	{
-		list_remove_by_condition(recurso->pcb_lock_escritura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
-
 		// Elimino lock de escritura (si pid lo tenia)
 		if (recurso->pcb_lock_escritura != NULL)
 		{
+			log_info(logger, "Recurso %s tiene un lock de escritura.", nombre_recurso);
 			if (recurso->pcb_lock_escritura->pid == pid)
 			{
+				log_info(logger, "Recurso %s tiene un lock de escritura y era del proceso PID %d a ser desasignado", nombre_recurso, pid);
+				list_remove_by_condition(recurso->pcb_lock_escritura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
 				recurso->pcb_lock_escritura = NULL;
 				recurso->instancias_iniciales = 1;
 				recurso->instancias_disponibles = 1;
@@ -1718,32 +1736,53 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		t_pcb *pcb_lock_lectura = list_find(recurso->pcbs_lock_lectura, (void *)_filtro_proceso_por_id);
 		if (pcb_lock_lectura != NULL)
 		{
+			log_info(logger, "Recurso %s tiene un lock de lectura y era del proceso PID %d a ser desasignado", nombre_recurso, pid);
 			list_remove_by_condition(recurso->pcbs_lock_lectura, (void *)_filtro_proceso_por_id);
-			recurso->instancias_iniciales = recurso->instancias_iniciales - 1;
+			recurso->instancias_iniciales--;
+			list_remove_by_condition(pcb_lock_lectura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
 		}
 
 		if (recurso->pcb_lock_escritura == NULL && list_is_empty(recurso->pcbs_lock_lectura))
 		{
+			log_info(logger, "Recurso %s quedo SIN LOCKS despues de desasignacion.", nombre_recurso);
 			if (queue_is_empty(recurso->pcbs_bloqueados_por_archivo))
 			{
 				// Si me quedo TODO vacio (lock escritura, locks de lectura, pcbs bloqueados por archivo), destruyo el recurso
+				log_info(logger, "Recurso %s quedo SIN LOCKS y nadie lo esta pidiendo despues de desasignacion. Se elimina el recurso.", nombre_recurso);
 				list_remove_by_condition(recursos, (void *)_filtro_recurso_por_nombre);
 			}
 			else
 			{
+				log_info(logger, "Recurso %s quedo SIN LOCKS y alguien lo esta pidiendo.", nombre_recurso);
 				t_pcb_bloqueado_archivo *pcb_a_desbloquear = queue_pop(recurso->pcbs_bloqueados_por_archivo);
+				log_info(logger, "PID %d se despierta para poder acceder a recurso %s.", pcb_a_desbloquear->pcb->pid, nombre_recurso);
 				if (pcb_a_desbloquear->lock == LOCK_ESCRITURA)
 				{
+					log_info(logger, "PID %d se despierta para poder acceder a recurso %s en modo escritura.", pcb_a_desbloquear->pcb->pid, nombre_recurso);
 					recurso->pcb_lock_escritura = pcb_a_desbloquear->pcb;
+					recurso->instancias_iniciales = 1;
+					recurso->instancias_disponibles = 0;
+					transicionar_proceso(pcb_a_desbloquear->pcb, CODIGO_ESTADO_PROCESO_READY);
 				}
 				else
 				{
+					log_info(logger, "PID %d se despierta para poder acceder a recurso %s en modo lectura.", pcb_a_desbloquear->pcb->pid, nombre_recurso);
 					list_add(recurso->pcbs_lock_lectura, pcb_a_desbloquear->pcb);
-				}
+					recurso->instancias_iniciales = 1;
+					recurso->instancias_disponibles = 0;
+					transicionar_proceso(pcb_a_desbloquear->pcb, CODIGO_ESTADO_PROCESO_READY);
 
-				recurso->instancias_iniciales = 1;
-				recurso->instancias_disponibles = 0;
-				transicionar_proceso(pcb_a_desbloquear->pcb, CODIGO_ESTADO_PROCESO_READY);
+					t_pcb_bloqueado_archivo *pcb_a_desbloquear_por_lectura = list_find(recurso->pcbs_bloqueados_por_archivo->elements, (void *)_filtro_pcb_bloqueado_archivo_por_modo_lectura);
+					while (pcb_a_desbloquear_por_lectura != NULL)
+					{
+						pid_lectura_filtro = pcb_a_desbloquear_por_lectura->pcb->pid;
+						list_remove_by_condition(recurso->pcbs_bloqueados_por_archivo->elements, (void *)_filtro_pcb_bloqueado_archivo_por_pid);
+						list_add(recurso->pcbs_lock_lectura, pcb_a_desbloquear_por_lectura->pcb);
+						recurso->instancias_iniciales++;
+						transicionar_proceso(pcb_a_desbloquear_por_lectura->pcb, CODIGO_ESTADO_PROCESO_READY);
+						pcb_a_desbloquear_por_lectura = list_find(recurso->pcbs_bloqueados_por_archivo->elements, (void *)_filtro_pcb_bloqueado_archivo_por_modo_lectura);
+					}
+				}
 			}
 		}
 	}

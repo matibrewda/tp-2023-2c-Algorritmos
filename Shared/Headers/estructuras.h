@@ -32,7 +32,6 @@ typedef struct
     char* nombre_archivo;
     int puntero;
     int modo_apertura;
-    int tamanio;
 } t_archivo_abierto_proceso;
 
 typedef struct

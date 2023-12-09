@@ -235,7 +235,7 @@ void *comunicacion_kernel()
 			int direccion_fisica_a_leer;
 			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_escribir, &puntero_escritura, &direccion_fisica_a_leer);
 			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
-			t_paquete *paquete_solicitud_leer_marco_de_memoria = crear_paquete_solicitud_leer_marco_de_memoria(logger, direccion_fisica_a_escribir, nombre_archivo_escribir, puntero_escritura);
+			t_paquete *paquete_solicitud_leer_marco_de_memoria = crear_paquete_solicitud_leer_marco_de_memoria(logger, direccion_fisica_a_leer, nombre_archivo_escribir, puntero_escritura);
 			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_marco_de_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			break;
 
