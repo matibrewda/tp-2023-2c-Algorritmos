@@ -101,6 +101,7 @@ void modificar_grado_max_multiprogramacion(int grado_multiprogramacion);
 
 // Utilidades
 const char *nombre_estado_proceso(char codigo_estado_proceso);
+void agregar_pid_pcb_bloqueado_por_archivo_a_string_dinamico(t_pcb_bloqueado_archivo *pcb_bloqueado_archivo);
 void agregar_pid_a_string_dinamico(t_pcb *pcb);
 void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola);
 void agregar_pid_recursos_bloqueados_a_string_dinamico(t_recurso *recurso);
