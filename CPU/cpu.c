@@ -24,8 +24,7 @@ pthread_t hilo_dispatch;
 
 // Semaforos
 sem_t semaforo_ejecutar_ciclo_de_instruccion;
-sem_t semaforo_espero_ejecutar_proceso;
-sem_t semaforo_devuelvo_proceso;
+pthread_mutex_t mutex_ocurrio_interrupcion;
 
 // Registros
 uint32_t program_counter = -1;
@@ -99,8 +98,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 
 	// Semaforos
 	sem_init(&semaforo_ejecutar_ciclo_de_instruccion, false, 0); // Inicialmente la CPU NO ejecuta (IDLE)
-	sem_init(&semaforo_devuelvo_proceso, false, 0);
-	sem_init(&semaforo_espero_ejecutar_proceso, false, 1);
+	pthread_mutex_init(&mutex_ocurrio_interrupcion, NULL);
 
 	// Hilos
 	pthread_create(&hilo_interrupt, NULL, interrupt, NULL);
@@ -154,14 +152,14 @@ void *interrupt()
 	{
 		// Bloqueado hasta que reciba una operacion desde la conexion interrupt.
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL, conexion_con_kernel_interrupt);
-
 		if (codigo_operacion_recibido == SOLICITUD_INTERRUMPIR_PROCESO)
 		{
 			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
 			motivo_interrupcion = leer_paquete_solicitud_interrumpir_proceso(logger, conexion_con_kernel_interrupt);
+
+			pthread_mutex_lock(&mutex_ocurrio_interrupcion);
 			ocurrio_interrupcion = true;
-			t_paquete *paquete_respuesta_interrumpir_proceso = crear_paquete_respuesta_interrumpir_proceso(logger);
-			enviar_paquete(logger, conexion_con_kernel_interrupt, paquete_respuesta_interrumpir_proceso, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL);
+			pthread_mutex_unlock(&mutex_ocurrio_interrupcion);
 		}
 		else
 		{
@@ -174,8 +172,6 @@ void *dispatch()
 {
 	while (true)
 	{
-		sem_wait(&semaforo_espero_ejecutar_proceso);
-
 		// Bloqueado hasta que reciba una operacion desde la conexion dispatch.
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch);
 
@@ -192,8 +188,7 @@ void *dispatch()
 			registro_cx = contexto_de_ejecucion->registro_cx;
 			registro_dx = contexto_de_ejecucion->registro_dx;
 
-			dejar_de_ejecutar = false;
-			ocurrio_interrupcion = false;
+			free(contexto_de_ejecucion);
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
@@ -206,99 +201,73 @@ void *dispatch()
 		{
 			log_trace(logger, "Se recibio una orden desconocida de %s en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 		}
-
-		sem_post(&semaforo_devuelvo_proceso);
 	}
 }
 
 void devolver_contexto_por_ser_interrumpido()
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_ser_interrumpido = crear_paquete_solicitud_devolver_proceso_por_ser_interrumpido(logger, contexto_de_ejecucion, motivo_interrupcion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_ser_interrumpido, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SER_INTERRUMPIDO
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_correcta_finalizacion()
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_correcta_finalizacion = crear_paquete_solicitud_devolver_proceso_por_correcta_finalizacion(logger, contexto_de_ejecucion);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_correcta_finalizacion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_sleep(int segundos_sleep)
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_sleep = crear_paquete_solicitud_devolver_proceso_por_sleep(logger, contexto_de_ejecucion, segundos_sleep);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_sleep, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SLEEP
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_wait(char *nombre_recurso)
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_wait = crear_paquete_solicitud_devolver_proceso_por_wait(logger, contexto_de_ejecucion, nombre_recurso);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_wait, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_WAIT
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_signal(char *nombre_recurso)
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_signal(logger, contexto_de_ejecucion, nombre_recurso);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_SIGNAL
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_error(int codigo_error)
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_error = crear_paquete_solicitud_devolver_proceso_por_error(logger, contexto_de_ejecucion, codigo_error);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_error, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_ERROR
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_page_fault(int numero_de_pagina)
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_paquete *paquete_devuelvo_proceso_por_pagefault = crear_paquete_solicitud_devolver_proceso_por_pagefault(logger, contexto_de_ejecucion, numero_de_pagina);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_pagefault, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_PAGEFAULT
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void devolver_contexto_por_operacion_filesystem(fs_op_code fs_opcode, char *nombre_archivo, int modo_apertura, int posicion, int direccion_fisica, int tamanio)
 {
-	sem_wait(&semaforo_devuelvo_proceso);
 	t_contexto_de_ejecucion *contexto_de_ejecucion = crear_objeto_contexto_de_ejecucion();
 	t_operacion_filesystem *operacion_filesystem = crear_objeto_operacion_filesystem(fs_opcode, nombre_archivo, modo_apertura, posicion, direccion_fisica, tamanio);
 	t_paquete *paquete_devuelvo_proceso_por_signal = crear_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, contexto_de_ejecucion, operacion_filesystem);
 	enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_devuelvo_proceso_por_signal, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 	free(operacion_filesystem);
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL, conexion_con_kernel_dispatch); // RESPUESTA_DEVOLVER_PROCESO_POR_OPERACION_FILESYSTEM
-	sem_post(&semaforo_espero_ejecutar_proceso);
 }
 
 void pedir_info_inicial_a_memoria()
@@ -325,6 +294,8 @@ int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 	t_paquete *paquete_solicitud_pedido_numero_de_marco = crear_paquete_solicitud_pedido_numero_de_marco(logger, pedido_numero_de_marco);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedido_numero_de_marco, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
+	free(pedido_numero_de_marco);
+
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	int numero_de_marco = leer_paquete_respuesta_pedir_numero_de_marco_a_memoria(logger, conexion_con_memoria);
@@ -332,7 +303,7 @@ int pedir_numero_de_marco_a_memoria(int numero_de_pagina)
 	return numero_de_marco;
 }
 
-void escribir_valor_en_memoria(int pid,int direccion_fisica, u_int32_t valor_a_escribir)
+void escribir_valor_en_memoria(int pid, int direccion_fisica, u_int32_t valor_a_escribir)
 {
 	// Enviar
 	t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = malloc(sizeof(t_pedido_escribir_valor_en_memoria));
@@ -357,6 +328,8 @@ u_int32_t leer_valor_de_memoria(int pid, int direccion_fisica)
 	t_paquete *paquete_solicitud_leer_valor_en_memoria = crear_paquete_solicitud_leer_valor_en_memoria(logger, pedido_leer_valor_de_memoria);
 	enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_valor_en_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
 
+	free(pedido_leer_valor_de_memoria);
+
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 	u_int32_t valor = leer_paquete_respuesta_leer_valor_en_memoria(logger, conexion_con_memoria);
@@ -368,17 +341,23 @@ void ciclo_de_ejecucion()
 {
 	while (true)
 	{
+		dejar_de_ejecutar = false;
+		pthread_mutex_lock(&mutex_ocurrio_interrupcion);
+		ocurrio_interrupcion = false;
+		pthread_mutex_lock(&mutex_ocurrio_interrupcion);
+
 		// Espero a que haya algo para ejecutar
 		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion);
 
 		// FETCH
 		log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);
+
 		t_pedido_instruccion *pedido_instruccion = malloc(sizeof(t_pedido_instruccion));
 		pedido_instruccion->pc = program_counter + 1;
 		pedido_instruccion->pid = pid_ejecutando;
 		t_paquete *paquete_solicitud_pedir_instruccion_a_memoria = crear_paquete_solicitud_pedir_instruccion_a_memoria(logger, pedido_instruccion);
-		free(pedido_instruccion);
 		enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_pedir_instruccion_a_memoria, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA);
+		free(pedido_instruccion);
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU, NOMBRE_MODULO_MEMORIA, conexion_con_memoria);
 		char *instruccion_con_parametros = leer_paquete_respuesta_pedir_instruccion_a_memoria(logger, conexion_con_memoria);
 
@@ -456,7 +435,7 @@ void ciclo_de_ejecucion()
 			int direccion_fisica = mmu(direccion_logica);
 			if (direccion_fisica != -1)
 			{
-				u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(pid_ejecutando,direccion_fisica);
+				u_int32_t valor_leido_en_memoria = leer_valor_de_memoria(pid_ejecutando, direccion_fisica);
 				escribir_valor_a_registro(nombre_registro, valor_leido_en_memoria);
 				log_info(logger, "PID: %d - Accion: LEER - Direccion Fisica: %d - Valor: %d", pid_ejecutando, direccion_fisica, valor_leido_en_memoria);
 				program_counter++;
@@ -489,7 +468,7 @@ void ciclo_de_ejecucion()
 			{
 				modo_apertura = LOCK_LECTURA;
 			}
-			
+
 			log_info(logger, "PID: %d - Ejecutando: %s - %s - %s", pid_ejecutando, FOPEN_NOMBRE_INSTRUCCION, nombre_archivo, modo_apertura_str);
 			program_counter++;
 			dejar_de_ejecutar = true;
@@ -557,10 +536,16 @@ void ciclo_de_ejecucion()
 		free(instruccion_con_parametros);
 
 		// CHECK INTERRUPT
+		pthread_mutex_lock(&mutex_ocurrio_interrupcion);
 		if (ocurrio_interrupcion)
 		{
+			pthread_mutex_unlock(&mutex_ocurrio_interrupcion);
 			devolver_contexto_por_ser_interrumpido();
 			dejar_de_ejecutar = true;
+		}
+		else
+		{
+			pthread_mutex_unlock(&mutex_ocurrio_interrupcion);
 		}
 
 		if (!dejar_de_ejecutar)
