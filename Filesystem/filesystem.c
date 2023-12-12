@@ -29,7 +29,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	log_debug(logger, "Inicializando %s", NOMBRE_MODULO_FILESYSTEM);
+	log_trace(logger, "Inicializando %s", NOMBRE_MODULO_FILESYSTEM);
 
 	argumentos_filesystem = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_filesystem == NULL)
@@ -86,7 +86,7 @@ void terminar_filesystem()
 {
 	if (logger != NULL)
 	{
-		log_debug(logger, "Finalizando %s", NOMBRE_MODULO_FILESYSTEM);
+		log_trace(logger, "Finalizando %s", NOMBRE_MODULO_FILESYSTEM);
 	}
 
 	destruir_logger(logger);
