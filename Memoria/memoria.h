@@ -35,9 +35,8 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/memoria.log"
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_TRACE
 
-// ?????
 void cargar_datos_de_pagina_en_memoria_real(void *contenido_pagina, int numero_de_marco);
 void borrar_contenido_de_marco_en_memoria_real(int numero_de_marco);
 int reemplazar_pagina(int pid, int numero_de_pagina);

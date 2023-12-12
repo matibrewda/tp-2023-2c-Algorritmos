@@ -2,7 +2,7 @@
 
 t_config_cpu *leer_configuracion(t_log *logger, char *ruta_archivo_configuracion)
 {
-	log_debug(logger, "Comenzando la lectura de archivo de configuracion");
+	log_trace(logger, "Comenzando la lectura de archivo de configuracion");
 
 	t_config *configuracion = leer_archivo_configuracion(logger, ruta_archivo_configuracion);
 
@@ -29,7 +29,7 @@ t_config_cpu *leer_configuracion(t_log *logger, char *ruta_archivo_configuracion
 	configuracion_cpu->puerto_escucha_dispatch = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_DISPATCH);
 	configuracion_cpu->puerto_escucha_interrupt = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_PUERTO_ESCUCHA_INTERRUPT);
 
-	log_debug(logger, "Exito en la lectura de archivo de configuracion");
+	log_trace(logger, "Exito en la lectura de archivo de configuracion");
 
 	config_destroy(configuracion);
 	return configuracion_cpu;

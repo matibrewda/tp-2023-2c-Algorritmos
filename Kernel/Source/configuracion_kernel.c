@@ -2,7 +2,7 @@
 
 t_config_kernel *leer_configuracion(t_log *logger, char *ruta_archivo_configuracion)
 {
-	log_debug(logger, "Comenzando la lectura de archivo de configuracion");
+	log_trace(logger, "Comenzando la lectura de archivo de configuracion");
 
 	t_config *configuracion = leer_archivo_configuracion(logger, ruta_archivo_configuracion);
 
@@ -45,7 +45,7 @@ t_config_kernel *leer_configuracion(t_log *logger, char *ruta_archivo_configurac
 	configuracion_kernel->instancias_recursos = leer_clave_arreglo_de_enteros(logger, configuracion, CLAVE_CONFIGURACION_INSTANCIAS_RECURSOS, &(configuracion_kernel->cantidad_de_recursos));
 	configuracion_kernel->grado_multiprogramacion_inicial = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_GRADO_MULTIPROGRAMACION_INI);
 
-	log_debug(logger, "Exito en la lectura de archivo de configuracion");
+	log_trace(logger, "Exito en la lectura de archivo de configuracion");
 
 	config_destroy(configuracion);
 

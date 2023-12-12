@@ -2,7 +2,7 @@
 
 t_config_memoria *leer_configuracion(t_log *logger, char *ruta_archivo_configuracion)
 {
-	log_debug(logger, "Comenzando la lectura de archivo de configuracion");
+	log_trace(logger, "Comenzando la lectura de archivo de configuracion");
 
 	t_config *configuracion = leer_archivo_configuracion(logger, ruta_archivo_configuracion);
 
@@ -37,7 +37,7 @@ t_config_memoria *leer_configuracion(t_log *logger, char *ruta_archivo_configura
 	configuracion_memoria->retardo_respuesta = leer_clave_int(logger, configuracion, CLAVE_CONFIGURACION_RETARDO_RESPUESTA);
 	configuracion_memoria->algoritmo_reemplazo = leer_clave_string(logger, configuracion, CLAVE_CONFIGURACION_ALGORITMO_REEMPLAZO);
 
-	log_debug(logger, "Exito en la lectura de archivo de configuracion");
+	log_trace(logger, "Exito en la lectura de archivo de configuracion");
 
 	config_destroy(configuracion);
 	return configuracion_memoria;

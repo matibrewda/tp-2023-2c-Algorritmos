@@ -6,7 +6,7 @@
 // El int retornado se utilizara para enviar o recibir paquetes con el servidor al cual se conecto (CONEXION BIDIRECCIONAL).
 int crear_socket_cliente(t_log *logger, char *ip_proceso_servidor, char *puerto_proceso_servidor, const char *nombre_modulo_cliente, const char *nombre_modulo_servidor)
 {
-	log_debug(logger, "Intentando conectar %s con %s ...", nombre_modulo_cliente, nombre_modulo_servidor);
+	log_trace(logger, "Intentando conectar %s con %s ...", nombre_modulo_cliente, nombre_modulo_servidor);
 
 	struct addrinfo hints;
 	struct addrinfo *server_info;
@@ -45,7 +45,7 @@ int crear_socket_cliente(t_log *logger, char *ip_proceso_servidor, char *puerto_
 		return -1;
 	}
 
-	log_debug(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_modulo_cliente, nombre_modulo_servidor);
+	log_trace(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_modulo_cliente, nombre_modulo_servidor);
 
 	freeaddrinfo(server_info);
 
@@ -128,7 +128,7 @@ int esperar_conexion_de_cliente(t_log *logger, int socket_servidor, const char *
 	}
 	else
 	{
-		log_debug(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_cliente_a_escuchar, nombre_modulo_servidor);
+		log_trace(logger, "Se realizo una conexion entre el cliente %s y el servidor %s.", nombre_cliente_a_escuchar, nombre_modulo_servidor);
 	}
 
 	return socket_conexion_con_cliente;
@@ -159,7 +159,7 @@ t_paquete *crear_paquete(t_log *logger, op_code codigo_operacion)
 // No bloquea!
 bool enviar_paquete(t_log *logger, int conexion, t_paquete *paquete, const char *nombre_proceso_origen, const char *nombre_proceso_destino)
 {
-	log_debug(logger, "Comenzando el envio de paquete de codigo de operacion %s desde %s a %s.", nombre_opcode(paquete->codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+	log_trace(logger, "Comenzando el envio de paquete de codigo de operacion %s desde %s a %s.", nombre_opcode(paquete->codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 
 	int tamanio_paquete_serializado = sizeof(int); // Inicialmente, el tamanio es: sizeof(codigo_operacion)
 
@@ -197,7 +197,7 @@ bool enviar_paquete(t_log *logger, int conexion, t_paquete *paquete, const char 
 	}
 	else
 	{
-		log_debug(logger, "Exito al enviar paquete de codigo de operacion %s desde %s a %s.", nombre_opcode(paquete->codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
+		log_trace(logger, "Exito al enviar paquete de codigo de operacion %s desde %s a %s.", nombre_opcode(paquete->codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
 	}
 
 	log_trace(logger, "Comenzando la destruccion de paquete (ya enviado) de codigo de operacion %s desde %s a %s.", nombre_opcode(paquete->codigo_operacion), nombre_proceso_origen, nombre_proceso_destino);
@@ -324,11 +324,11 @@ op_code esperar_operacion(t_log *logger, const char *nombre_proceso_que_espera, 
 {
 	int cod_op;
 
-	log_debug(logger, "%s esta esperando un codigo de operacion proveniente de %s.", nombre_proceso_que_espera, nombre_proceso_que_manda);
+	log_trace(logger, "%s esta esperando un codigo de operacion proveniente de %s.", nombre_proceso_que_espera, nombre_proceso_que_manda);
 
 	if (recv(conexion, &cod_op, sizeof(int), MSG_WAITALL) > 0)
 	{
-		log_debug(logger, "%s recibio un codigo de operacion proveniente de %s y es %s.", nombre_proceso_que_espera, nombre_proceso_que_manda, nombre_opcode(cod_op));
+		log_trace(logger, "%s recibio un codigo de operacion proveniente de %s y es %s.", nombre_proceso_que_espera, nombre_proceso_que_manda, nombre_opcode(cod_op));
 		return cod_op;
 	}
 
