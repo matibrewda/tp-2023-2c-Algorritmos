@@ -341,13 +341,13 @@ void ciclo_de_ejecucion()
 {
 	while (true)
 	{
+		// Espero a que haya algo para ejecutar
+		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion);
+
 		dejar_de_ejecutar = false;
 		pthread_mutex_lock(&mutex_ocurrio_interrupcion);
 		ocurrio_interrupcion = false;
-		pthread_mutex_lock(&mutex_ocurrio_interrupcion);
-
-		// Espero a que haya algo para ejecutar
-		sem_wait(&semaforo_ejecutar_ciclo_de_instruccion);
+		pthread_mutex_unlock(&mutex_ocurrio_interrupcion);
 
 		// FETCH
 		log_info(logger, "PID: %d - FETCH - Program Counter: %d", pid_ejecutando, program_counter);

@@ -234,18 +234,15 @@ void *planificador_corto_plazo()
 		{
 			sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
 			pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
-			if (pcb == NULL)
+			if (pcb == NULL) // CHEQUEALO FORRO
 			{
 				continue;
 			}
 		}
 
 		mantener_proceso_ejecutando = false;
-		log_info(logger, "HOLA 1");
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
-		log_info(logger, "HOLA 2");
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
-		log_info(logger, "HOLA 3");
 		actualizar_pcb(pcb, contexto_de_ejecucion);
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 
@@ -1538,11 +1535,12 @@ void push_cola_ready(t_pcb *pcb)
 
 	loguear_cola(cola_ready, "ready", &mutex_cola_ready);
 
-	if (planifico_con_round_robin && pcb_ejecutando != NULL && pcb_ejecutando->quantum_finalizado)
-	{
-		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
-		log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_ejecutando->pid);
-	}
+	// Esto era EXCLUSIVAMENTE para cuando planifico con RR, hay UN solo proceso ejecutando en todo el sistema y NO lo quiero interrumpir por QUANTUM:
+	// if (planifico_con_round_robin && pcb_ejecutando != NULL && pcb_ejecutando->quantum_finalizado)
+	// {
+	// 	interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
+	// 	log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_ejecutando->pid);
+	// }
 
 	if (planifico_con_prioridades && pcb_ejecutando != NULL && pcb->prioridad < pcb_ejecutando->prioridad)
 	{
