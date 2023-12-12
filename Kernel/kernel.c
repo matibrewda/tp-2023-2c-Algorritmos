@@ -1469,6 +1469,66 @@ void push_cola_ready(t_pcb *pcb)
 	pthread_mutex_unlock(&mutex_cola_ready);
 }
 
+void log_fin_de_proceso(t_pcb *pcb)
+{
+	if (pcb->motivo_finalizacion == FINALIZACION_SUCCESS)
+	{
+		log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+	}
+	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_RESOURCE)
+	{
+		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_RESOURCE", pcb->pid);
+	}
+	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_WRITE)
+	{
+		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_WRITE", pcb->pid);
+	}
+}
+
+char *crear_string_dinamico()
+{
+	char *string_dinamico = malloc(sizeof(char));
+	strcpy(string_dinamico, "");
+	return string_dinamico;
+}
+
+char *agregar_string_a_string_dinamico(char *string_dinamico, char *string_a_agregar)
+{
+	int tamanio_anterior = strlen(string_dinamico) + 1;
+	int tamanio_a_aumentar = strlen(string_dinamico);
+	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
+	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
+	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string_a_agregar);
+	string_dinamico[nuevo_tamanio] = '\0';
+	return string_dinamico;
+}
+
+char *agregar_entero_a_string_dinamico(char *string_dinamico, int entero)
+{
+	int cantidad_digitos_entero;
+	if (entero == 0)
+	{
+		cantidad_digitos_entero = 1;
+	}
+	else
+	{
+		cantidad_digitos_entero = floor(log10(abs(entero))) + 1;
+		if (entero < 0)
+		{
+			cantidad_digitos_entero++;
+		}
+	}
+	char entero_como_string[cantidad_digitos_entero + 1];
+	sprintf(entero_como_string, "%d", entero);
+	int tamanio_anterior = strlen(string_dinamico) + 1;
+	int tamanio_a_aumentar = strlen(entero_como_string);
+	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
+	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
+	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), entero_como_string);
+	string_dinamico[nuevo_tamanio] = '\0';
+	return string_dinamico;
+}
+
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* RECURSOS *//////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -1702,21 +1762,7 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 	pthread_mutex_unlock(&mutex_recursos);
 }
 
-void log_fin_de_proceso(t_pcb *pcb)
-{
-	if (pcb->motivo_finalizacion == FINALIZACION_SUCCESS)
-	{
-		log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
-	}
-	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_RESOURCE)
-	{
-		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_RESOURCE", pcb->pid);
-	}
-	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_WRITE)
-	{
-		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_WRITE", pcb->pid);
-	}
-}
+
 
 t_list *obtener_procesos_analisis_deadlock()
 {
@@ -2036,48 +2082,4 @@ bool hay_deadlock()
 	list_destroy(procesos_a_analizar);
 	pthread_mutex_unlock(&mutex_recursos);
 	return en_deadlock;
-}
-
-char *crear_string_dinamico()
-{
-	char *string_dinamico = malloc(sizeof(char));
-	strcpy(string_dinamico, "");
-	return string_dinamico;
-}
-
-char *agregar_string_a_string_dinamico(char *string_dinamico, char *string_a_agregar)
-{
-	int tamanio_anterior = strlen(string_dinamico) + 1;
-	int tamanio_a_aumentar = strlen(string_dinamico);
-	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
-	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
-	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string_a_agregar);
-	string_dinamico[nuevo_tamanio] = '\0';
-	return string_dinamico;
-}
-
-char *agregar_entero_a_string_dinamico(char *string_dinamico, int entero)
-{
-	int cantidad_digitos_entero;
-	if (entero == 0)
-	{
-		cantidad_digitos_entero = 1;
-	}
-	else
-	{
-		cantidad_digitos_entero = floor(log10(abs(entero))) + 1;
-		if (entero < 0)
-		{
-			cantidad_digitos_entero++;
-		}
-	}
-	char entero_como_string[cantidad_digitos_entero + 1];
-	sprintf(entero_como_string, "%d", entero);
-	int tamanio_anterior = strlen(string_dinamico) + 1;
-	int tamanio_a_aumentar = strlen(entero_como_string);
-	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
-	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
-	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), entero_como_string);
-	string_dinamico[nuevo_tamanio] = '\0';
-	return string_dinamico;
 }
