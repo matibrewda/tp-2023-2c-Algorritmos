@@ -4,12 +4,15 @@
 t_log *logger = NULL;
 t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
+
+// Procesos
+t_list *procesos; // Lista para listar procesos
+
 int proximo_pid = 0;
+int id_hilo_quantum = 0;
 bool planificacion_detenida = false;
-char *string_dinamico;
 bool planifico_con_round_robin = false;
 bool planifico_con_prioridades = false;
-int id_hilo_quantum = 0;
 bool en_deadlock = false;
 int grado_max_multiprogramacion_actual;
 
@@ -31,21 +34,19 @@ sem_t semaforo_grado_max_multiprogramacion;
 sem_t semaforo_hay_algun_proceso_en_cola_new;
 sem_t semaforo_hay_algun_proceso_en_cola_ready;
 
-pthread_mutex_t mutex_string_dinamico;
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_bloqueados_sleep;
 pthread_mutex_t mutex_cola_bloqueados_pagefault;
 pthread_mutex_t mutex_cola_bloqueados_operaciones_archivos;
-pthread_mutex_t mutex_conexion_cpu_dispatch;
-pthread_mutex_t mutex_conexion_cpu_interrupt;
 pthread_mutex_t mutex_conexion_memoria;
 pthread_mutex_t mutex_conexion_filesystem;
-pthread_mutex_t mutex_id_hilo_quantum;
 pthread_mutex_t mutex_planificacion;
 pthread_mutex_t mutex_recursos;
 pthread_mutex_t mutex_detener_planificacion_corto_plazo;
 pthread_mutex_t mutex_detener_planificacion_largo_plazo;
+pthread_mutex_t mutex_procesos;
+pthread_mutex_t mutex_bool_planificacion_detenida;
 
 // Colas de planificacion
 t_queue *cola_new = NULL;
@@ -111,7 +112,12 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	}
 
 	// Recursos
-	crear_recursos();
+	procesos = list_create();
+	recursos = list_create();
+	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+	{
+		list_add(recursos, crear_recurso(configuracion_kernel->recursos[i], configuracion_kernel->instancias_recursos[i]));
+	}
 
 	// Semaforos
 	grado_max_multiprogramacion_actual = configuracion_kernel->grado_multiprogramacion_inicial;
@@ -119,21 +125,19 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	sem_init(&semaforo_hay_algun_proceso_en_cola_new, false, 0);
 	sem_init(&semaforo_hay_algun_proceso_en_cola_ready, false, 0);
 
-	pthread_mutex_init(&mutex_string_dinamico, NULL);
 	pthread_mutex_init(&mutex_cola_new, NULL);
 	pthread_mutex_init(&mutex_cola_ready, NULL);
 	pthread_mutex_init(&mutex_cola_bloqueados_sleep, NULL);
 	pthread_mutex_init(&mutex_cola_bloqueados_pagefault, NULL);
-	pthread_mutex_init(&mutex_conexion_cpu_dispatch, NULL);
-	pthread_mutex_init(&mutex_conexion_cpu_interrupt, NULL);
 	pthread_mutex_init(&mutex_conexion_memoria, NULL);
 	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
-	pthread_mutex_init(&mutex_id_hilo_quantum, NULL);
 	pthread_mutex_init(&mutex_planificacion, NULL);
 	pthread_mutex_init(&mutex_recursos, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_corto_plazo, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_largo_plazo, NULL);
 	pthread_mutex_init(&mutex_cola_bloqueados_operaciones_archivos, NULL);
+	pthread_mutex_init(&mutex_procesos, NULL);
+	pthread_mutex_init(&mutex_bool_planificacion_detenida, NULL);
 
 	// Colas de planificacion
 	cola_new = queue_create();
@@ -189,21 +193,19 @@ void terminar_kernel()
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* PLANIFICADORES *////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-
 void *planificador_largo_plazo()
 {
-	t_pcb *pcb;
-
 	while (true)
 	{
 		sem_wait(&semaforo_grado_max_multiprogramacion);
 		sem_wait(&semaforo_hay_algun_proceso_en_cola_new);
 		pthread_mutex_lock(&mutex_detener_planificacion_largo_plazo);
-		pcb = queue_pop_thread_safe(cola_new, &mutex_cola_new);
+		t_pcb *pcb = queue_pop_thread_safe(cola_new, &mutex_cola_new);
 		if (pcb == NULL)
 		{
 			sem_post(&semaforo_grado_max_multiprogramacion);
 		}
+		log_debug(logger, "Planificador largo plazo - push a cola de ready de PID %d", pcb->pid);
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 		pthread_mutex_unlock(&mutex_detener_planificacion_largo_plazo);
 	}
@@ -234,7 +236,7 @@ void *planificador_corto_plazo()
 		{
 			sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
 			pcb = queue_pop_thread_safe(cola_ready, &mutex_cola_ready);
-			if (pcb == NULL) // CHEQUEALO FORRO
+			if (pcb == NULL)
 			{
 				continue;
 			}
@@ -494,38 +496,32 @@ void *planificador_corto_plazo()
 
 void *contador_quantum(void *id_hilo_quantum)
 {
+	int *id_hilo = (int *)id_hilo_quantum;
 	int pid_proceso_a_interrumpir = pcb_ejecutando->pid;
-	int id_hilo = *((int *)id_hilo_quantum);
 
 	usleep((configuracion_kernel->quantum) * 1000);
 
-	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid_proceso_a_interrumpir && pcb_ejecutando->id_hilo_quantum == id_hilo)
+	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid_proceso_a_interrumpir && pcb_ejecutando->id_hilo_quantum == *id_hilo)
 	{
-		pcb_ejecutando->quantum_finalizado = true;
-		if (!queue_is_empty_thread_safe(cola_ready, &mutex_cola_ready))
-		{
-			interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
-			log_info(logger, "PID: %d - Desalojado por fin de Quantum", pid_proceso_a_interrumpir);
-		}
+		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
+		log_info(logger, "PID: %d - Desalojado por fin de Quantum", pid_proceso_a_interrumpir);
 	}
+
+	free(id_hilo);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* TRANSICIONES *//////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-
 void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 {
-	if (pcb->estado == CODIGO_ESTADO_PROCESO_DESCONOCIDO)
+	if (pcb->estado == CODIGO_ESTADO_PROCESO_NEW)
 	{
 		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_NEW)
 		{
 			transicionar_proceso_a_new(pcb);
 		}
-	}
-	else if (pcb->estado == CODIGO_ESTADO_PROCESO_NEW)
-	{
-		if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
+		else if (nuevo_estado_proceso == CODIGO_ESTADO_PROCESO_READY)
 		{
 			transicionar_proceso_de_new_a_ready(pcb);
 		}
@@ -579,17 +575,16 @@ void transicionar_proceso(t_pcb *pcb, char nuevo_estado_proceso)
 
 void transicionar_proceso_a_new(t_pcb *pcb)
 {
-	bool estructuras_inicializadas_correctamente = iniciar_estructuras_de_proceso_en_memoria(pcb);
-
-	if (!estructuras_inicializadas_correctamente)
+	if (!iniciar_estructuras_de_proceso_en_memoria(pcb))
 	{
 		log_error(logger, "Ocurrio un error al inicializar las estructuras en memoria del proceso %d", pcb->pid);
+		destruir_pcb(pcb);
 		return;
 	}
 
 	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
-	pcb->estado = CODIGO_ESTADO_PROCESO_NEW;
 	queue_push_thread_safe(cola_new, pcb, &mutex_cola_new);
+	list_add_thread_safe(procesos, pcb, &mutex_procesos);
 	sem_post(&semaforo_hay_algun_proceso_en_cola_new);
 }
 
@@ -605,7 +600,8 @@ void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new);
-	free(pcb);
+	eliminar_pcb_de_lista(pcb->pid, procesos, &mutex_procesos);
+	destruir_pcb(pcb);
 }
 
 void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
@@ -617,15 +613,12 @@ void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 
 	if (planifico_con_round_robin)
 	{
-		pthread_mutex_lock(&mutex_id_hilo_quantum);
 		id_hilo_quantum++;
 		pcb->id_hilo_quantum = id_hilo_quantum;
-		pcb->quantum_finalizado = false;
 		pthread_t hilo_contador_quantum;
 		int *id_hilo_quantum_arg = malloc(sizeof(int));
 		*id_hilo_quantum_arg = id_hilo_quantum;
 		pthread_create(&hilo_contador_quantum, NULL, contador_quantum, (void *)id_hilo_quantum_arg);
-		pthread_mutex_unlock(&mutex_id_hilo_quantum);
 	}
 }
 
@@ -636,7 +629,8 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_ready, &mutex_cola_ready);
-	free(pcb);
+	eliminar_pcb_de_lista(pcb->pid, procesos, &mutex_procesos);
+	destruir_pcb(pcb);
 	if (en_deadlock)
 	{
 		hay_deadlock();
@@ -671,7 +665,8 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 	log_fin_de_proceso(pcb);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
-	free(pcb);
+	eliminar_pcb_de_lista(pcb->pid, procesos, &mutex_procesos);
+	destruir_pcb(pcb);
 	pcb_ejecutando = NULL;
 	if (en_deadlock)
 	{
@@ -693,9 +688,11 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
+	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_operaciones_archivos, &mutex_cola_bloqueados_operaciones_archivos);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
-	free(pcb);
+	eliminar_pcb_de_lista(pcb->pid, procesos, &mutex_procesos);
+	destruir_pcb(pcb);
 	if (en_deadlock)
 	{
 		hay_deadlock();
@@ -724,15 +721,17 @@ void *bloqueo_sleep(void *argumentos)
 
 	log_debug(logger, "Sleep de %d segundos", bloqueo_sleep->tiempo_sleep);
 	usleep(bloqueo_sleep->tiempo_sleep * 1000 * 1000);
+
 	pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 	t_pcb *pcb = buscar_pcb_con_pid_en_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
-
 	if (pcb != NULL)
 	{
 		eliminar_pcb_de_cola(pid_proceso_bloqueado, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
 	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+
+	free(bloqueo_sleep);
 }
 
 void crear_hilo_operacion_archivo(t_pcb *pcb, int operacion_archivo, char *nombre_archivo, int modo_apertura, int puntero, int direccion_fisica, int nuevo_tamanio)
@@ -781,6 +780,8 @@ void *operacion_archivo_h(void *argumentos)
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_READY);
 	}
 	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+
+	free(parametros_operacion_archivo);
 }
 
 void crear_hilo_page_fault(t_pcb *pcb, int numero_pagina)
@@ -818,6 +819,8 @@ void *page_fault(void *argumentos)
 		}
 	}
 	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+
+	free(bloqueo_page_fault);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -825,49 +828,45 @@ void *page_fault(void *argumentos)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 void consola()
 {
-	bool finalizar = false;
+	char *valor_ingresado_por_teclado, *saveptr, *funcion_seleccionada, *path, *size_str, *nuevo_grado_multiprogramacion_str, *pid_str, *prioridad_str;
+	int size, prioridad, pid, nuevo_grado_multiprogramacion;
 
-	while (!finalizar)
+	while (true)
 	{
-		char *valor_ingresado_por_teclado = NULL;
+		valor_ingresado_por_teclado = NULL;
 
 		do
 		{
 			valor_ingresado_por_teclado = readline("KERNEL> ");
-		} while (!valor_ingresado_por_teclado);
 
-		log_trace(logger, "Valor ingresado por consola: %s", valor_ingresado_por_teclado);
+		} while (valor_ingresado_por_teclado == NULL || strlen(valor_ingresado_por_teclado) == 0);
+		
+		log_debug(logger, "%s", valor_ingresado_por_teclado);
 
-		add_history(valor_ingresado_por_teclado);
+		saveptr = valor_ingresado_por_teclado;
+		funcion_seleccionada = strtok_r(saveptr, " ", &saveptr);
 
-		char *saveptr = valor_ingresado_por_teclado;
-		char *funcion_seleccionada = strtok_r(saveptr, " ", &saveptr);
-
-		if (strcmp(funcion_seleccionada, INICIAR_PROCESO) == 0)
+		if (strcmp(funcion_seleccionada, DETENER_PLANIFICACION) == 0)
 		{
-			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-
-			char *path;
-			char *size_str;
-			int size;
-			char *prioridad_str;
-			int prioridad;
-
-			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
-
-			log_trace(logger, "Intentando leer argumento 'path' de funcion %s", funcion_seleccionada);
+			detener_planificacion();
+		}
+		else if (strcmp(funcion_seleccionada, INICIAR_PLANIFICACION) == 0)
+		{
+			iniciar_planificacion();
+		}
+		else if (strcmp(funcion_seleccionada, PROCESO_ESTADO) == 0)
+		{
+			listar_procesos();
+		}
+		else if (strcmp(funcion_seleccionada, INICIAR_PROCESO) == 0)
+		{
 			if ((path = strtok_r(saveptr, " ", &saveptr)) == NULL)
 			{
 				printf("No se encontro parametro 'path' para la funcion %s.\n", funcion_seleccionada);
 				log_error(logger, "No se encontro parametro 'path' para la funcion %s.", funcion_seleccionada);
 				continue;
 			}
-			else
-			{
-				log_trace(logger, "Se leyo el argumento 'path' de funcion %s y es: '%s'", funcion_seleccionada, path);
-			}
 
-			log_trace(logger, "Intentando leer argumento 'size' de funcion %s", funcion_seleccionada);
 			if ((size_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
 			{
 				printf("No se encontro parametro 'size' para la funcion %s.\n", funcion_seleccionada);
@@ -876,22 +875,14 @@ void consola()
 			}
 			else
 			{
-				log_trace(logger, "Se leyo el argumento 'size' de funcion %s y es: '%s'", funcion_seleccionada, size_str);
-				log_trace(logger, "Intentando convertir el argumento 'size' = '%s' de funcion %s a entero", size_str, funcion_seleccionada);
-
-				if (size = atoi(size_str))
+				if (!(size = atoi(size_str)))
 				{
-					log_trace(logger, "Se pudo convertir el argumento 'size' de funcion %s al entero %d", funcion_seleccionada, size);
-				}
-				else
-				{
-					log_trace(logger, "No se pudo convertir el argumento 'size' = '%s' de funcion %s a entero", size_str, funcion_seleccionada);
+					log_error(logger, "No se pudo convertir el argumento 'size' = '%s' de funcion %s a entero", size_str, funcion_seleccionada);
 					printf("No se pudo convertir el argumento 'size' = '%s' de funcion %s a entero\n", size_str, funcion_seleccionada);
 					continue;
 				}
 			}
 
-			log_trace(logger, "Intentando leer argumento 'prioridad' de funcion %s", funcion_seleccionada);
 			if ((prioridad_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
 			{
 				printf("No se encontro parametro 'prioridad' para la funcion %s.\n", funcion_seleccionada);
@@ -900,16 +891,9 @@ void consola()
 			}
 			else
 			{
-				log_trace(logger, "Se leyo el argumento 'prioridad' de funcion %s y es: '%s'", funcion_seleccionada, prioridad_str);
-				log_trace(logger, "Intentando convertir el argumento 'prioridad' = '%s' de funcion %s a entero", prioridad_str, funcion_seleccionada);
-
-				if (prioridad = atoi(prioridad_str))
+				if (!(prioridad = atoi(prioridad_str)))
 				{
-					log_trace(logger, "Se pudo convertir el argumento 'prioridad' de funcion %s al entero %d", funcion_seleccionada, prioridad);
-				}
-				else
-				{
-					log_trace(logger, "No se pudo convertir el argumento 'prioridad' = '%s' de funcion %s a entero", prioridad_str, funcion_seleccionada);
+					log_error(logger, "No se pudo convertir el argumento 'prioridad' = '%s' de funcion %s a entero", prioridad_str, funcion_seleccionada);
 					printf("No se pudo convertir el argumento 'prioridad' = '%s' de funcion %s a entero\n", prioridad_str, funcion_seleccionada);
 					continue;
 				}
@@ -919,14 +903,7 @@ void consola()
 		}
 		else if (strcmp(funcion_seleccionada, FINALIZAR_PROCESO) == 0)
 		{
-			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
-			char *pid_str;
-			int pid;
-
-			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
-
-			log_trace(logger, "Intentando leer argumento 'pid' de funcion %s", funcion_seleccionada);
 			if ((pid_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
 			{
 				printf("No se encontro parametro 'pid' para la funcion %s.\n", funcion_seleccionada);
@@ -935,14 +912,7 @@ void consola()
 			}
 			else
 			{
-				log_trace(logger, "Se leyo el argumento 'pid' de funcion %s y es: '%s'", funcion_seleccionada, pid_str);
-				log_trace(logger, "Intentando convertir el argumento 'pid' = '%s' de funcion %s a entero", pid_str, funcion_seleccionada);
-
-				if (pid = atoi(pid_str))
-				{
-					log_trace(logger, "Se pudo convertir el argumento 'pid' de funcion %s al entero %d", funcion_seleccionada, pid);
-				}
-				else
+				if (!(pid = atoi(pid_str)))
 				{
 					log_trace(logger, "No se pudo convertir el argumento 'pid' = '%s' de funcion %s a entero", pid_str, funcion_seleccionada);
 					printf("No se pudo convertir el argumento 'pid' = '%s' de funcion %s a entero\n", pid_str, funcion_seleccionada);
@@ -952,26 +922,10 @@ void consola()
 
 			finalizar_proceso(pid);
 		}
-		else if (strcmp(funcion_seleccionada, DETENER_PLANIFICACION) == 0)
-		{
-			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-			detener_planificacion();
-		}
-		else if (strcmp(funcion_seleccionada, INICIAR_PLANIFICACION) == 0)
-		{
-			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-			iniciar_planificacion();
-		}
+
 		else if (strcmp(funcion_seleccionada, MULTIPROGRAMACION) == 0)
 		{
-			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
 
-			char *nuevo_grado_multiprogramacion_str;
-			int nuevo_grado_multiprogramacion;
-
-			log_trace(logger, "Leyendo argumentos de funcion %s", funcion_seleccionada);
-
-			log_trace(logger, "Intentando leer argumento 'nuevo_grado_multiprogramacion' de funcion %s", funcion_seleccionada);
 			if ((nuevo_grado_multiprogramacion_str = strtok_r(saveptr, " ", &saveptr)) == NULL)
 			{
 				printf("No se encontro parametro 'nuevo_grado_multiprogramacion para la funcion %s.\n", funcion_seleccionada);
@@ -980,14 +934,7 @@ void consola()
 			}
 			else
 			{
-				log_trace(logger, "Se leyo el argumento 'nuevo_grado_multiprogramacion' de funcion %s y es: '%s'", funcion_seleccionada, nuevo_grado_multiprogramacion_str);
-				log_trace(logger, "Intentando convertir el argumento 'nuevo_grado_multiprogramacion' = '%s' de funcion %s a entero", nuevo_grado_multiprogramacion_str, funcion_seleccionada);
-
-				if (nuevo_grado_multiprogramacion = atoi(nuevo_grado_multiprogramacion_str))
-				{
-					log_trace(logger, "Se pudo convertir el argumento 'nuevo_grado_multiprogramacion' de funcion %s al entero %d", funcion_seleccionada, nuevo_grado_multiprogramacion);
-				}
-				else
+				if (!(nuevo_grado_multiprogramacion = atoi(nuevo_grado_multiprogramacion_str)))
 				{
 					log_trace(logger, "No se pudo convertir el argumento 'nuevo_grado_multiprogramacion' = '%s' de funcion %s a entero", nuevo_grado_multiprogramacion_str, funcion_seleccionada);
 					printf("No se pudo convertir el argumento 'nuevo_grado_multiprogramacion' = '%s' de funcion %s a entero\n", nuevo_grado_multiprogramacion_str, funcion_seleccionada);
@@ -997,16 +944,13 @@ void consola()
 
 			modificar_grado_max_multiprogramacion(nuevo_grado_multiprogramacion);
 		}
-		else if (strcmp(funcion_seleccionada, PROCESO_ESTADO) == 0)
-		{
-			log_trace(logger, "Se recibio la funcion %s por consola", funcion_seleccionada);
-			listar_procesos();
-		}
 		else
 		{
 			log_error(logger, "'%s' no coincide con ninguna funcion conocida.", funcion_seleccionada);
 			printf("'%s' no coincide con ninguna funcion conocida.\n", funcion_seleccionada);
 		}
+
+		free(valor_ingresado_por_teclado);
 	}
 }
 
@@ -1023,9 +967,27 @@ void iniciar_proceso(char *path, int size, int prioridad)
 void *hilo_iniciar_proceso(void *argumentos)
 {
 	t_iniciar_proceso *iniciar_proceso_parametros = (t_iniciar_proceso *)argumentos;
+	t_pcb *pcb = malloc(sizeof(t_pcb));
 
-	t_pcb *pcb = crear_pcb(iniciar_proceso_parametros->path, iniciar_proceso_parametros->size, iniciar_proceso_parametros->prioridad);
+	pcb->path = malloc(sizeof(char) * strlen(iniciar_proceso_parametros->path) + 1);
+	strcpy(pcb->path, iniciar_proceso_parametros->path);
+
+	pcb->estado = CODIGO_ESTADO_PROCESO_NEW;
+	pcb->pid = ++proximo_pid;
+	pcb->program_counter = 0;
+	pcb->registro_ax = 0;
+	pcb->registro_bx = 0;
+	pcb->registro_cx = 0;
+	pcb->registro_dx = 0;
+	pcb->prioridad = iniciar_proceso_parametros->prioridad;
+	pcb->size = iniciar_proceso_parametros->size;
+	pcb->id_hilo_quantum = -1;
+	pcb->motivo_finalizacion = FINALIZACION_SUCCESS;
+	pcb->ultimo_recurso_pedido = NULL;
+	pcb->tabla_archivos = list_create();
+
 	transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_NEW);
+	free(iniciar_proceso_parametros);
 }
 
 void finalizar_proceso(int pid)
@@ -1039,19 +1001,21 @@ void finalizar_proceso(int pid)
 void *hilo_finalizar_proceso(void *argumentos)
 {
 	t_finalizar_proceso *finalizar_proceso_parametros = (t_finalizar_proceso *)argumentos;
-
 	t_pcb *pcb = buscar_pcb_con_pid(finalizar_proceso_parametros->pid);
 
 	if (pcb != NULL)
 	{
 		if (pcb->estado == CODIGO_ESTADO_PROCESO_EXECUTING)
 		{
+			pthread_mutex_lock(&mutex_bool_planificacion_detenida);
 			if (planificacion_detenida)
 			{
+				pthread_mutex_unlock(&mutex_bool_planificacion_detenida);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 			}
 			else
 			{
+				pthread_mutex_unlock(&mutex_bool_planificacion_detenida);
 				interrumpir_proceso_en_cpu(INTERRUPCION_POR_KILL);
 			}
 		}
@@ -1060,10 +1024,13 @@ void *hilo_finalizar_proceso(void *argumentos)
 			transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 		}
 	}
+
+	free(finalizar_proceso_parametros);
 }
 
 void iniciar_planificacion()
 {
+	pthread_mutex_lock(&mutex_bool_planificacion_detenida);
 	if (planificacion_detenida)
 	{
 		log_info(logger, "INICIO DE PLANIFICACIÓN");
@@ -1071,10 +1038,12 @@ void iniciar_planificacion()
 		pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
 		pthread_mutex_unlock(&mutex_detener_planificacion_largo_plazo);
 	}
+	pthread_mutex_unlock(&mutex_bool_planificacion_detenida);
 }
 
 void detener_planificacion()
 {
+	pthread_mutex_lock(&mutex_bool_planificacion_detenida);
 	if (!planificacion_detenida)
 	{
 		log_info(logger, "PAUSA DE PLANIFICACIÓN");
@@ -1082,6 +1051,90 @@ void detener_planificacion()
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 		pthread_mutex_lock(&mutex_detener_planificacion_largo_plazo);
 	}
+	pthread_mutex_unlock(&mutex_bool_planificacion_detenida);
+}
+
+void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion)
+{
+	int grado_max_multiprogramacion_anterior = grado_max_multiprogramacion_actual;
+	grado_max_multiprogramacion_actual = nuevo_grado_max_multiprogramacion;
+	log_info(logger, "Grado anterior: %d - Grado actual: %d", grado_max_multiprogramacion_anterior, grado_max_multiprogramacion_actual);
+	sem_destroy(&semaforo_grado_max_multiprogramacion);
+	sem_init(&semaforo_grado_max_multiprogramacion, false, nuevo_grado_max_multiprogramacion - 1);
+}
+
+void listar_procesos()
+{
+	pthread_mutex_lock(&mutex_procesos);
+
+	char *procesos_en_new_string_dinamico = crear_string_dinamico();
+	char *procesos_en_ready_string_dinamico = crear_string_dinamico();
+	char *procesos_en_executing_string_dinamico = crear_string_dinamico();
+	char *procesos_en_blocked_string_dinamico = crear_string_dinamico();
+
+	t_list_iterator *iterador = list_iterator_create(procesos);
+	while (list_iterator_has_next(iterador))
+	{
+		t_pcb *pcb_a_loguear = list_iterator_next(iterador);
+		if (pcb_a_loguear->estado == CODIGO_ESTADO_PROCESO_NEW)
+		{
+			procesos_en_new_string_dinamico = agregar_entero_a_string_dinamico(procesos_en_new_string_dinamico, pcb_a_loguear->pid);
+			procesos_en_new_string_dinamico = agregar_string_a_string_dinamico(procesos_en_new_string_dinamico, ",");
+		}
+		else if (pcb_a_loguear->estado == CODIGO_ESTADO_PROCESO_READY)
+		{
+			procesos_en_ready_string_dinamico = agregar_entero_a_string_dinamico(procesos_en_ready_string_dinamico, pcb_a_loguear->pid);
+			procesos_en_ready_string_dinamico = agregar_string_a_string_dinamico(procesos_en_ready_string_dinamico, ",");
+		}
+		else if (pcb_a_loguear->estado == CODIGO_ESTADO_PROCESO_EXECUTING)
+		{
+			procesos_en_executing_string_dinamico = agregar_entero_a_string_dinamico(procesos_en_executing_string_dinamico, pcb_a_loguear->pid);
+			procesos_en_executing_string_dinamico = agregar_string_a_string_dinamico(procesos_en_executing_string_dinamico, ",");
+		}
+		else if (pcb_a_loguear->estado == CODIGO_ESTADO_PROCESO_BLOCKED)
+		{
+			procesos_en_blocked_string_dinamico = agregar_entero_a_string_dinamico(procesos_en_blocked_string_dinamico, pcb_a_loguear->pid);
+			procesos_en_blocked_string_dinamico = agregar_string_a_string_dinamico(procesos_en_blocked_string_dinamico, ",");
+		}
+	}
+	list_iterator_destroy(iterador);
+
+	if (strlen(procesos_en_new_string_dinamico))
+	{
+		procesos_en_new_string_dinamico[strlen(procesos_en_new_string_dinamico) - 1] = '\0';
+	}
+
+	if (strlen(procesos_en_ready_string_dinamico))
+	{
+		procesos_en_ready_string_dinamico[strlen(procesos_en_ready_string_dinamico) - 1] = '\0';
+	}
+
+	if (strlen(procesos_en_executing_string_dinamico))
+	{
+		procesos_en_executing_string_dinamico[strlen(procesos_en_executing_string_dinamico) - 1] = '\0';
+	}
+
+	if (strlen(procesos_en_blocked_string_dinamico))
+	{
+		procesos_en_blocked_string_dinamico[strlen(procesos_en_blocked_string_dinamico) - 1] = '\0';
+	}
+
+	printf("Estado: NEW     - Procesos: %s", procesos_en_new_string_dinamico);
+	printf("\nEstado: READY   - Procesos: %s", procesos_en_ready_string_dinamico);
+	printf("\nEstado: EXEC    - Procesos: %s", procesos_en_executing_string_dinamico);
+	printf("\nEstado: BLOCKED - Procesos: %s\n", procesos_en_blocked_string_dinamico);
+
+	log_info(logger, "Estado: NEW - Procesos: %s", procesos_en_new_string_dinamico);
+	log_info(logger, "Estado: READY - Procesos: %s", procesos_en_ready_string_dinamico);
+	log_info(logger, "Estado: EXEC - Procesos: %s", procesos_en_executing_string_dinamico);
+	log_info(logger, "Estado: BLOCKED - Procesos: %s", procesos_en_blocked_string_dinamico);
+
+	free(procesos_en_new_string_dinamico);
+	free(procesos_en_ready_string_dinamico);
+	free(procesos_en_executing_string_dinamico);
+	free(procesos_en_blocked_string_dinamico);
+
+	pthread_mutex_unlock(&mutex_procesos);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -1089,13 +1142,10 @@ void detener_planificacion()
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, int *modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode)
 {
-	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
-
 	// Esperar operacion
 	*codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch);
 	t_contexto_de_ejecucion *contexto_de_ejecucion;
 
-	// Responder a CPU
 	if (*codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 	{
 		contexto_de_ejecucion = leer_paquete_contexto_de_ejecucion(logger, conexion_con_cpu_dispatch, *codigo_operacion_recibido, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
@@ -1129,15 +1179,11 @@ t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operaci
 		contexto_de_ejecucion = leer_paquete_solicitud_devolver_proceso_por_operacion_filesystem(logger, conexion_con_cpu_dispatch, nombre_archivo, modo_apertura, posicion_puntero_archivo, direccion_fisica, nuevo_tamanio_archivo, fs_opcode);
 	}
 
-	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
-
 	return contexto_de_ejecucion;
 }
 
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 {
-	pthread_mutex_lock(&mutex_conexion_cpu_dispatch);
-
 	// Enviar
 	t_contexto_de_ejecucion *contexto_de_ejecucion = malloc(sizeof(t_contexto_de_ejecucion));
 	contexto_de_ejecucion->pid = pcb_proceso_a_ejecutar->pid;
@@ -1152,21 +1198,13 @@ void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 
 	// Recibir
 	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch); // RESPUESTA_EJECUTAR_PROCESO
-
-	pthread_mutex_unlock(&mutex_conexion_cpu_dispatch);
 }
 
 void interrumpir_proceso_en_cpu(int motivo_interrupcion)
 {
-	pthread_mutex_lock(&mutex_conexion_cpu_interrupt);
-
-	log_warning(logger, "-INTERRUPT-");
-
-	// Enviar
+	log_debug(logger, "-INTERRUPT-");
 	t_paquete *paquete_solicitud_interrumpir_ejecucion = crear_paquete_solicitud_interrumpir_proceso(logger, motivo_interrupcion);
 	enviar_paquete(logger, conexion_con_cpu_interrupt, paquete_solicitud_interrumpir_ejecucion, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
-
-	pthread_mutex_unlock(&mutex_conexion_cpu_interrupt);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -1323,120 +1361,6 @@ const char *nombre_estado_proceso(char codigo_estado_proceso)
 	}
 }
 
-void agregar_pid_pcb_bloqueado_por_archivo_a_string_dinamico(t_pcb_bloqueado_archivo *pcb_bloqueado_archivo)
-{
-	agregar_entero_a_string_dinamico(pcb_bloqueado_archivo->pcb->pid);
-	agregar_string_a_string_dinamico(",");
-}
-
-void agregar_pid_a_string_dinamico(t_pcb *pcb)
-{
-	agregar_entero_a_string_dinamico(pcb->pid);
-	agregar_string_a_string_dinamico(",");
-}
-
-void loguear_cola(t_queue *cola, const char *nombre_cola, pthread_mutex_t *mutex_cola)
-{
-	crear_string_dinamico();
-
-	queue_iterate_thread_safe(cola, (void (*)(void *)) & agregar_pid_a_string_dinamico, mutex_cola);
-
-	int tamanio_pids = strlen(string_dinamico);
-	if (tamanio_pids > 0)
-	{
-		string_dinamico[tamanio_pids - 1] = '\0';
-	}
-
-	log_info(logger, "Cola %s %s: [%s]", nombre_cola, configuracion_kernel->algoritmo_planificacion, string_dinamico);
-	liberar_string_dinamico();
-}
-
-void agregar_pid_recursos_bloqueados_a_string_dinamico(t_recurso *recurso)
-{
-	list_iterate(recurso->pcbs_bloqueados->elements, (void (*)(void *)) & agregar_pid_a_string_dinamico);
-}
-
-void agregar_pid_recursos_bloqueados_por_archivos_a_string_dinamico(t_recurso *recurso)
-{
-	list_iterate(recurso->pcbs_bloqueados_por_archivo->elements, (void (*)(void *)) & agregar_pid_pcb_bloqueado_por_archivo_a_string_dinamico);
-}
-
-void listar_procesos()
-{
-	// NEW
-	crear_string_dinamico();
-	queue_iterate_thread_safe(cola_new, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_new);
-	if (strlen(string_dinamico))
-	{
-		string_dinamico[strlen(string_dinamico) - 1] = '\0';
-	}
-	printf("Estado: NEW     - Procesos: %s", string_dinamico);
-	log_info(logger, "Estado: NEW - Procesos: %s", string_dinamico);
-	liberar_string_dinamico();
-
-	// READY
-	crear_string_dinamico();
-	queue_iterate_thread_safe(cola_ready, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_ready);
-	if (strlen(string_dinamico))
-	{
-		string_dinamico[strlen(string_dinamico) - 1] = '\0';
-	}
-	printf("\nEstado: READY   - Procesos: %s", string_dinamico);
-	log_info(logger, "Estado: READY - Procesos: %s", string_dinamico);
-	liberar_string_dinamico();
-
-	// EXECUTING
-	crear_string_dinamico();
-	if (pcb_ejecutando != NULL)
-	{
-		agregar_pid_a_string_dinamico(pcb_ejecutando);
-		string_dinamico[strlen(string_dinamico) - 1] = '\0';
-	}
-	printf("\nEstado: EXEC    - Procesos: %s", string_dinamico);
-	log_info(logger, "Estado: EXEC - Procesos: %s", string_dinamico);
-	liberar_string_dinamico();
-
-	// BLOCKED
-	crear_string_dinamico();
-	queue_iterate_thread_safe(cola_bloqueados_sleep, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_sleep);
-	queue_iterate_thread_safe(cola_bloqueados_pagefault, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_pagefault);
-	queue_iterate_thread_safe(cola_bloqueados_operaciones_archivos, (void (*)(void *)) & agregar_pid_a_string_dinamico, &mutex_cola_bloqueados_operaciones_archivos);
-	pthread_mutex_lock(&mutex_recursos);
-	list_iterate(recursos, (void (*)(void *)) & agregar_pid_recursos_bloqueados_a_string_dinamico);
-	list_iterate(recursos, (void (*)(void *)) & agregar_pid_recursos_bloqueados_por_archivos_a_string_dinamico);
-	pthread_mutex_unlock(&mutex_recursos);
-	if (strlen(string_dinamico))
-	{
-		string_dinamico[strlen(string_dinamico) - 1] = '\0';
-	}
-	printf("\nEstado: BLOCKED - Procesos: %s\n", string_dinamico);
-	log_info(logger, "Estado: BLOCKED - Procesos: %s", string_dinamico);
-	liberar_string_dinamico();
-}
-
-t_pcb *crear_pcb(char *path, int size, int prioridad)
-{
-	t_pcb *pcb = malloc(sizeof(t_pcb));
-
-	pcb->pid = ++proximo_pid;
-	pcb->estado = CODIGO_ESTADO_PROCESO_DESCONOCIDO;
-	pcb->program_counter = 0;
-	pcb->registro_ax = 0;
-	pcb->registro_bx = 0;
-	pcb->registro_cx = 0;
-	pcb->registro_dx = 0;
-	pcb->prioridad = prioridad;
-	pcb->path = path;
-	pcb->size = size;
-	pcb->quantum_finalizado = false;
-	pcb->id_hilo_quantum = -1;
-	pcb->motivo_finalizacion = FINALIZACION_SUCCESS;
-	pcb->ultimo_recurso_pedido = NULL;
-	pcb->tabla_archivos = list_create();
-
-	return pcb;
-}
-
 void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion)
 {
 	pcb->program_counter = contexto_de_ejecucion->program_counter;
@@ -1448,54 +1372,13 @@ void actualizar_pcb(t_pcb *pcb, t_contexto_de_ejecucion *contexto_de_ejecucion)
 
 t_pcb *buscar_pcb_con_pid(int pid)
 {
-	t_pcb *pcb;
-
-	pcb = buscar_pcb_con_pid_en_cola(pid, cola_new, &mutex_cola_new);
-	if (pcb != NULL)
+	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
-		return pcb;
-	}
+		return pcb->pid == pid;
+	};
 
-	pcb = buscar_pcb_con_pid_en_cola(pid, cola_ready, &mutex_cola_ready);
-	if (pcb != NULL)
-	{
-		return pcb;
-	}
-
-	pcb = buscar_pcb_con_pid_en_cola(pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
-	if (pcb != NULL)
-	{
-		return pcb;
-	}
-
-	pcb = buscar_pcb_con_pid_en_cola(pid, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
-	if (pcb != NULL)
-	{
-		return pcb;
-	}
-
-	pthread_mutex_lock(&mutex_recursos);
-	for (int i = 0; i < list_size(recursos); i++)
-	{
-		t_recurso *recurso = list_get(recursos, i);
-		pcb = buscar_pcb_con_pid_en_cola(pid, recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
-
-		if (pcb != NULL)
-		{
-			pthread_mutex_unlock(&mutex_recursos);
-			return pcb;
-		}
-	}
-	pthread_mutex_unlock(&mutex_recursos);
-
-	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid)
-	{
-		return pcb_ejecutando;
-	}
-
-	log_warning(logger, "No se encontro proceso con PID %d", pid);
-
-	return NULL;
+	t_pcb *pcb = list_find_thread_safe(procesos, (void *)_filtro_proceso_por_id, &mutex_procesos);
+	return pcb;
 }
 
 t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
@@ -1511,59 +1394,84 @@ t_pcb *buscar_pcb_con_pid_en_cola(int pid, t_queue *cola, pthread_mutex_t *mutex
 
 void eliminar_pcb_de_cola(int pid, t_queue *cola, pthread_mutex_t *mutex)
 {
+	eliminar_pcb_de_lista(pid, cola->elements, mutex);
+}
+
+void eliminar_pcb_de_lista(int pid, t_list *lista, pthread_mutex_t *mutex)
+{
 	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
 		return pcb->pid == pid;
 	};
 
-	list_remove_by_condition_thread_safe(cola->elements, (void *)_filtro_proceso_por_id, mutex);
+	list_remove_by_condition_thread_safe(lista, (void *)_filtro_proceso_por_id, mutex);
+}
+
+void destruir_pcb(t_pcb *pcb)
+{
+	if (pcb->ultimo_recurso_pedido != NULL)
+	{
+		free(pcb->ultimo_recurso_pedido);
+	}
+
+	list_destroy(pcb->tabla_archivos);
+	free(pcb->path);
+	free(pcb);
 }
 
 void push_cola_ready(t_pcb *pcb)
 {
-	queue_push_thread_safe(cola_ready, pcb, &mutex_cola_ready);
+	pthread_mutex_lock(&mutex_cola_ready);
+	pthread_mutex_lock(&mutex_procesos);
 
+	// Agrego PCB a cola de ready
+	queue_push(cola_ready, pcb);
+
+	// Si planifico con prioridades, reordeno la cola de ready por prioridad
 	if (planifico_con_prioridades)
 	{
 		bool _comparador_prioridades(t_pcb * pcb1, t_pcb * pcb2)
 		{
 			return pcb1->prioridad < pcb2->prioridad;
 		}
-
-		list_sort_thread_safe(cola_ready->elements, (void *)_comparador_prioridades, &mutex_cola_ready);
+		list_sort(cola_ready->elements, (void *)_comparador_prioridades);
 	}
 
-	loguear_cola(cola_ready, "ready", &mutex_cola_ready);
+	// Logueo la cola de ready
+	char *string_dinamico = crear_string_dinamico();
+	t_list_iterator *iterador = list_iterator_create(cola_ready->elements);
+	while (list_iterator_has_next(iterador))
+	{
+		t_pcb *pcb_a_loguear = list_iterator_next(iterador);
+		string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_a_loguear->pid);
+		string_dinamico = agregar_string_a_string_dinamico(string_dinamico, ",");
+	}
+	list_iterator_destroy(iterador);
 
-	// Esto era EXCLUSIVAMENTE para cuando planifico con RR, hay UN solo proceso ejecutando en todo el sistema y NO lo quiero interrumpir por QUANTUM:
-	// if (planifico_con_round_robin && pcb_ejecutando != NULL && pcb_ejecutando->quantum_finalizado)
-	// {
-	// 	interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
-	// 	log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_ejecutando->pid);
-	// }
+	if (strlen(string_dinamico))
+	{
+		string_dinamico[strlen(string_dinamico) - 1] = '\0';
+	}
+	log_info(logger, "Cola ready %s: [%s]", configuracion_kernel->algoritmo_planificacion, string_dinamico);
+	free(string_dinamico);
 
+	// Si planifico con prioridades y el PCB que llego tiene mayor prioridad que el que esta ejecutando, lo desalojo
 	if (planifico_con_prioridades && pcb_ejecutando != NULL && pcb->prioridad < pcb_ejecutando->prioridad)
 	{
 		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
 		log_info(logger, "PID: %d - Desalojado por proceso con mayor prioridad", pcb_ejecutando->pid);
 	}
 
+	// Notifico al planificador de corto plazo
 	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
+
+	pthread_mutex_unlock(&mutex_procesos);
+	pthread_mutex_unlock(&mutex_cola_ready);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* RECURSOS *//////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
-
-void crear_recursos()
-{
-	recursos = list_create();
-	for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
-	{
-		list_add(recursos, crear_recurso(configuracion_kernel->recursos[i], configuracion_kernel->instancias_recursos[i]));
-	}
-}
-
 t_recurso *crear_recurso(char *nombre, int instancias)
 {
 	t_recurso *recurso = malloc(sizeof(t_recurso));
@@ -1582,8 +1490,6 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 	recurso->pcb_lock_escritura = NULL;
 	recurso->pcbs_lock_lectura = list_create();
 	recurso->pcbs_bloqueados_por_archivo = queue_create();
-
-	log_debug(logger, "Se crea el recurso %s con %d instancias", nombre, instancias);
 
 	return recurso;
 }
@@ -1695,7 +1601,7 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		return pcb_bloqueado_archivo->pcb->pid == pid_lectura_filtro;
 	};
 
-	log_info(logger, "Desasignado %s a PID %d", nombre_recurso, pid);
+	log_debug(logger, "Desasignado %s a PID %d", nombre_recurso, pid);
 
 	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
 
@@ -1704,10 +1610,8 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		// Elimino lock de escritura (si pid lo tenia)
 		if (recurso->pcb_lock_escritura != NULL)
 		{
-			log_info(logger, "Recurso %s tiene un lock de escritura.", nombre_recurso);
 			if (recurso->pcb_lock_escritura->pid == pid)
 			{
-				log_info(logger, "Recurso %s tiene un lock de escritura y era del proceso PID %d a ser desasignado", nombre_recurso, pid);
 				list_remove_by_condition(recurso->pcb_lock_escritura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
 				recurso->pcb_lock_escritura = NULL;
 				recurso->instancias_iniciales = 1;
@@ -1719,7 +1623,6 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		t_pcb *pcb_lock_lectura = list_find(recurso->pcbs_lock_lectura, (void *)_filtro_proceso_por_id);
 		if (pcb_lock_lectura != NULL)
 		{
-			log_info(logger, "Recurso %s tiene un lock de lectura y era del proceso PID %d a ser desasignado", nombre_recurso, pid);
 			list_remove_by_condition(recurso->pcbs_lock_lectura, (void *)_filtro_proceso_por_id);
 			recurso->instancias_iniciales--;
 			list_remove_by_condition(pcb_lock_lectura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
@@ -1727,21 +1630,16 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 
 		if (recurso->pcb_lock_escritura == NULL && list_is_empty(recurso->pcbs_lock_lectura))
 		{
-			log_info(logger, "Recurso %s quedo SIN LOCKS despues de desasignacion.", nombre_recurso);
 			if (queue_is_empty(recurso->pcbs_bloqueados_por_archivo))
 			{
 				// Si me quedo TODO vacio (lock escritura, locks de lectura, pcbs bloqueados por archivo), destruyo el recurso
-				log_info(logger, "Recurso %s quedo SIN LOCKS y nadie lo esta pidiendo despues de desasignacion. Se elimina el recurso.", nombre_recurso);
 				list_remove_by_condition(recursos, (void *)_filtro_recurso_por_nombre);
 			}
 			else
 			{
-				log_info(logger, "Recurso %s quedo SIN LOCKS y alguien lo esta pidiendo.", nombre_recurso);
 				t_pcb_bloqueado_archivo *pcb_a_desbloquear = queue_pop(recurso->pcbs_bloqueados_por_archivo);
-				log_info(logger, "PID %d se despierta para poder acceder a recurso %s.", pcb_a_desbloquear->pcb->pid, nombre_recurso);
 				if (pcb_a_desbloquear->lock == LOCK_ESCRITURA)
 				{
-					log_info(logger, "PID %d se despierta para poder acceder a recurso %s en modo escritura.", pcb_a_desbloquear->pcb->pid, nombre_recurso);
 					recurso->pcb_lock_escritura = pcb_a_desbloquear->pcb;
 					recurso->instancias_iniciales = 1;
 					recurso->instancias_disponibles = 0;
@@ -1749,7 +1647,6 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 				}
 				else
 				{
-					log_info(logger, "PID %d se despierta para poder acceder a recurso %s en modo lectura.", pcb_a_desbloquear->pcb->pid, nombre_recurso);
 					list_add(recurso->pcbs_lock_lectura, pcb_a_desbloquear->pcb);
 					recurso->instancias_iniciales = 1;
 					recurso->instancias_disponibles = 0;
@@ -2000,14 +1897,15 @@ int *obtener_vector_recursos_disponibles()
 bool hay_deadlock()
 {
 	pthread_mutex_lock(&mutex_recursos);
+	char *string_dinamico = crear_string_dinamico();
 	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK");
 	int cantidad_de_recursos = list_size(recursos);
-	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK: CANTIDAD DE RECURSOS %d", cantidad_de_recursos);
+	log_debug(logger, "ANALISIS DE DETECCION DE DEADLOCK: CANTIDAD DE RECURSOS %d", cantidad_de_recursos);
 	int *recursos_disponibles = obtener_vector_recursos_disponibles();
 	//-
 	for (int i = 0; i < cantidad_de_recursos; i++)
 	{
-		log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK: RECURSO DISPONIBLE[%d] %d", i, recursos_disponibles[i]);
+		log_debug(logger, "ANALISIS DE DETECCION DE DEADLOCK: RECURSO DISPONIBLE[%d] %d", i, recursos_disponibles[i]);
 	}
 	//-
 	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
@@ -2019,11 +1917,11 @@ bool hay_deadlock()
 		t_pcb_analisis_deadlock *pcb_analisis_log = list_iterator_next(mi_iterador_log);
 		for (int i = 0; i < cantidad_de_recursos; i++)
 		{
-			log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK: PID %d PETICIONES ACTUALES[%d] %d", pcb_analisis_log->pid, i, pcb_analisis_log->solicitudes_actuales[i]);
+			log_debug(logger, "ANALISIS DE DETECCION DE DEADLOCK: PID %d PETICIONES ACTUALES[%d] %d", pcb_analisis_log->pid, i, pcb_analisis_log->solicitudes_actuales[i]);
 		}
 		for (int i = 0; i < cantidad_de_recursos; i++)
 		{
-			log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK: PID %d RECURSOS ASIGNADOS[%d] %d", pcb_analisis_log->pid, i, pcb_analisis_log->recursos_asignados[i]);
+			log_debug(logger, "ANALISIS DE DETECCION DE DEADLOCK: PID %d RECURSOS ASIGNADOS[%d] %d", pcb_analisis_log->pid, i, pcb_analisis_log->recursos_asignados[i]);
 		}
 
 		contador++;
@@ -2039,7 +1937,7 @@ bool hay_deadlock()
 
 	if (list_is_empty(procesos_a_analizar))
 	{
-		log_info(logger, "NO HAY DEADLOCK");
+		log_debug(logger, "NO HAY DEADLOCK");
 		return false;
 	}
 
@@ -2090,10 +1988,9 @@ bool hay_deadlock()
 			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
 			if (!pcb_analisis_deadlock->finalizado)
 			{
-				crear_string_dinamico();
-				agregar_string_a_string_dinamico("Deadlock detectado: ");
-				agregar_entero_a_string_dinamico(pcb_analisis_deadlock->pid);
-				agregar_string_a_string_dinamico(" - Recursos en posesion: ");
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, "Deadlock detectado: ");
+				string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->pid);
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recursos en posesion: ");
 
 				bool agregue_recurso_a_lista_posesion = false;
 				for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
@@ -2104,27 +2001,27 @@ bool hay_deadlock()
 					{
 						if (agregue_recurso_a_lista_posesion)
 						{
-							agregar_string_a_string_dinamico(",");
+							string_dinamico = agregar_string_a_string_dinamico(string_dinamico, ",");
 						}
 						else
 						{
 							agregue_recurso_a_lista_posesion = true;
 						}
 
-						agregar_string_a_string_dinamico(recurso->nombre);
+						string_dinamico = agregar_string_a_string_dinamico(string_dinamico, recurso->nombre);
 					}
 				}
 
-				agregar_string_a_string_dinamico(" - Recurso requerido: ");
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recurso requerido: ");
 
 				if (pcb_analisis_deadlock->ultimo_recurso_pedido != NULL)
 				{
-					agregar_string_a_string_dinamico(pcb_analisis_deadlock->ultimo_recurso_pedido);
+					string_dinamico = agregar_string_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->ultimo_recurso_pedido);
 				}
 
 				log_info(logger, "%s", string_dinamico);
 				printf("\n%s", string_dinamico);
-				liberar_string_dinamico();
+				free(string_dinamico);
 			}
 		}
 		list_iterator_destroy(iterador_procesos_a_analizar);
@@ -2132,7 +2029,7 @@ bool hay_deadlock()
 	}
 	else
 	{
-		log_info(logger, "NO HAY DEADLOCK");
+		log_debug(logger, "NO HAY DEADLOCK");
 	}
 	// FIN LOG/IMPRIMIR DEADLOCK
 
@@ -2141,24 +2038,25 @@ bool hay_deadlock()
 	return en_deadlock;
 }
 
-void crear_string_dinamico()
+char *crear_string_dinamico()
 {
-	pthread_mutex_lock(&mutex_string_dinamico);
-	string_dinamico = malloc(sizeof(char));
+	char *string_dinamico = malloc(sizeof(char));
 	strcpy(string_dinamico, "");
+	return string_dinamico;
 }
 
-void agregar_string_a_string_dinamico(char *string)
+char *agregar_string_a_string_dinamico(char *string_dinamico, char *string_a_agregar)
 {
 	int tamanio_anterior = strlen(string_dinamico) + 1;
-	int tamanio_a_aumentar = strlen(string);
+	int tamanio_a_aumentar = strlen(string_dinamico);
 	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
 	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
-	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string);
+	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string_a_agregar);
 	string_dinamico[nuevo_tamanio] = '\0';
+	return string_dinamico;
 }
 
-void agregar_entero_a_string_dinamico(int entero)
+char *agregar_entero_a_string_dinamico(char *string_dinamico, int entero)
 {
 	int cantidad_digitos_entero;
 	if (entero == 0)
@@ -2181,19 +2079,5 @@ void agregar_entero_a_string_dinamico(int entero)
 	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
 	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), entero_como_string);
 	string_dinamico[nuevo_tamanio] = '\0';
-}
-
-void liberar_string_dinamico()
-{
-	free(string_dinamico);
-	pthread_mutex_unlock(&mutex_string_dinamico);
-}
-
-void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion)
-{
-	int grado_max_multiprogramacion_anterior = grado_max_multiprogramacion_actual;
-	grado_max_multiprogramacion_actual = nuevo_grado_max_multiprogramacion;
-	log_info(logger, "Grado anterior: %d - Grado actual: %d", grado_max_multiprogramacion_anterior, grado_max_multiprogramacion_actual);
-	sem_destroy(&semaforo_grado_max_multiprogramacion);
-	sem_init(&semaforo_grado_max_multiprogramacion, false, nuevo_grado_max_multiprogramacion - 1);
+	return string_dinamico;
 }

@@ -33,7 +33,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/filesystem.log"
-#define LOG_LEVEL LOG_LEVEL_INFO
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 
 // Comunicaciones
 void *comunicacion_kernel();

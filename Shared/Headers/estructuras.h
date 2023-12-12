@@ -12,7 +12,6 @@ typedef struct
     char estado;
     char *path;
     int size;
-    bool quantum_finalizado;
     int id_hilo_quantum;
     int motivo_finalizacion;
     char *ultimo_recurso_pedido;

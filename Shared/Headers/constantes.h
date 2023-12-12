@@ -43,7 +43,6 @@
 #define CODIGO_ESTADO_PROCESO_EXECUTING 'X'
 #define CODIGO_ESTADO_PROCESO_EXIT 'E'
 #define CODIGO_ESTADO_PROCESO_BLOCKED 'B'
-#define CODIGO_ESTADO_PROCESO_DESCONOCIDO '?'
 
 // Estado procesos (nombres completos)
 #define NOMBRE_ESTADO_PROCESO_NEW "NEW"
@@ -73,6 +72,7 @@
 #define LEER_ARCHIVO 4
 #define ESCRIBIR_ARCHIVO 5
 
+// Modo apertura / Locks
 #define LOCK_LECTURA 1
 #define LOCK_ESCRITURA 2
 

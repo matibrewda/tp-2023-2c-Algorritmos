@@ -46,7 +46,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 		return EXIT_FAILURE;
 	}
 
-	log_debug(logger, "Inicializando %s", NOMBRE_MODULO_MEMORIA);
+	log_trace(logger, "Inicializando %s", NOMBRE_MODULO_MEMORIA);
 
 	argumentos_memoria = leer_argumentos(logger, cantidad_argumentos_recibidos, argumentos);
 	if (argumentos_memoria == NULL)
@@ -142,7 +142,7 @@ void *atender_kernel()
 	while (true)
 	{
 		int operacion_recibida_de_kernel = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_KERNEL, conexion_con_kernel);
-		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_kernel), NOMBRE_MODULO_KERNEL);
+		log_trace(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_kernel), NOMBRE_MODULO_KERNEL);
 
 		if (operacion_recibida_de_kernel == SOLICITUD_INICIAR_PROCESO_MEMORIA)
 		{
@@ -174,7 +174,7 @@ void *atender_cpu()
 	while (true)
 	{
 		int operacion_recibida_de_cpu = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU, conexion_con_cpu);
-		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_cpu), NOMBRE_MODULO_CPU);
+		log_trace(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_cpu), NOMBRE_MODULO_CPU);
 
 		if (operacion_recibida_de_cpu == SOLICITUD_PEDIR_INFO_DE_MEMORIA_INICIAL_PARA_CPU)
 		{
@@ -227,7 +227,7 @@ void *atender_filesystem()
 	while (true)
 	{
 		int operacion_recibida_de_filesystem = esperar_operacion(logger, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM, conexion_con_filesystem);
-		log_debug(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_filesystem), NOMBRE_MODULO_FILESYSTEM);
+		log_trace(logger, "Se recibio la operacion %s desde %s", nombre_opcode(operacion_recibida_de_filesystem), NOMBRE_MODULO_FILESYSTEM);
 
 		if (operacion_recibida_de_filesystem == SOLICITUD_LEER_MARCO_DE_MEMORIA)
 		{
@@ -337,9 +337,9 @@ void inicializar_lista_de_marcos_bitmap()
 
 void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 {
-	log_debug(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
-	log_debug(logger, "El tamanio del proceso a iniciar es: %d", size);
-	log_debug(logger, "El PID del proceso a iniciar es: %d", pid);
+	log_trace(logger, "El path del archivo con el pseudocodigo para iniciar el proceso es: %s", path);
+	log_trace(logger, "El tamanio del proceso a iniciar es: %d", size);
+	log_trace(logger, "El PID del proceso a iniciar es: %d", pid);
 
 	char *ruta_archivo_completa = NULL;
 
@@ -396,13 +396,13 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 
 	char *linea_instruccion = buscar_linea(logger, archivo_proceso->archivo, pc);
 
-	log_debug(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", linea_instruccion);
+	log_trace(logger, "Comenzando la creacion de paquete para enviar la instruccion %s al cpu!", linea_instruccion);
 	t_paquete *paquete = crear_paquete_respuesta_pedir_instruccion_a_memoria(logger, linea_instruccion);
 
 	usleep((configuracion_memoria->retardo_respuesta) * 1000);
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
-	log_debug(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);
+	log_trace(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);
 }
 
 void finalizar_proceso_en_memoria(int pid)
@@ -607,7 +607,7 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima()
 	{
 		return encontrar_pagina_victima_lru();
 	}
-	log_debug(logger, "No se encontro un algoritmo de reemplazo correcto en la configuracion de la memoria");
+	log_trace(logger, "No se encontro un algoritmo de reemplazo correcto en la configuracion de la memoria");
 	return NULL;
 }
 
