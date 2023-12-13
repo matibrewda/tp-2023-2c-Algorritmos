@@ -231,7 +231,6 @@ void *planificador_corto_plazo()
 
 	while (true)
 	{
-		correr_deteccion_deadlock = false;
 		if (!mantener_proceso_ejecutando)
 		{
 			sem_wait(&semaforo_hay_algun_proceso_en_cola_ready);
@@ -241,18 +240,24 @@ void *planificador_corto_plazo()
 				continue;
 			}
 		}
+		else
+		{
+			if (pcb->quantum_finalizado)
+			{
+				mantener_proceso_ejecutando = false;
+				continue;
+			}
+		}
 
 		mantener_proceso_ejecutando = false;
+		correr_deteccion_deadlock = false;
+
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
+		pcb_ejecutando = NULL;
 		actualizar_pcb(pcb, contexto_de_ejecucion);
-		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 
-		if (pcb_ejecutando == NULL)
-		{
-			pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
-			continue;
-		}
+		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 
 		if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 		{
@@ -494,20 +499,26 @@ void *planificador_corto_plazo()
 	}
 }
 
-void *contador_quantum(void *id_hilo_quantum)
+void *contador_quantum(void *argumentos)
 {
-	int *id_hilo = (int *)id_hilo_quantum;
-	int pid_proceso_a_interrumpir = pcb_ejecutando->pid;
+	t_arg_hilo_quantum *arg_hilo_quantum = (t_arg_hilo_quantum *)argumentos;
 
 	usleep((configuracion_kernel->quantum) * 1000);
 
-	if (pcb_ejecutando != NULL && pcb_ejecutando->pid == pid_proceso_a_interrumpir && pcb_ejecutando->id_hilo_quantum == *id_hilo)
+	t_pcb *pcb_quantum_finalizado = buscar_pcb_con_pid(arg_hilo_quantum->pid_a_interrumpir);
+
+	if (pcb_quantum_finalizado != NULL && pcb_quantum_finalizado->pid == arg_hilo_quantum->pid_a_interrumpir && pcb_quantum_finalizado->id_hilo_quantum == arg_hilo_quantum->id_hilo_quantum)
 	{
-		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
-		log_info(logger, "PID: %d - Desalojado por fin de Quantum", pid_proceso_a_interrumpir);
+		pcb_quantum_finalizado->quantum_finalizado = true;
+
+		if (pcb_ejecutando != NULL)
+		{
+			log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_quantum_finalizado->pid);
+			interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
+		}
 	}
 
-	free(id_hilo);
+	free(arg_hilo_quantum);
 }
 
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
@@ -607,18 +618,21 @@ void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXECUTING));
-	pcb_ejecutando = pcb;
+
 	pcb->estado = CODIGO_ESTADO_PROCESO_EXECUTING;
 	ejecutar_proceso_en_cpu(pcb);
 
 	if (planifico_con_round_robin)
 	{
-		id_hilo_quantum++;
-		pcb->id_hilo_quantum = id_hilo_quantum;
+		pcb->quantum_finalizado = false;
+		pcb->id_hilo_quantum = ++id_hilo_quantum;
+
+		// Creo hilo quantum
 		pthread_t hilo_contador_quantum;
-		int *id_hilo_quantum_arg = malloc(sizeof(int));
-		*id_hilo_quantum_arg = id_hilo_quantum;
-		pthread_create(&hilo_contador_quantum, NULL, contador_quantum, (void *)id_hilo_quantum_arg);
+		t_arg_hilo_quantum *arg_hilo_quantum = malloc(sizeof(t_arg_hilo_quantum));
+		arg_hilo_quantum->id_hilo_quantum = id_hilo_quantum;
+		arg_hilo_quantum->pid_a_interrumpir = pcb->pid;
+		pthread_create(&hilo_contador_quantum, NULL, contador_quantum, (void *)arg_hilo_quantum);
 	}
 }
 
@@ -641,7 +655,6 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
-	pcb_ejecutando = NULL;
 	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
 	push_cola_ready(pcb);
 }
@@ -649,14 +662,12 @@ void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 {
 	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_BLOCKED));
-	pcb_ejecutando = NULL;
 	pcb->estado = CODIGO_ESTADO_PROCESO_BLOCKED;
 }
 
 void transicionar_proceso_de_executing_a_executing(t_pcb *pcb)
 {
-	pcb_ejecutando = pcb;
-	ejecutar_proceso_en_cpu(pcb);
+	ejecutar_proceso_en_cpu(pcb); // Revjsar
 }
 
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
@@ -667,7 +678,6 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 	destruir_estructuras_de_proceso_en_memoria(pcb);
 	eliminar_pcb_de_lista(pcb->pid, procesos, &mutex_procesos);
 	destruir_pcb(pcb);
-	pcb_ejecutando = NULL;
 	if (en_deadlock)
 	{
 		hay_deadlock();
@@ -840,7 +850,7 @@ void consola()
 			valor_ingresado_por_teclado = readline("KERNEL> ");
 
 		} while (valor_ingresado_por_teclado == NULL || strlen(valor_ingresado_por_teclado) == 0);
-		
+
 		log_debug(logger, "%s", valor_ingresado_por_teclado);
 
 		saveptr = valor_ingresado_por_teclado;
@@ -972,6 +982,7 @@ void *hilo_iniciar_proceso(void *argumentos)
 	pcb->path = malloc(sizeof(char) * strlen(iniciar_proceso_parametros->path) + 1);
 	strcpy(pcb->path, iniciar_proceso_parametros->path);
 
+	pcb->quantum_finalizado = false;
 	pcb->estado = CODIGO_ESTADO_PROCESO_NEW;
 	pcb->pid = ++proximo_pid;
 	pcb->program_counter = 0;
@@ -1196,8 +1207,7 @@ void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_solicitud_ejecutar_proceso, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 
-	// Recibir
-	op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH, conexion_con_cpu_dispatch); // RESPUESTA_EJECUTAR_PROCESO
+	pcb_ejecutando = pcb_proceso_a_ejecutar;
 }
 
 void interrumpir_proceso_en_cpu(int motivo_interrupcion)
@@ -1761,8 +1771,6 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 	}
 	pthread_mutex_unlock(&mutex_recursos);
 }
-
-
 
 t_list *obtener_procesos_analisis_deadlock()
 {

@@ -375,7 +375,7 @@ void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
-	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
+	fwrite(bloque, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
 	fclose(archivo_bloques);
 	pthread_mutex_unlock(&mutex_archivo_bloques);
 }
@@ -678,9 +678,14 @@ void escribir_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloqu
 	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 
+	for (int i = 0 ; i < configuracion_filesystem->tam_bloques ; i++)
+	{
+		log_info(logger, "Contenido de marco a escribir en archivo en %d es %02x", i, ((unsigned char*)bloque)[i]);
+	}
+
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, (numero_de_bloque_fs + configuracion_filesystem->cant_bloques_swap) * configuracion_filesystem->tam_bloques, SEEK_SET);
-	fwrite(bloque, 1, configuracion_filesystem->tam_bloques, archivo_bloques);
+	fwrite(bloque, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
 	fclose(archivo_bloques);
 
 	pthread_mutex_unlock(&mutex_archivo_bloques);

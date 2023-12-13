@@ -716,6 +716,10 @@ void *buscar_contenido_marco(int numero_de_marco)
 
 	pthread_mutex_lock(&mutex_memoria_real);
 	memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);
+	for (int i = 0 ; i < configuracion_memoria->tam_pagina ; i++)
+	{
+		log_info(logger, "Contenido de marco %d en %d es %02x", numero_de_marco, i, ((unsigned char*)contenido_marco)[i]);
+	}
 	pthread_mutex_unlock(&mutex_memoria_real);
 
 	return contenido_marco;

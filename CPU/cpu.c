@@ -192,10 +192,6 @@ void *dispatch()
 
 			// Aviso que hay que ejecutar el ciclo de instruccion
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
-
-			// Aviso al kernel que recibi el paquete
-			t_paquete *paquete_respuesta_ejecutar_proceso = crear_paquete_respuesta_ejecutar_proceso(logger);
-			enviar_paquete(logger, conexion_con_kernel_dispatch, paquete_respuesta_ejecutar_proceso, NOMBRE_MODULO_CPU_DISPATCH, NOMBRE_MODULO_KERNEL);
 		}
 		else
 		{

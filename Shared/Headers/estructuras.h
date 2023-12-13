@@ -15,6 +15,7 @@ typedef struct
     int id_hilo_quantum;
     int motivo_finalizacion;
     char *ultimo_recurso_pedido;
+    bool quantum_finalizado;
 
     // Registros del CPU
     int program_counter;
@@ -173,6 +174,12 @@ typedef struct
     t_pcb *pcb;
     int numero_pagina;
 } t_bloqueo_page_fault;
+
+typedef struct
+{
+    int pid_a_interrumpir;
+    int id_hilo_quantum;
+} t_arg_hilo_quantum;
 
 typedef struct
 {
