@@ -125,13 +125,25 @@ void *comunicacion_memoria()
 			bool pude_reservar_todos = bloques_reservados != NULL;
 			t_paquete *paquete_respuesta_pedir_bloques_a_fs = crear_paquete_respuesta_pedir_bloques_a_filesystem(logger, bloques_reservados, pid_pedido_bloques);
 			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_pedir_bloques_a_fs, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
-			list_destroy(bloques_reservados);
+
+			void _destruir_bloque_reservado(int *numero_bloque)
+			{
+				free(numero_bloque);
+			};
+			list_destroy_and_destroy_elements(bloques_reservados, (void *)_destruir_bloque_reservado);
+
 			break;
 		case SOLICITUD_LIBERAR_BLOQUES_EN_FILESYSTEM:
 			t_list *bloques_a_liberar = leer_paquete_solicitud_liberar_bloques_de_fs(logger, conexion_con_memoria);
 			liberar_bloques_en_swap(bloques_a_liberar);
 			t_paquete *paquete_respuesta_liberar_bloques = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_LIBERAR_BLOQUES_EN_FILESYSTEM, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_liberar_bloques, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+
+			void _destruir_bloque_a_liberar(int *numero_bloque)
+			{
+				free(numero_bloque);
+			};
+			list_destroy_and_destroy_elements(bloques_a_liberar, (void *)_destruir_bloque_reservado);
 			break;
 		case SOLICITUD_LEER_PAGINA_EN_SWAP:
 			int posicion_swap_a_leer;
@@ -141,6 +153,7 @@ void *comunicacion_memoria()
 			void *pagina_en_swap = leer_bloque_swap(posicion_swap_a_leer);
 			t_paquete *paquete_respuesta_leer_pagina_en_swap = crear_paquete_respuesta_leer_pagina_swap(logger, pagina_en_swap, configuracion_filesystem->tam_bloques, numero_de_pagina, pid);
 			enviar_paquete(logger, conexion_con_memoria, paquete_respuesta_leer_pagina_en_swap, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			free(pagina_en_swap);
 			break;
 		case SOLICITUD_ESCRIBIR_PAGINA_EN_SWAP:
 			void *contenido_pagina;
@@ -162,6 +175,7 @@ void *comunicacion_memoria()
 			uint32_t numero_de_bloque_archivo_a_escribir = floor(puntero_escritra / (double)(configuracion_filesystem->tam_bloques));
 			uint32_t numero_de_bloque_fs_a_escribir = obtener_numero_de_bloque_fs(nombre_archivo, numero_de_bloque_archivo_a_escribir);
 			escribir_bloque_fs(numero_de_bloque_fs_a_escribir, numero_de_bloque_archivo_a_escribir, nombre_archivo, contenido_marco);
+			free(nombre_archivo);
 			free(contenido_marco);
 			t_paquete *respuesta_escribir_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			enviar_paquete(logger, conexion_con_kernel, respuesta_escribir_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
@@ -186,6 +200,7 @@ void *comunicacion_kernel()
 			char *nombre_archivo_abrir = leer_paquete_solicitud_abrir_archivo_fs(logger, conexion_con_kernel);
 			log_info(logger, "Abrir Archivo: %s", nombre_archivo_abrir);
 			int tamanio_archivo = abrir_archivo_fs(nombre_archivo_abrir);
+			free(nombre_archivo_abrir);
 			t_paquete *respuesta_abrir_archivo;
 			if (tamanio_archivo < 0)
 			{
@@ -202,6 +217,7 @@ void *comunicacion_kernel()
 			char *nombre_crear = leer_paquete_solicitud_crear_archivo_fs(logger, conexion_con_kernel);
 			log_info(logger, "Crear Archivo: %s", nombre_archivo_abrir);
 			crear_archivo_fs(nombre_crear);
+			free(nombre_crear);
 			t_paquete *respuesta_crear_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CREAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			enviar_paquete(logger, conexion_con_kernel, respuesta_crear_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			break;
@@ -212,6 +228,7 @@ void *comunicacion_kernel()
 			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_truncar, &nuevo_tamanio_archivo);
 			log_info(logger, "Truncar Archivo: %s - Tamano: %d", nombre_archivo_truncar, nuevo_tamanio_archivo);
 			truncar_archivo_fs(nombre_archivo_truncar, nuevo_tamanio_archivo);
+			free(nombre_archivo_truncar);
 			t_paquete *respuesta_truncar_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_TRUNCAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			enviar_paquete(logger, conexion_con_kernel, respuesta_truncar_archivo, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
 			break;
@@ -225,8 +242,10 @@ void *comunicacion_kernel()
 			uint32_t numero_de_bloque_archivo_a_leer = floor(puntero_lectura / (double)(configuracion_filesystem->tam_bloques));
 			uint32_t numero_de_bloque_fs_a_leer = obtener_numero_de_bloque_fs(nombre_archivo_leer, numero_de_bloque_archivo_a_leer);
 			void *bloque_fs = leer_bloque_fs(numero_de_bloque_fs_a_leer, numero_de_bloque_archivo_a_leer, nombre_archivo_leer);
+			free(nombre_archivo_leer);
 			t_paquete *paquete_solicitud_escribir_bloque_en_memoria = crear_paquete_solicitud_escribir_bloque_en_memoria(logger, direccion_fisica_a_escribir, bloque_fs, configuracion_filesystem->tam_bloques);
 			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_escribir_bloque_en_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			free(bloque_fs);
 			break;
 
 		case SOLICITUD_ESCRIBIR_ARCHIVO_FS:
@@ -237,6 +256,7 @@ void *comunicacion_kernel()
 			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
 			t_paquete *paquete_solicitud_leer_marco_de_memoria = crear_paquete_solicitud_leer_marco_de_memoria(logger, direccion_fisica_a_leer, nombre_archivo_escribir, puntero_escritura);
 			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_marco_de_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
+			free(nombre_archivo_escribir);
 			break;
 
 		default:
@@ -377,6 +397,7 @@ void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
 	fwrite(bloque, configuracion_filesystem->tam_bloques, 1, archivo_bloques);
 	fclose(archivo_bloques);
+	free(bloque);
 	pthread_mutex_unlock(&mutex_archivo_bloques);
 }
 
@@ -399,7 +420,12 @@ t_list *buscar_bloques_libres_en_swap(int cantidad_de_bloques)
 
 	if (cantidad_de_bloques != bloques_libres_encontrados)
 	{
-		list_destroy(bloques_libres);
+		void _destruir_bloque_libre(int *numero_bloque)
+		{
+			free(numero_bloque);
+		};
+		list_destroy_and_destroy_elements(bloques_libres, (void *)_destruir_bloque_libre);
+
 		return NULL;
 	}
 
@@ -409,12 +435,12 @@ t_list *buscar_bloques_libres_en_swap(int cantidad_de_bloques)
 void liberar_bloques_en_swap(t_list *numeros_de_bloques_a_liberar)
 {
 	t_list_iterator *iterador = list_iterator_create(numeros_de_bloques_a_liberar);
-
 	while (list_iterator_has_next(iterador))
 	{
 		int *numero_de_bloque_a_liberar = list_iterator_next(iterador);
 		bitmap_bloques_libres_swap[*numero_de_bloque_a_liberar] = true;
 	}
+	list_iterator_destroy(iterador);
 }
 
 t_list *reservar_bloques_en_swap(int cantidad_de_bloques)
@@ -441,6 +467,7 @@ t_list *reservar_bloques_en_swap(int cantidad_de_bloques)
 
 		escribir_bloque_swap(*numero_de_bloque_reservado, bloque_con_ceros);
 	}
+	list_iterator_destroy(iterador);
 
 	return bloques_libres;
 }
@@ -605,7 +632,11 @@ void escribir_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indic
 FCB *iniciar_fcb(char *nombre_archivo, uint32_t tamanio_archivo, uint32_t bloque_inicial)
 {
 	FCB *fcb = malloc(sizeof(FCB));
-	fcb->nombre_archivo = strdup(nombre_archivo);
+
+	fcb->nombre_archivo = malloc(strlen(nombre_archivo));
+	strcpy(fcb->nombre_archivo, nombre_archivo);
+	fcb->nombre_archivo = strdup(fcb->nombre_archivo);
+
 	fcb->tamanio_archivo = tamanio_archivo;
 	fcb->bloque_inicial = bloque_inicial;
 	return fcb;
@@ -678,9 +709,9 @@ void escribir_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloqu
 	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 
-	for (int i = 0 ; i < configuracion_filesystem->tam_bloques ; i++)
+	for (int i = 0; i < configuracion_filesystem->tam_bloques; i++)
 	{
-		log_info(logger, "Contenido de marco a escribir en archivo en %d es %02x", i, ((unsigned char*)bloque)[i]);
+		log_info(logger, "Contenido de marco a escribir en archivo en %d es %02x", i, ((unsigned char *)bloque)[i]);
 	}
 
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
