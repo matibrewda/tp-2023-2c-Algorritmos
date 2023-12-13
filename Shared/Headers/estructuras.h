@@ -115,14 +115,14 @@ typedef struct
     int instancias_disponibles;
     t_queue *pcbs_bloqueados;
     t_list *pcbs_asignados;
-    pthread_mutex_t mutex_pcbs_bloqueados;
-    pthread_mutex_t mutex_pcbs_asignados;
-
+    
     bool es_archivo;
     int tamanio_archivo;
     t_pcb* pcb_lock_escritura;
     t_list* pcbs_lock_lectura;
     t_queue* pcbs_bloqueados_por_archivo;
+
+    pthread_mutex_t mutex_recurso;
 } t_recurso;
 
 typedef struct

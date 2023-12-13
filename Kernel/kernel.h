@@ -73,7 +73,7 @@ void crear_hilo_page_fault(t_pcb *pcb, int numero_pagina); // CHEQUEADA (Y)
 void *page_fault(); // CHEQUEADA (Y)
 
 // Comunicacion con CPU
-t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, int*modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode);
+t_contexto_de_ejecucion *recibir_paquete_de_cpu_dispatch(op_code *codigo_operacion_recibido, int *tiempo_sleep, int *motivo_interrupcion, char **nombre_recurso, int *codigo_error, int *numero_pagina, char **nombre_archivo, int*modo_apertura, int *posicion_puntero_archivo, int *direccion_fisica, int *nuevo_tamanio_archivo, int *fs_opcode);  // CHEQUEADA (Y)
 void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar); // CHEQUEADA (Y)
 void interrumpir_proceso_en_cpu(int motivo_interrupcion); // CHEQUEADA (Y)
 
@@ -115,16 +115,13 @@ void leer_archivo_fs(char *nombre_archivo, int puntero_archivo, int direccion_fi
 void escribir_archivo_fs(char *nombre_archivo, int puntero_archivo, int direccion_fisica);
 
 // Recursos
-t_recurso *crear_recurso(char *nombre, int instancias);
-t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tamanio, t_pcb* pcb);
-bool recurso_existe(char *nombre);
-bool recurso_archivo_tiene_lock_de_escritura(t_recurso* recurso);
-bool recurso_archivo_tiene_locks_de_lectura(t_recurso* recurso);
-t_recurso *buscar_recurso_por_nombre(char *nombre_recurso);
-t_archivo_abierto_proceso* buscar_archivo_abierto_proceso(char* nombre_archivo, int pid);
-bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid);
-void desasignar_recurso_a_pcb(char *nombre_recurso, int pid);
-void desasignar_todos_los_recursos_a_pcb(int pid);
+t_recurso *crear_recurso(char *nombre, int instancias); // CHEQUEADA (Y)
+t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tamanio, t_pcb* pcb); // CHEQUEADA (Y)
+t_recurso *buscar_recurso_por_nombre(char *nombre_recurso); // CHEQUEADA (Y)
+
+bool recurso_esta_asignado_a_pcb(t_recurso *recurso, int pid); // CHEQUEADA (Y)
+void desasignar_recurso_a_pcb(t_recurso *recurso, int pid); // TODO CHECK
+void desasignar_todos_los_recursos_a_pcb(int pid); // CHEQUEADA (Y)
 
 // Deadlock
 t_list *obtener_procesos_analisis_deadlock(); // CHEQUEADA (Y)

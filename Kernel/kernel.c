@@ -4,20 +4,19 @@
 t_log *logger = NULL;
 t_argumentos_kernel *argumentos_kernel = NULL;
 t_config_kernel *configuracion_kernel = NULL;
-
-// Procesos
-t_list *procesos; // Lista para listar procesos
-
 int proximo_pid = 0;
 int id_hilo_quantum = 0;
-bool planificacion_detenida = false;
 bool planifico_con_round_robin = false;
 bool planifico_con_prioridades = false;
 bool en_deadlock = false;
 int grado_max_multiprogramacion_actual;
+bool planificacion_detenida = false;
+
+// Procesos
+t_list *procesos; // Chequear proteccion
 
 // Recursos
-t_list *recursos;
+t_list *recursos; // Chequear proteccion
 
 // Conexiones
 int conexion_con_cpu_dispatch = -1;
@@ -34,19 +33,19 @@ sem_t semaforo_grado_max_multiprogramacion;
 sem_t semaforo_hay_algun_proceso_en_cola_new;
 sem_t semaforo_hay_algun_proceso_en_cola_ready;
 
+pthread_mutex_t mutex_conexion_memoria;
+pthread_mutex_t mutex_conexion_filesystem;
+pthread_mutex_t mutex_bool_planificacion_detenida;
 pthread_mutex_t mutex_cola_new;
 pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_bloqueados_sleep;
 pthread_mutex_t mutex_cola_bloqueados_pagefault;
 pthread_mutex_t mutex_cola_bloqueados_operaciones_archivos;
-pthread_mutex_t mutex_conexion_memoria;
-pthread_mutex_t mutex_conexion_filesystem;
-pthread_mutex_t mutex_planificacion;
-pthread_mutex_t mutex_recursos;
 pthread_mutex_t mutex_detener_planificacion_corto_plazo;
 pthread_mutex_t mutex_detener_planificacion_largo_plazo;
+
+pthread_mutex_t mutex_recursos;
 pthread_mutex_t mutex_procesos;
-pthread_mutex_t mutex_bool_planificacion_detenida;
 
 // Colas de planificacion
 t_queue *cola_new = NULL;
@@ -54,7 +53,7 @@ t_queue *cola_ready = NULL;
 t_queue *cola_bloqueados_sleep = NULL;
 t_queue *cola_bloqueados_pagefault = NULL;
 t_queue *cola_bloqueados_operaciones_archivos = NULL;
-t_pcb *pcb_ejecutando = NULL;
+t_pcb *pcb_ejecutando = NULL; // Chequear proteccion
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -131,7 +130,6 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_cola_bloqueados_pagefault, NULL);
 	pthread_mutex_init(&mutex_conexion_memoria, NULL);
 	pthread_mutex_init(&mutex_conexion_filesystem, NULL);
-	pthread_mutex_init(&mutex_planificacion, NULL);
 	pthread_mutex_init(&mutex_recursos, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_corto_plazo, NULL);
 	pthread_mutex_init(&mutex_detener_planificacion_largo_plazo, NULL);
@@ -213,6 +211,7 @@ void *planificador_largo_plazo()
 
 void *planificador_corto_plazo()
 {
+	t_pcb *pcb;
 	op_code codigo_operacion_recibido;
 	int tiempo_sleep = -1;
 	int motivo_interrupcion = -1;
@@ -222,12 +221,11 @@ void *planificador_corto_plazo()
 	int direccion_fisica = -1;
 	int nuevo_tamanio_archivo = -1;
 	int fs_opcode = -1;
+	int modo_apertura = -1;
+	bool mantener_proceso_ejecutando = false;
+	bool correr_deteccion_deadlock = false;
 	char *nombre_recurso = NULL;
 	char *nombre_archivo = NULL;
-	int modo_apertura = -1;
-	t_pcb *pcb;
-	bool mantener_proceso_ejecutando;
-	bool correr_deteccion_deadlock = false;
 
 	while (true)
 	{
@@ -257,6 +255,7 @@ void *planificador_corto_plazo()
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 		pcb_ejecutando = NULL;
 		actualizar_pcb(pcb, contexto_de_ejecucion);
+		free(contexto_de_ejecucion);
 
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 
@@ -287,28 +286,27 @@ void *planificador_corto_plazo()
 				return strcmp(archivo_abierto_proceso->nombre_archivo, nombre_archivo) == 0;
 			};
 
-			pthread_mutex_lock(&mutex_recursos);
 			t_recurso *recurso_archivo = buscar_recurso_por_nombre(nombre_archivo);
-			pthread_mutex_unlock(&mutex_recursos);
 			t_archivo_abierto_proceso *archivo_abierto_proceso = list_find(pcb->tabla_archivos, (void *)_filtro_archivo_abierto_proceso_por_nombre);
 
 			if (fs_opcode == FOPEN_OPCODE)
 			{
-				log_info(logger, "PID: %d - Abrir Archivo: %s", contexto_de_ejecucion->pid, nombre_archivo);
+				log_info(logger, "PID: %d - Abrir Archivo: %s", pcb->pid, nombre_archivo);
 
 				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo != NULL;
 				if (archivo_a_abrir_existe_y_estaba_abierto)
 				{
 					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
-					archivo_abierto_pcb->nombre_archivo = nombre_archivo;
+					archivo_abierto_pcb->nombre_archivo = malloc(strlen(nombre_archivo));
+					strcpy(archivo_abierto_pcb->nombre_archivo, nombre_archivo);
 					archivo_abierto_pcb->puntero = 0;
 					archivo_abierto_pcb->modo_apertura = modo_apertura;
 					list_add(pcb->tabla_archivos, archivo_abierto_pcb);
 
 					if (modo_apertura == LOCK_ESCRITURA)
 					{
-						pthread_mutex_lock(&mutex_recursos);
-						if (recurso_archivo_tiene_lock_de_escritura(recurso_archivo) || recurso_archivo_tiene_locks_de_lectura(recurso_archivo))
+						pthread_mutex_lock(&recurso_archivo->mutex_recurso);
+						if (recurso_archivo->pcb_lock_escritura != NULL || !queue_is_empty(recurso_archivo->pcbs_bloqueados_por_archivo))
 						{
 							transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 							t_pcb_bloqueado_archivo *pcb_bloqueado_archivo = malloc(sizeof(t_pcb_bloqueado_archivo));
@@ -325,12 +323,12 @@ void *planificador_corto_plazo()
 							recurso_archivo->instancias_disponibles = 0;
 							mantener_proceso_ejecutando = true;
 						}
-						pthread_mutex_unlock(&mutex_recursos);
+						pthread_mutex_unlock(&recurso_archivo->mutex_recurso);
 					}
 					else
 					{
-						pthread_mutex_lock(&mutex_recursos);
-						if (recurso_archivo_tiene_lock_de_escritura(recurso_archivo))
+						pthread_mutex_lock(&recurso_archivo->mutex_recurso);
+						if (recurso_archivo->pcb_lock_escritura != NULL)
 						{
 							transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 							t_pcb_bloqueado_archivo *pcb_bloqueado_archivo = malloc(sizeof(t_pcb_bloqueado_archivo));
@@ -347,7 +345,7 @@ void *planificador_corto_plazo()
 							recurso_archivo->instancias_iniciales = list_size(recurso_archivo->pcbs_lock_lectura);
 							recurso_archivo->instancias_disponibles = 0;
 						}
-						pthread_mutex_unlock(&mutex_recursos);
+						pthread_mutex_unlock(&recurso_archivo->mutex_recurso);
 					}
 				}
 				else
@@ -362,9 +360,7 @@ void *planificador_corto_plazo()
 						tamanio_archivo_abierto = 0;
 						existe_archivo_a_abrir = true;
 					}
-					pthread_mutex_lock(&mutex_recursos);
-					list_add(recursos, crear_recurso_archivo(nombre_archivo, modo_apertura, tamanio_archivo_abierto, pcb));
-					pthread_mutex_unlock(&mutex_recursos);
+					list_add_thread_safe(recursos, crear_recurso_archivo(nombre_archivo, modo_apertura, tamanio_archivo_abierto, pcb), &mutex_recursos);
 					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
 					archivo_abierto_pcb->nombre_archivo = nombre_archivo;
 					archivo_abierto_pcb->puntero = 0;
@@ -374,34 +370,30 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
 			{
-				log_info(logger, "PID: %d - Cerrar Archivo: %s", contexto_de_ejecucion->pid, nombre_archivo);
-
-				pthread_mutex_lock(&mutex_recursos);
-				desasignar_recurso_a_pcb(nombre_archivo, pcb->pid);
-				pthread_mutex_unlock(&mutex_recursos);
-
+				log_info(logger, "PID: %d - Cerrar Archivo: %s", pcb->pid, nombre_archivo);
+				desasignar_recurso_a_pcb(recurso_archivo, pcb->pid);
 				correr_deteccion_deadlock = true;
 				mantener_proceso_ejecutando = true;
 			}
 			else if (fs_opcode == FSEEK_OPCODE)
 			{
-				log_info(logger, "PID: %d - Actualizar puntero Archivo: %s - Puntero: %d - Puntero Anterior: %d", contexto_de_ejecucion->pid, nombre_archivo, posicion_puntero_archivo, archivo_abierto_proceso->puntero);
+				log_info(logger, "PID: %d - Actualizar puntero Archivo: %s - Puntero: %d - Puntero Anterior: %d", pcb->pid, nombre_archivo, posicion_puntero_archivo, archivo_abierto_proceso->puntero);
 				mantener_proceso_ejecutando = true;
 				archivo_abierto_proceso->puntero = posicion_puntero_archivo;
 			}
 			else if (fs_opcode == FTRUNCATE_OPCODE)
 			{
-				pthread_mutex_lock(&mutex_recursos);
-				log_info(logger, "PID: %d - Truncar Archivo: %s - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, nuevo_tamanio_archivo);
+				log_info(logger, "PID: %d - Truncar Archivo: %s - Tamaño: %d", pcb->pid, nombre_archivo, nuevo_tamanio_archivo);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
 				crear_hilo_operacion_archivo(pcb, TRUNCAR_ARCHIVO, nombre_archivo, archivo_abierto_proceso->modo_apertura, -1, -1, nuevo_tamanio_archivo);
+				pthread_mutex_lock(&recurso_archivo->mutex_recurso);
 				recurso_archivo->tamanio_archivo = nuevo_tamanio_archivo;
-				pthread_mutex_unlock(&mutex_recursos);
+				pthread_mutex_unlock(&recurso_archivo->mutex_recurso);
 			}
 			else if (fs_opcode == FWRITE_OPCODE)
 			{
-				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
+				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", pcb->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
 				if (archivo_abierto_proceso->modo_apertura != LOCK_ESCRITURA)
 				{
 					pcb->motivo_finalizacion = FINALIZACION_INVALID_WRITE;
@@ -416,7 +408,7 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FREAD_OPCODE)
 			{
-				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", contexto_de_ejecucion->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
+				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", pcb->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
 				crear_hilo_operacion_archivo(pcb, LEER_ARCHIVO, nombre_archivo, modo_apertura, archivo_abierto_proceso->puntero, direccion_fisica, -1);
@@ -436,58 +428,53 @@ void *planificador_corto_plazo()
 		}
 		else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_WAIT)
 		{
-			pthread_mutex_lock(&mutex_recursos);
-			if (!recurso_existe(nombre_recurso))
+			t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
+
+			if (recurso_para_wait == NULL)
 			{
-				pthread_mutex_unlock(&mutex_recursos);
 				pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 			}
 			else
 			{
-				t_recurso *recurso_para_wait = buscar_recurso_por_nombre(nombre_recurso);
 				recurso_para_wait->instancias_disponibles--;
 				log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
 
 				if (recurso_para_wait->instancias_disponibles < 0)
 				{
 					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
+
+					pthread_mutex_lock(&recurso_para_wait->mutex_recurso);
 					pcb->ultimo_recurso_pedido = recurso_para_wait->nombre;
-					queue_push_thread_safe(recurso_para_wait->pcbs_bloqueados, pcb, &recurso_para_wait->mutex_pcbs_bloqueados);
+					queue_push(recurso_para_wait->pcbs_bloqueados, pcb);
 					log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
+					pthread_mutex_unlock(&recurso_para_wait->mutex_recurso);
+
 					correr_deteccion_deadlock = true;
 				}
 				else
 				{
-					list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_pcbs_asignados);
+					list_add_thread_safe(recurso_para_wait->pcbs_asignados, pcb, &recurso_para_wait->mutex_recurso);
 					mantener_proceso_ejecutando = true;
 				}
-				pthread_mutex_unlock(&mutex_recursos);
 			}
 		}
 		else if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_SIGNAL)
 		{
-			pthread_mutex_lock(&mutex_recursos);
-			if (!recurso_existe(nombre_recurso))
+			t_recurso *recurso_para_signal = buscar_recurso_por_nombre(nombre_recurso);
+			if (recurso_para_signal == NULL || !recurso_esta_asignado_a_pcb(recurso_para_signal, pcb->pid))
 			{
-				pthread_mutex_unlock(&mutex_recursos);
-				pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
-
-				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
-			}
-			else if (!recurso_esta_asignado_a_pcb(nombre_recurso, pcb->pid))
-			{
-				pthread_mutex_unlock(&mutex_recursos);
 				pcb->motivo_finalizacion = FINALIZACION_INVALID_RESOURCE;
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXIT);
 			}
 			else
 			{
-				t_recurso *recurso_para_signal = buscar_recurso_por_nombre(nombre_recurso);
+				pthread_mutex_lock(&recurso_para_signal->mutex_recurso);
 				log_info(logger, "PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
+				pthread_mutex_unlock(&recurso_para_signal->mutex_recurso);
+
 				mantener_proceso_ejecutando = true;
-				desasignar_recurso_a_pcb(nombre_recurso, pcb->pid);
-				pthread_mutex_unlock(&mutex_recursos);
+				desasignar_recurso_a_pcb(recurso_para_signal, pcb->pid);
 			}
 		}
 
@@ -497,6 +484,18 @@ void *planificador_corto_plazo()
 		}
 
 		pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+
+		if (nombre_recurso != NULL)
+		{
+			free(nombre_recurso);
+			nombre_recurso = NULL;
+		}
+
+		if (nombre_archivo != NULL)
+		{
+			free(nombre_archivo);
+			nombre_archivo = NULL;
+		}
 	}
 }
 
@@ -1432,7 +1431,7 @@ void destruir_pcb(t_pcb *pcb)
 		free(pcb->ultimo_recurso_pedido);
 	}
 
-	list_destroy(pcb->tabla_archivos);
+	list_destroy(pcb->tabla_archivos); // TODO remove all and destroy deberia ser
 	free(pcb->path);
 	free(pcb);
 }
@@ -1554,20 +1553,19 @@ t_recurso *crear_recurso(char *nombre, int instancias)
 {
 	t_recurso *recurso = malloc(sizeof(t_recurso));
 
-	recurso->nombre = malloc(strlen(nombre));
-	strcpy(recurso->nombre, nombre);
+	recurso->nombre = nombre;
 	recurso->instancias_iniciales = instancias;
 	recurso->instancias_disponibles = instancias;
 	recurso->pcbs_bloqueados = queue_create();
 	recurso->pcbs_asignados = list_create();
-	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
-	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
 	recurso->es_archivo = false;
 	recurso->tamanio_archivo = -1;
 	recurso->pcb_lock_escritura = NULL;
 	recurso->pcbs_lock_lectura = list_create();
 	recurso->pcbs_bloqueados_por_archivo = queue_create();
+
+	pthread_mutex_init(&recurso->mutex_recurso, NULL);
 
 	return recurso;
 }
@@ -1582,13 +1580,14 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tama
 	recurso->instancias_disponibles = 0;
 	recurso->pcbs_bloqueados = queue_create();
 	recurso->pcbs_asignados = list_create();
-	pthread_mutex_init(&recurso->mutex_pcbs_asignados, NULL);
-	pthread_mutex_init(&recurso->mutex_pcbs_bloqueados, NULL);
 
 	recurso->es_archivo = true;
 	recurso->tamanio_archivo = tamanio;
-	recurso->pcbs_lock_lectura = list_create();
 	recurso->pcb_lock_escritura = NULL;
+	recurso->pcbs_lock_lectura = list_create();
+	recurso->pcbs_bloqueados_por_archivo = queue_create();
+
+	pthread_mutex_init(&recurso->mutex_recurso, NULL);
 
 	if (lock_actual == LOCK_ESCRITURA)
 	{
@@ -1599,32 +1598,7 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tama
 		list_add(recurso->pcbs_lock_lectura, pcb);
 	}
 
-	recurso->pcbs_bloqueados_por_archivo = queue_create();
-	pthread_mutex_t mutex_pcbs_archivos;
-
-	log_debug(logger, "Se crea el recurso archivo %s con %d instancias", nombre_archivo, 1);
-
 	return recurso;
-}
-
-bool recurso_existe(char *nombre)
-{
-	bool _filtro_nombre_recurso(t_recurso * recurso)
-	{
-		return strcmp(recurso->nombre, nombre) == 0;
-	}
-
-	return list_any_satisfy(recursos, (void *)_filtro_nombre_recurso);
-}
-
-bool recurso_archivo_tiene_lock_de_escritura(t_recurso *recurso)
-{
-	return recurso->pcb_lock_escritura != NULL;
-}
-
-bool recurso_archivo_tiene_locks_de_lectura(t_recurso *recurso)
-{
-	return !queue_is_empty(recurso->pcbs_bloqueados_por_archivo);
 }
 
 t_recurso *buscar_recurso_por_nombre(char *nombre_recurso)
@@ -1634,23 +1608,21 @@ t_recurso *buscar_recurso_por_nombre(char *nombre_recurso)
 		return strcmp(nombre_recurso, recurso->nombre) == 0;
 	};
 
-	t_recurso *recurso = list_find(recursos, (void *)_filtro_recurso_por_nombre);
+	t_recurso *recurso = list_find_thread_safe(recursos, (void *)_filtro_recurso_por_nombre, &mutex_recursos);
 	return recurso;
 }
 
-bool recurso_esta_asignado_a_pcb(char *nombre_recurso, int pid)
+bool recurso_esta_asignado_a_pcb(t_recurso *recurso, int pid)
 {
-	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
-
 	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
 		return pcb->pid == pid;
 	};
 
-	return list_find_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_asignados) != NULL;
+	return list_find_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_recurso) != NULL;
 }
 
-void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
+void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 {
 	int pid_lectura_filtro;
 
@@ -1659,14 +1631,9 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		return pcb->pid == pid;
 	};
 
-	bool _filtro_recurso_por_nombre(t_recurso * recurso)
-	{
-		return strcmp(nombre_recurso, recurso->nombre) == 0;
-	};
-
 	bool _filtro_archivo_abierto_por_nombre(t_archivo_abierto_proceso * archivo_abierto_proceso)
 	{
-		return strcmp(nombre_recurso, archivo_abierto_proceso->nombre_archivo) == 0;
+		return strcmp(recurso->nombre, archivo_abierto_proceso->nombre_archivo) == 0;
 	};
 
 	bool _filtro_pcb_bloqueado_archivo_por_modo_lectura(t_pcb_bloqueado_archivo * pcb_bloqueado_archivo)
@@ -1679,10 +1646,8 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 		return pcb_bloqueado_archivo->pcb->pid == pid_lectura_filtro;
 	};
 
-	log_debug(logger, "Desasignado %s a PID %d", nombre_recurso, pid);
-
-	t_recurso *recurso = buscar_recurso_por_nombre(nombre_recurso);
-
+	pthread_mutex_lock(&recurso->mutex_recurso);
+	log_debug(logger, "Desasignado %s a PID %d", recurso->nombre, pid);
 	if (recurso->es_archivo)
 	{
 		// Elimino lock de escritura (si pid lo tenia)
@@ -1711,6 +1676,7 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 			if (queue_is_empty(recurso->pcbs_bloqueados_por_archivo))
 			{
 				// Si me quedo TODO vacio (lock escritura, locks de lectura, pcbs bloqueados por archivo), destruyo el recurso
+				// TODO FREE Y BOCHA MAS
 				list_remove_by_condition(recursos, (void *)_filtro_recurso_por_nombre);
 			}
 			else
@@ -1746,18 +1712,19 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid)
 	}
 	else
 	{
-		list_remove_by_condition_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_asignados);
+		list_remove_by_condition(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id);
 		recurso->instancias_disponibles++;
 		if (recurso->instancias_disponibles <= 0)
 		{
-			if (!queue_is_empty_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados))
+			if (!queue_is_empty(recurso->pcbs_bloqueados))
 			{
-				t_pcb *pcb_a_desbloquear = queue_pop_thread_safe(recurso->pcbs_bloqueados, &recurso->mutex_pcbs_bloqueados);
-				list_add_thread_safe(recurso->pcbs_asignados, pcb_a_desbloquear, &recurso->mutex_pcbs_asignados);
+				t_pcb *pcb_a_desbloquear = queue_pop(recurso->pcbs_bloqueados);
+				list_add(recurso->pcbs_asignados, pcb_a_desbloquear);
 				transicionar_proceso(pcb_a_desbloquear, CODIGO_ESTADO_PROCESO_READY);
 			}
 		}
 	}
+	pthread_mutex_unlock(&recurso->mutex_recurso);
 }
 
 void desasignar_todos_los_recursos_a_pcb(int pid)
@@ -1771,10 +1738,11 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 		{
 			return pcb->pid == pid;
 		};
-		list_remove_by_condition_thread_safe(recurso->pcbs_bloqueados->elements, (void *)_filtro_proceso_por_id, &recurso->mutex_pcbs_bloqueados);
-		while (recurso_esta_asignado_a_pcb(recurso->nombre, pid))
+		list_remove_by_condition_thread_safe(recurso->pcbs_bloqueados->elements, (void *)_filtro_proceso_por_id, &recurso->mutex_recurso);
+
+		while (recurso_esta_asignado_a_pcb(recurso, pid))
 		{
-			desasignar_recurso_a_pcb(recurso->nombre, pid);
+			desasignar_recurso_a_pcb(recurso, pid);
 		}
 	}
 	pthread_mutex_unlock(&mutex_recursos);
@@ -1958,9 +1926,11 @@ int *obtener_vector_recursos_disponibles()
 
 bool hay_deadlock()
 {
-	pthread_mutex_lock(&mutex_recursos);
-	char *string_dinamico = crear_string_dinamico();
 	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK");
+
+	char *string_dinamico = crear_string_dinamico();
+
+	pthread_mutex_lock(&mutex_recursos);
 	int cantidad_de_recursos = list_size(recursos);
 	log_debug(logger, "ANALISIS DE DETECCION DE DEADLOCK: CANTIDAD DE RECURSOS %d", cantidad_de_recursos);
 	int *recursos_disponibles = obtener_vector_recursos_disponibles();
@@ -1990,6 +1960,7 @@ bool hay_deadlock()
 	}
 	list_iterator_destroy(mi_iterador_log);
 	//--
+
 	bool finalice_alguno = true;
 	t_list_iterator *iterador_procesos_a_analizar;
 	t_pcb_analisis_deadlock *pcb_analisis_deadlock;
@@ -2055,11 +2026,11 @@ bool hay_deadlock()
 				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recursos en posesion: ");
 
 				bool agregue_recurso_a_lista_posesion = false;
-				for (int i = 0; i < configuracion_kernel->cantidad_de_recursos; i++)
+				for (int i = 0; i < cantidad_de_recursos; i++)
 				{
 					t_recurso *recurso = list_get(recursos, i);
 
-					if (recurso_esta_asignado_a_pcb(recurso->nombre, pcb_analisis_deadlock->pid))
+					if (recurso_esta_asignado_a_pcb(recurso, pcb_analisis_deadlock->pid))
 					{
 						if (agregue_recurso_a_lista_posesion)
 						{
@@ -2070,7 +2041,9 @@ bool hay_deadlock()
 							agregue_recurso_a_lista_posesion = true;
 						}
 
+						pthread_mutex_lock(&recurso->mutex_recurso);
 						string_dinamico = agregar_string_a_string_dinamico(string_dinamico, recurso->nombre);
+						pthread_mutex_unlock(&recurso->mutex_recurso);
 					}
 				}
 
@@ -2095,6 +2068,8 @@ bool hay_deadlock()
 	}
 	// FIN LOG/IMPRIMIR DEADLOCK
 
+	pthread_mutex_unlock(&mutex_recursos);
+
 	void _destruir_pcb_analisis_deadlock(t_pcb_analisis_deadlock * pcb_analisis_deadlock)
 	{
 		free(pcb_analisis_deadlock->recursos_asignados);
@@ -2103,6 +2078,6 @@ bool hay_deadlock()
 	};
 
 	list_destroy_and_destroy_elements(procesos_a_analizar, (void *)_destruir_pcb_analisis_deadlock);
-	pthread_mutex_unlock(&mutex_recursos);
+
 	return en_deadlock;
 }
