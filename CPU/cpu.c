@@ -154,7 +154,7 @@ void *interrupt()
 		op_code codigo_operacion_recibido = esperar_operacion(logger, NOMBRE_MODULO_CPU_INTERRUPT, NOMBRE_MODULO_KERNEL, conexion_con_kernel_interrupt);
 		if (codigo_operacion_recibido == SOLICITUD_INTERRUMPIR_PROCESO)
 		{
-			log_trace(logger, "Se recibio una orden de %s para interrumpir el proceso en %s.", NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_INTERRUPT);
+			log_warning(logger, "RECIBI INTERRUPT");
 			motivo_interrupcion = leer_paquete_solicitud_interrumpir_proceso(logger, conexion_con_kernel_interrupt);
 
 			pthread_mutex_lock(&mutex_ocurrio_interrupcion);
@@ -533,9 +533,10 @@ void ciclo_de_ejecucion()
 
 		// CHECK INTERRUPT
 		pthread_mutex_lock(&mutex_ocurrio_interrupcion);
-		if (ocurrio_interrupcion)
+		if (ocurrio_interrupcion && !dejar_de_ejecutar)
 		{
 			pthread_mutex_unlock(&mutex_ocurrio_interrupcion);
+			log_warning(logger, "DEVUELVO INTERRUPT");
 			devolver_contexto_por_ser_interrumpido();
 			dejar_de_ejecutar = true;
 		}
@@ -546,8 +547,13 @@ void ciclo_de_ejecucion()
 
 		if (!dejar_de_ejecutar)
 		{
+
 			// Sigo ejecutando
 			sem_post(&semaforo_ejecutar_ciclo_de_instruccion);
+		}
+		else
+		{
+			log_warning(logger, "FRENO");
 		}
 	}
 }

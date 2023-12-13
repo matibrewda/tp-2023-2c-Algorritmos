@@ -33,7 +33,7 @@
 #include "../Shared/Headers/constantes.h"
 
 #define RUTA_ARCHIVO_DE_LOGS "Logs/kernel.log"
-#define LOG_LEVEL LOG_LEVEL_TRACE
+#define LOG_LEVEL LOG_LEVEL_DEBUG
 
 // Funciones por consola
 #define INICIAR_PROCESO "INICIAR_PROCESO"
@@ -127,8 +127,8 @@ void desasignar_recurso_a_pcb(char *nombre_recurso, int pid);
 void desasignar_todos_los_recursos_a_pcb(int pid);
 
 // Deadlock
-t_list *obtener_procesos_analisis_deadlock();
-int *obtener_vector_recursos_disponibles();
-bool hay_deadlock();
+t_list *obtener_procesos_analisis_deadlock(); // CHEQUEADA (Y)
+int *obtener_vector_recursos_disponibles(); // CHEQUEADA (Y)
+bool hay_deadlock(); // CHEQUEADA (Y)
 
 #endif /* KERNEL_H_ */
