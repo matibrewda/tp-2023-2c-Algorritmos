@@ -1704,7 +1704,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 	};
 
 	pthread_mutex_lock(&recurso->mutex_recurso);
-	log_debug(logger, "Desasignado %s a PID %d", recurso->nombre, pid);
+	log_debug(logger, "Desasignando %s a PID %d", recurso->nombre, pid);
 	if (recurso->es_archivo)
 	{
 		// Elimino lock de escritura (si pid lo tenia)
@@ -1785,6 +1785,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 		}
 	}
 	pthread_mutex_unlock(&recurso->mutex_recurso);
+	log_debug(logger, "Desasignado recurso a PID %d", pid);
 }
 
 void desasignar_todos_los_recursos_a_pcb(int pid)
@@ -2009,6 +2010,7 @@ bool hay_deadlock()
 	}
 	//-
 	t_list *procesos_a_analizar = obtener_procesos_analisis_deadlock();
+	log_info(logger, "LALA");
 	//--
 	t_list_iterator *mi_iterador_log = list_iterator_create(procesos_a_analizar);
 	int contador = 0;
@@ -2039,6 +2041,7 @@ bool hay_deadlock()
 	if (list_is_empty(procesos_a_analizar))
 	{
 		log_debug(logger, "NO HAY DEADLOCK");
+		pthread_mutex_unlock(&mutex_recursos);
 		return false;
 	}
 
