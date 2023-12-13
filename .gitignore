@@ -58,6 +58,12 @@ Memoria/Logs/memoria.log
 Filesystem/Logs/filesystem.log
 *.log
 
+# Valgrind
+Kernel/Valgrind/*.txt
+CPU/Valgrind/*.txt
+Filesystem/Valgrind/*.txt
+Memoria/Valgrind/*.txt
+
 # FS
 Filesystem/fs/bloques.dat
 Filesystem/fs/fat.dat

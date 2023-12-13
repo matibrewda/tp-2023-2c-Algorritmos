@@ -7,7 +7,9 @@ LOGS=Logs/$(NOMBRE_MODULO).log
 FUENTES_MODULO=$(shell find *.c) $(shell find Source/*.c)
 FUENTES_SHARED=$(shell find ../Shared/*.c)
 
-.PHONY: ejecutar limpiar compilar
+.PHONY: valgrind ejecutar limpiar compilar
+valgrind: limpiar compilar
+	valgrind --leak-check=full --track-origins=yes --log-file=Valgrind/valgrind.txt ./$(EJECUTABLE) $(CONFIGURACION)
 ejecutar: limpiar compilar
 	./$(EJECUTABLE) $(CONFIGURACION)
 limpiar:
