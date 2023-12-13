@@ -25,6 +25,7 @@ typedef struct
     uint32_t registro_dx;
 
     t_list* tabla_archivos;
+    pthread_mutex_t mutex_tabla_archivos;
 } t_pcb;
 
 typedef struct

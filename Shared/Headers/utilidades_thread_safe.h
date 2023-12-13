@@ -27,5 +27,6 @@ int list_size_thread_safe(t_list *lista, pthread_mutex_t *mutex);
 void bitarray_set_bit_thread_safe(t_bitarray *, int indice, pthread_mutex_t *mutex);
 void bitarray_clean_bit_thread_safe(t_bitarray *bitarray, int indice, pthread_mutex_t *mutex);
 bool bitarray_test_bit_thread_safe(t_bitarray *bitarray, int indice, pthread_mutex_t *mutex);
+void list_destroy_and_destroy_elements_thread_safe(t_list *lista, void(*destructor)(void*), pthread_mutex_t *mutex);
 
 #endif /* UTILIDADES_THREAD_SAFE_H_ */

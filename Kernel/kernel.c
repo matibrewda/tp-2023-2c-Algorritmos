@@ -13,10 +13,10 @@ int grado_max_multiprogramacion_actual;
 bool planificacion_detenida = false;
 
 // Procesos
-t_list *procesos; // Chequear proteccion
+t_list *procesos;
 
 // Recursos
-t_list *recursos; // Chequear proteccion
+t_list *recursos;
 
 // Conexiones
 int conexion_con_cpu_dispatch = -1;
@@ -41,9 +41,9 @@ pthread_mutex_t mutex_cola_ready;
 pthread_mutex_t mutex_cola_bloqueados_sleep;
 pthread_mutex_t mutex_cola_bloqueados_pagefault;
 pthread_mutex_t mutex_cola_bloqueados_operaciones_archivos;
+pthread_mutex_t mutex_proceso_ejecutando;
 pthread_mutex_t mutex_detener_planificacion_corto_plazo;
 pthread_mutex_t mutex_detener_planificacion_largo_plazo;
-
 pthread_mutex_t mutex_recursos;
 pthread_mutex_t mutex_procesos;
 
@@ -53,7 +53,7 @@ t_queue *cola_ready = NULL;
 t_queue *cola_bloqueados_sleep = NULL;
 t_queue *cola_bloqueados_pagefault = NULL;
 t_queue *cola_bloqueados_operaciones_archivos = NULL;
-t_pcb *pcb_ejecutando = NULL; // Chequear proteccion
+t_pcb *pcb_ejecutando = NULL;
 
 int main(int cantidad_argumentos_recibidos, char **argumentos)
 {
@@ -136,6 +136,7 @@ int main(int cantidad_argumentos_recibidos, char **argumentos)
 	pthread_mutex_init(&mutex_cola_bloqueados_operaciones_archivos, NULL);
 	pthread_mutex_init(&mutex_procesos, NULL);
 	pthread_mutex_init(&mutex_bool_planificacion_detenida, NULL);
+	pthread_mutex_init(&mutex_proceso_ejecutando, NULL);
 
 	// Colas de planificacion
 	cola_new = queue_create();
@@ -253,7 +254,9 @@ void *planificador_corto_plazo()
 
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
+		pthread_mutex_lock(&mutex_proceso_ejecutando);
 		pcb_ejecutando = NULL;
+		pthread_mutex_unlock(&mutex_proceso_ejecutando);
 		actualizar_pcb(pcb, contexto_de_ejecucion);
 		free(contexto_de_ejecucion);
 
@@ -287,7 +290,7 @@ void *planificador_corto_plazo()
 			};
 
 			t_recurso *recurso_archivo = buscar_recurso_por_nombre(nombre_archivo);
-			t_archivo_abierto_proceso *archivo_abierto_proceso = list_find(pcb->tabla_archivos, (void *)_filtro_archivo_abierto_proceso_por_nombre);
+			t_archivo_abierto_proceso *archivo_abierto_proceso = list_find_thread_safe(pcb->tabla_archivos, (void *)_filtro_archivo_abierto_proceso_por_nombre, &pcb->mutex_tabla_archivos);
 
 			if (fs_opcode == FOPEN_OPCODE)
 			{
@@ -301,7 +304,7 @@ void *planificador_corto_plazo()
 					strcpy(archivo_abierto_pcb->nombre_archivo, nombre_archivo);
 					archivo_abierto_pcb->puntero = 0;
 					archivo_abierto_pcb->modo_apertura = modo_apertura;
-					list_add(pcb->tabla_archivos, archivo_abierto_pcb);
+					list_add_thread_safe(pcb->tabla_archivos, archivo_abierto_pcb, &pcb->mutex_tabla_archivos);
 
 					if (modo_apertura == LOCK_ESCRITURA)
 					{
@@ -312,7 +315,8 @@ void *planificador_corto_plazo()
 							t_pcb_bloqueado_archivo *pcb_bloqueado_archivo = malloc(sizeof(t_pcb_bloqueado_archivo));
 							pcb_bloqueado_archivo->pcb = pcb;
 							pcb_bloqueado_archivo->lock = modo_apertura;
-							pcb->ultimo_recurso_pedido = nombre_archivo;
+							pcb->ultimo_recurso_pedido = malloc(strlen(nombre_archivo));
+							strcpy(pcb->ultimo_recurso_pedido, nombre_archivo);
 							queue_push(recurso_archivo->pcbs_bloqueados_por_archivo, pcb_bloqueado_archivo);
 							correr_deteccion_deadlock = true;
 						}
@@ -334,7 +338,8 @@ void *planificador_corto_plazo()
 							t_pcb_bloqueado_archivo *pcb_bloqueado_archivo = malloc(sizeof(t_pcb_bloqueado_archivo));
 							pcb_bloqueado_archivo->pcb = pcb;
 							pcb_bloqueado_archivo->lock = modo_apertura;
-							pcb->ultimo_recurso_pedido = nombre_archivo;
+							pcb->ultimo_recurso_pedido = malloc(strlen(nombre_archivo));
+							strcpy(pcb->ultimo_recurso_pedido, nombre_archivo);
 							queue_push(recurso_archivo->pcbs_bloqueados_por_archivo, pcb_bloqueado_archivo);
 							correr_deteccion_deadlock = true;
 						}
@@ -362,10 +367,11 @@ void *planificador_corto_plazo()
 					}
 					list_add_thread_safe(recursos, crear_recurso_archivo(nombre_archivo, modo_apertura, tamanio_archivo_abierto, pcb), &mutex_recursos);
 					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
-					archivo_abierto_pcb->nombre_archivo = nombre_archivo;
+					archivo_abierto_pcb->nombre_archivo = malloc(strlen(nombre_archivo));
+					strcpy(archivo_abierto_pcb->nombre_archivo, nombre_archivo);
 					archivo_abierto_pcb->puntero = 0;
 					archivo_abierto_pcb->modo_apertura = modo_apertura;
-					list_add(pcb->tabla_archivos, archivo_abierto_pcb);
+					list_add_thread_safe(pcb->tabla_archivos, archivo_abierto_pcb, &pcb->mutex_tabla_archivos);
 				}
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
@@ -445,7 +451,10 @@ void *planificador_corto_plazo()
 					transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 
 					pthread_mutex_lock(&recurso_para_wait->mutex_recurso);
-					pcb->ultimo_recurso_pedido = recurso_para_wait->nombre;
+
+					pcb->ultimo_recurso_pedido = malloc(strlen(recurso_para_wait->nombre));
+					strcpy(pcb->ultimo_recurso_pedido, recurso_para_wait->nombre);
+
 					queue_push(recurso_para_wait->pcbs_bloqueados, pcb);
 					log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
 					pthread_mutex_unlock(&recurso_para_wait->mutex_recurso);
@@ -513,10 +522,17 @@ void *contador_quantum(void *argumentos)
 	{
 		pcb_quantum_finalizado->quantum_finalizado = true;
 
+		pthread_mutex_lock(&mutex_proceso_ejecutando);
 		if (pcb_ejecutando != NULL && pcb_ejecutando->pid == arg_hilo_quantum->pid_a_interrumpir && pcb_ejecutando->id_hilo_quantum == arg_hilo_quantum->id_hilo_quantum)
 		{
+			pthread_mutex_unlock(&mutex_proceso_ejecutando);
 			log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_quantum_finalizado->pid);
 			interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
+		}
+		else
+		{
+			log_info(logger, "Soy el hilo %d y NO tuve que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
+			pthread_mutex_unlock(&mutex_proceso_ejecutando);
 		}
 	}
 	else
@@ -756,8 +772,11 @@ void crear_hilo_operacion_archivo(t_pcb *pcb, int operacion_archivo, char *nombr
 	log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_archivo);
 	pthread_t hilo_operacion_archivo;
 	t_operacion_archivo *operacion_archivo_parametros = malloc(sizeof(t_operacion_archivo));
+
+	operacion_archivo_parametros->nombre_archivo = malloc(strlen(nombre_archivo));
+	strcpy(operacion_archivo_parametros->nombre_archivo, nombre_archivo);
+
 	operacion_archivo_parametros->pcb = pcb;
-	operacion_archivo_parametros->nombre_archivo = nombre_archivo;
 	operacion_archivo_parametros->codigo_operacion_archivo = operacion_archivo;
 	operacion_archivo_parametros->modo_apertura = modo_apertura;
 	operacion_archivo_parametros->puntero = puntero;
@@ -798,6 +817,7 @@ void *operacion_archivo_h(void *argumentos)
 	}
 	pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
 
+	free(parametros_operacion_archivo->nombre_archivo);
 	free(parametros_operacion_archivo);
 }
 
@@ -1003,6 +1023,7 @@ void *hilo_iniciar_proceso(void *argumentos)
 	pcb->motivo_finalizacion = FINALIZACION_SUCCESS;
 	pcb->ultimo_recurso_pedido = NULL;
 	pcb->tabla_archivos = list_create();
+	pthread_mutex_init(&pcb->mutex_tabla_archivos, NULL);
 
 	transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_NEW);
 	free(iniciar_proceso_parametros);
@@ -1214,7 +1235,9 @@ void ejecutar_proceso_en_cpu(t_pcb *pcb_proceso_a_ejecutar)
 	enviar_paquete(logger, conexion_con_cpu_dispatch, paquete_solicitud_ejecutar_proceso, NOMBRE_MODULO_KERNEL, NOMBRE_MODULO_CPU_DISPATCH);
 	free(contexto_de_ejecucion);
 
+	pthread_mutex_lock(&mutex_proceso_ejecutando);
 	pcb_ejecutando = pcb_proceso_a_ejecutar;
+	pthread_mutex_unlock(&mutex_proceso_ejecutando);
 }
 
 void interrumpir_proceso_en_cpu(int motivo_interrupcion)
@@ -1431,7 +1454,13 @@ void destruir_pcb(t_pcb *pcb)
 		free(pcb->ultimo_recurso_pedido);
 	}
 
-	list_destroy(pcb->tabla_archivos); // TODO remove all and destroy deberia ser
+	void _destruir_archivo_abierto(t_archivo_abierto_proceso * archivo_abierto_proceso)
+	{
+		free(archivo_abierto_proceso->nombre_archivo);
+		free(archivo_abierto_proceso);
+	};
+
+	list_destroy_and_destroy_elements_thread_safe(pcb->tabla_archivos, (void *)_destruir_archivo_abierto, &pcb->mutex_tabla_archivos);
 	free(pcb->path);
 	free(pcb);
 }
@@ -1439,7 +1468,6 @@ void destruir_pcb(t_pcb *pcb)
 void push_cola_ready(t_pcb *pcb)
 {
 	pthread_mutex_lock(&mutex_cola_ready);
-	pthread_mutex_lock(&mutex_procesos);
 
 	// Agrego PCB a cola de ready
 	queue_push(cola_ready, pcb);
@@ -1473,16 +1501,21 @@ void push_cola_ready(t_pcb *pcb)
 	free(string_dinamico);
 
 	// Si planifico con prioridades y el PCB que llego tiene mayor prioridad que el que esta ejecutando, lo desalojo
+	pthread_mutex_lock(&mutex_proceso_ejecutando);
 	if (planifico_con_prioridades && pcb_ejecutando != NULL && pcb->prioridad < pcb_ejecutando->prioridad)
 	{
 		interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
 		log_info(logger, "PID: %d - Desalojado por proceso con mayor prioridad", pcb_ejecutando->pid);
+		pthread_mutex_unlock(&mutex_proceso_ejecutando);
+	}
+	else
+	{
+		pthread_mutex_unlock(&mutex_proceso_ejecutando);
 	}
 
 	// Notifico al planificador de corto plazo
 	sem_post(&semaforo_hay_algun_proceso_en_cola_ready);
 
-	pthread_mutex_unlock(&mutex_procesos);
 	pthread_mutex_unlock(&mutex_cola_ready);
 }
 
@@ -1636,6 +1669,30 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 		return strcmp(recurso->nombre, archivo_abierto_proceso->nombre_archivo) == 0;
 	};
 
+	bool _filtro_recurso_por_nombre(t_recurso * recurso_filtro)
+	{
+		return strcmp(recurso->nombre, recurso_filtro->nombre) == 0;
+	};
+
+	void _destruir_archivo_abierto(t_archivo_abierto_proceso * archivo_abierto_proceso)
+	{
+		free(archivo_abierto_proceso->nombre_archivo);
+		free(archivo_abierto_proceso);
+	};
+
+	void _destruir_recurso(t_recurso * recurso)
+	{
+		free(recurso->nombre);
+		
+		queue_destroy(recurso->pcbs_bloqueados);
+		list_destroy(recurso->pcbs_asignados);
+
+		queue_destroy(recurso->pcbs_bloqueados_por_archivo);
+		list_destroy(recurso->pcbs_lock_lectura);
+
+		free(recurso);
+	};
+
 	bool _filtro_pcb_bloqueado_archivo_por_modo_lectura(t_pcb_bloqueado_archivo * pcb_bloqueado_archivo)
 	{
 		return pcb_bloqueado_archivo->lock == LOCK_LECTURA;
@@ -1655,7 +1712,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 		{
 			if (recurso->pcb_lock_escritura->pid == pid)
 			{
-				list_remove_by_condition(recurso->pcb_lock_escritura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
+				list_remove_and_destroy_by_condition_thread_safe(recurso->pcb_lock_escritura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre, (void *)_destruir_archivo_abierto, &recurso->pcb_lock_escritura->mutex_tabla_archivos);
 				recurso->pcb_lock_escritura = NULL;
 				recurso->instancias_iniciales = 1;
 				recurso->instancias_disponibles = 1;
@@ -1668,7 +1725,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 		{
 			list_remove_by_condition(recurso->pcbs_lock_lectura, (void *)_filtro_proceso_por_id);
 			recurso->instancias_iniciales--;
-			list_remove_by_condition(pcb_lock_lectura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre);
+			list_remove_and_destroy_by_condition_thread_safe(pcb_lock_lectura->tabla_archivos, (void *)_filtro_archivo_abierto_por_nombre, (void *)_destruir_archivo_abierto, &pcb_lock_lectura->mutex_tabla_archivos);
 		}
 
 		if (recurso->pcb_lock_escritura == NULL && list_is_empty(recurso->pcbs_lock_lectura))
@@ -1676,18 +1733,19 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 			if (queue_is_empty(recurso->pcbs_bloqueados_por_archivo))
 			{
 				// Si me quedo TODO vacio (lock escritura, locks de lectura, pcbs bloqueados por archivo), destruyo el recurso
-				// TODO FREE Y BOCHA MAS
-				list_remove_by_condition(recursos, (void *)_filtro_recurso_por_nombre);
+				list_remove_and_destroy_by_condition_thread_safe(recursos, (void *)_filtro_recurso_por_nombre, (void *)_destruir_recurso, &mutex_recursos);
 			}
 			else
 			{
 				t_pcb_bloqueado_archivo *pcb_a_desbloquear = queue_pop(recurso->pcbs_bloqueados_por_archivo);
+
 				if (pcb_a_desbloquear->lock == LOCK_ESCRITURA)
 				{
 					recurso->pcb_lock_escritura = pcb_a_desbloquear->pcb;
 					recurso->instancias_iniciales = 1;
 					recurso->instancias_disponibles = 0;
 					transicionar_proceso(pcb_a_desbloquear->pcb, CODIGO_ESTADO_PROCESO_READY);
+					free(pcb_a_desbloquear);
 				}
 				else
 				{
@@ -1695,6 +1753,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 					recurso->instancias_iniciales = 1;
 					recurso->instancias_disponibles = 0;
 					transicionar_proceso(pcb_a_desbloquear->pcb, CODIGO_ESTADO_PROCESO_READY);
+					free(pcb_a_desbloquear);
 
 					t_pcb_bloqueado_archivo *pcb_a_desbloquear_por_lectura = list_find(recurso->pcbs_bloqueados_por_archivo->elements, (void *)_filtro_pcb_bloqueado_archivo_por_modo_lectura);
 					while (pcb_a_desbloquear_por_lectura != NULL)
@@ -1704,6 +1763,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 						list_add(recurso->pcbs_lock_lectura, pcb_a_desbloquear_por_lectura->pcb);
 						recurso->instancias_iniciales++;
 						transicionar_proceso(pcb_a_desbloquear_por_lectura->pcb, CODIGO_ESTADO_PROCESO_READY);
+						free(pcb_a_desbloquear_por_lectura);
 						pcb_a_desbloquear_por_lectura = list_find(recurso->pcbs_bloqueados_por_archivo->elements, (void *)_filtro_pcb_bloqueado_archivo_por_modo_lectura);
 					}
 				}
@@ -1729,7 +1789,9 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 
 void desasignar_todos_los_recursos_a_pcb(int pid)
 {
+	log_info(logger, "HOLA 1");
 	pthread_mutex_lock(&mutex_recursos);
+	log_info(logger, "HOLA 2");
 	for (int i = 0; i < list_size(recursos); i++)
 	{
 		t_recurso *recurso = list_get(recursos, i);
@@ -1785,7 +1847,9 @@ t_list *obtener_procesos_analisis_deadlock()
 				pcb_a_analizar_nuevo->pid = pcb->pid;
 				pcb_a_analizar_nuevo->recursos_asignados = malloc(cantidad_de_recursos * sizeof(int));
 				pcb_a_analizar_nuevo->solicitudes_actuales = malloc(cantidad_de_recursos * sizeof(int));
-				pcb_a_analizar_nuevo->ultimo_recurso_pedido = pcb->ultimo_recurso_pedido;
+
+				pcb_a_analizar_nuevo->ultimo_recurso_pedido = malloc(strlen(pcb->ultimo_recurso_pedido));
+				strcpy(pcb_a_analizar_nuevo->ultimo_recurso_pedido, pcb->ultimo_recurso_pedido);
 
 				for (j = 0; j < cantidad_de_recursos; j++)
 				{
@@ -1817,7 +1881,9 @@ t_list *obtener_procesos_analisis_deadlock()
 				pcb_a_analizar_nuevo->pid = pcb->pid;
 				pcb_a_analizar_nuevo->recursos_asignados = malloc(cantidad_de_recursos * sizeof(int));
 				pcb_a_analizar_nuevo->solicitudes_actuales = malloc(cantidad_de_recursos * sizeof(int));
-				pcb_a_analizar_nuevo->ultimo_recurso_pedido = pcb->ultimo_recurso_pedido;
+
+				pcb_a_analizar_nuevo->ultimo_recurso_pedido = malloc(strlen(pcb->ultimo_recurso_pedido));
+				strcpy(pcb_a_analizar_nuevo->ultimo_recurso_pedido, pcb->ultimo_recurso_pedido);
 
 				for (j = 0; j < cantidad_de_recursos; j++)
 				{
@@ -1850,7 +1916,9 @@ t_list *obtener_procesos_analisis_deadlock()
 				pcb_a_analizar_nuevo->pid = pcb->pid;
 				pcb_a_analizar_nuevo->recursos_asignados = malloc(cantidad_de_recursos * sizeof(int));
 				pcb_a_analizar_nuevo->solicitudes_actuales = malloc(cantidad_de_recursos * sizeof(int));
-				pcb_a_analizar_nuevo->ultimo_recurso_pedido = pcb->ultimo_recurso_pedido;
+
+				pcb_a_analizar_nuevo->ultimo_recurso_pedido = malloc(strlen(pcb->ultimo_recurso_pedido));
+				strcpy(pcb_a_analizar_nuevo->ultimo_recurso_pedido, pcb->ultimo_recurso_pedido);
 
 				for (j = 0; j < cantidad_de_recursos; j++)
 				{

@@ -89,6 +89,13 @@ void list_remove_and_destroy_by_condition_thread_safe(t_list *lista, bool(*filtr
 	pthread_mutex_unlock(mutex);
 }
 
+void list_destroy_and_destroy_elements_thread_safe(t_list *lista, void(*destructor)(void*), pthread_mutex_t *mutex)
+{
+    pthread_mutex_lock(mutex);
+	list_destroy_and_destroy_elements(lista, destructor);
+	pthread_mutex_unlock(mutex);
+}
+
 void list_remove_by_condition_thread_safe(t_list *lista, bool(*filtro)(void*), pthread_mutex_t *mutex)
 {
     pthread_mutex_lock(mutex);
