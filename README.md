@@ -18,17 +18,7 @@
 # Comandos Útiles
 
 * strace -> tracea syscalls
-* netstar -> lista sockets abiertos del SO
-
-# Utilidades
-
-* Valgrind: analizador de uso de memoria
-* perror()
-
-# Notas
-
-* NO hay que validar instrucciones (de CPU)
-* Las pruebas con las que nos evaluan el TP las dan una semana antes de la primera fecha de entrega
+* netstat -> lista sockets abiertos del SO
 
 # Orden de ejecucion
 
