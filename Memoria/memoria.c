@@ -203,7 +203,7 @@ void *atender_cpu()
 		{
 			t_pedido_leer_valor_de_memoria *pedido_leer_valor_de_memoria = leer_paquete_solicitud_leer_valor_en_memoria(logger, conexion_con_cpu);
 			uint32_t valor_leido = leer_valor_en_memoria(pedido_leer_valor_de_memoria->direccion_fisica);
-			log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: LEER - Direccion fisica : %d",pedido_leer_valor_de_memoria->pid,pedido_leer_valor_de_memoria->direccion_fisica);//TODO traer pid
+			log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: LEER - Direccion fisica : %d", pedido_leer_valor_de_memoria->pid, pedido_leer_valor_de_memoria->direccion_fisica); // TODO traer pid
 			t_valor_leido_en_memoria *valor_leido_en_memoria = malloc(sizeof(t_valor_leido_en_memoria));
 			valor_leido_en_memoria->valor_leido = valor_leido;
 			t_paquete *paquete = crear_paquete_respuesta_leer_valor_en_memoria(logger, valor_leido_en_memoria);
@@ -214,7 +214,7 @@ void *atender_cpu()
 		{
 			t_pedido_escribir_valor_en_memoria *pedido_escribir_valor_en_memoria = leer_paquete_solicitud_escribir_valor_en_memoria(logger, conexion_con_cpu);
 			escribir_valor_en_memoria(pedido_escribir_valor_en_memoria->direccion_fisica, pedido_escribir_valor_en_memoria->valor_a_escribir);
-			log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d",pedido_escribir_valor_en_memoria->pid,pedido_escribir_valor_en_memoria->direccion_fisica);//TODO traer pid
+			log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d", pedido_escribir_valor_en_memoria->pid, pedido_escribir_valor_en_memoria->direccion_fisica); // TODO traer pid
 			t_paquete *paquete = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_VALOR_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 			enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 			free(pedido_escribir_valor_en_memoria);
@@ -240,6 +240,7 @@ void *atender_filesystem()
 			t_paquete *paquete = crear_paquete_respuesta_leer_marco_de_memoria(logger, nombre_archivo_a_escribir, puntero_archivo_a_escribir, contenido_marco, configuracion_memoria->tam_pagina);
 			enviar_paquete(logger, conexion_con_filesystem, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			free(contenido_marco);
+			free(nombre_archivo_a_escribir);
 		}
 		else if (operacion_recibida_de_filesystem == SOLICITUD_ESCRIBIR_BLOQUE_EN_MEMORIA)
 		{
@@ -248,8 +249,9 @@ void *atender_filesystem()
 			leer_paquete_solicitud_escribir_bloque_en_memoria(logger, conexion_con_filesystem, &direccion_fisica, &contenido_bloque);
 			int numero_de_marco = floor(direccion_fisica / configuracion_memoria->tam_pagina);
 			cargar_datos_de_pagina_en_memoria_real(contenido_bloque, numero_de_marco);
+			free(contenido_bloque);
 			t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
-			log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d",pagina->pid,direccion_fisica);
+			log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d", pagina->pid, direccion_fisica);
 			t_paquete *respuesta_escribir_bloque_en_memoria = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_ESCRIBIR_BLOQUE_EN_MEMORIA, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 			enviar_paquete(logger, conexion_con_filesystem, respuesta_escribir_bloque_en_memoria, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_FILESYSTEM);
 		}
@@ -267,12 +269,19 @@ void *atender_filesystem()
 			{
 				log_error(logger, "No alcanzan los bloques de swap (para PID: %d)", pid_reservando);
 				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(false);
+				list_destroy(posiciones_swap);
 			}
 			else
 			{
 				crear_entradas_de_tabla_de_paginas_de_proceso(list_size(posiciones_swap), posiciones_swap, pid_reservando);
 				log_info(logger, "Creacion de tabla de paginas- PID: %d - Tamanio : %d", pid_reservando, list_size(posiciones_swap));
 				enviar_paquete_respuesta_iniciar_proceso_en_memoria_a_kernel(true);
+
+				void _destruir_posicion_swap(int *posicion_int)
+				{
+					free(posicion_int);
+				};
+				list_destroy_and_destroy_elements(posiciones_swap, (void*)_destruir_posicion_swap);
 			}
 		}
 		else if (operacion_recibida_de_filesystem == RESPUESTA_LEER_PAGINA_EN_SWAP)
@@ -352,6 +361,7 @@ void iniciar_proceso_memoria(char *path, int size, int prioridad, int pid)
 	}
 
 	FILE *archivo = abrir_archivo(logger, ruta_archivo_completa);
+	free(ruta_archivo_completa);
 	if (archivo == NULL)
 	{
 		log_error(logger, "No se pudo abrir archivo de pseudocodigo (para PID: %d)", pid);
@@ -390,7 +400,7 @@ void enviar_paquete_respuesta_cargar_pagina_en_memoria_a_kernel(bool resultado_c
 
 void enviar_instruccion_a_cpu(int pid, int pc)
 {
-	//log_info(logger, "El proceso pid=%d pide instruccion en pc=%d", pid, pc);
+	// log_info(logger, "El proceso pid=%d pide instruccion en pc=%d", pid, pc);
 
 	t_archivo_proceso *archivo_proceso = buscar_archivo_con_pid(pid);
 
@@ -403,6 +413,8 @@ void enviar_instruccion_a_cpu(int pid, int pc)
 
 	enviar_paquete(logger, conexion_con_cpu, paquete, NOMBRE_MODULO_MEMORIA, NOMBRE_MODULO_CPU);
 	log_trace(logger, "Exito en el envio de paquete para instruccion %s al cpu!", linea_instruccion);
+
+	free(linea_instruccion);
 }
 
 void finalizar_proceso_en_memoria(int pid)
@@ -475,7 +487,7 @@ void limpiar_entradas_tabla_de_paginas(int pid)
 		if (es_pagina_presente(entrada_tabla_de_paginas))
 		{
 			borrar_contenido_de_marco_en_memoria_real(entrada_tabla_de_paginas->marco);
-			log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: BORRAR - Direccion fisica : %d",pid,(entrada_tabla_de_paginas->marco*configuracion_memoria->tam_pagina));
+			log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: BORRAR - Direccion fisica : %d", pid, (entrada_tabla_de_paginas->marco * configuracion_memoria->tam_pagina));
 		}
 		eliminar_entrada_de_tabla_de_paginas(pid);
 		free(entrada_tabla_de_paginas);
@@ -566,21 +578,21 @@ t_entrada_de_tabla_de_pagina *encontrar_pagina_victima_lru()
 {
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	t_list *paginas_presentes = obtener_entradas_de_tabla_de_pagina_presentes();
-	t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0);// toma la primer pagina de las presentes
+	t_entrada_de_tabla_de_pagina *pagina_victima_lru = list_get(paginas_presentes, 0); // toma la primer pagina de las presentes
 
 	for (int i = 1; i < list_size(paginas_presentes); i++)
 	{
 		t_entrada_de_tabla_de_pagina *pagina_actual = list_get(paginas_presentes, i);
-		log_trace(logger,"La pagina con mayor tiempo es la del PID %d y pagina %d con timestamp %ld",pagina_victima_lru->pid,pagina_victima_lru->numero_de_pagina,pagina_victima_lru->timestamp);
-		log_trace(logger,"La pagina con la que se compara es  PID %d y pagina %d con timestamp %ld",pagina_actual->pid,pagina_actual->numero_de_pagina,pagina_actual->timestamp);
+		log_trace(logger, "La pagina con mayor tiempo es la del PID %d y pagina %d con timestamp %ld", pagina_victima_lru->pid, pagina_victima_lru->numero_de_pagina, pagina_victima_lru->timestamp);
+		log_trace(logger, "La pagina con la que se compara es  PID %d y pagina %d con timestamp %ld", pagina_actual->pid, pagina_actual->numero_de_pagina, pagina_actual->timestamp);
 		// Comparar timestamps para encontrar la página con el timestamp más bajo (LRU)
 		if (pagina_actual->timestamp < pagina_victima_lru->timestamp)
 		{
 			pagina_victima_lru = pagina_actual;
 		}
-		log_trace(logger,"Por ahora la victima es PID %d y pagina %d",pagina_victima_lru->pid,pagina_victima_lru->numero_de_pagina);
+		log_trace(logger, "Por ahora la victima es PID %d y pagina %d", pagina_victima_lru->pid, pagina_victima_lru->numero_de_pagina);
 	}
-	log_trace(logger,"La victima es PID %d y pagina %d",pagina_victima_lru->pid,pagina_victima_lru->numero_de_pagina);
+	log_trace(logger, "La victima es PID %d y pagina %d", pagina_victima_lru->pid, pagina_victima_lru->numero_de_pagina);
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
 
 	return pagina_victima_lru;
@@ -655,17 +667,17 @@ void cargar_pagina_de_swap_en_memoria(int pid, int numero_de_pagina, void *conte
 	int marco_desocupado;
 	if (obtener_primer_marco_desocupado(&marco_desocupado))
 	{
-		log_info(logger,"Lectura de Pagina en SWAP: SWAP IN - PID: %d - Marco: %d - Page In: %d-%d",pid,marco_desocupado,pid,numero_de_pagina);
+		log_info(logger, "Lectura de Pagina en SWAP: SWAP IN - PID: %d - Marco: %d - Page In: %d-%d", pid, marco_desocupado, pid, numero_de_pagina);
 		// Actualizar entrada tabla de paginas de la nueva pagina
 		actualizar_entrada_tabla_de_paginas(pagina, marco_desocupado);
-		//entro a la tabla de paginas a catualizar la info de la entrada
+		// entro a la tabla de paginas a catualizar la info de la entrada
 		log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", pagina->pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
-		//entro a la tabla de paginas a leer el marco que se le asigno
+		// entro a la tabla de paginas a leer el marco que se le asigno
 		log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", pagina->pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
-		//Cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
+		// Cargar el marco con el contenido en swap y actualizar entrada tabla de pagina
 		cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_desocupado);
-		log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d",pagina->pid,marco_desocupado*configuracion_memoria->tam_pagina); 
-		ocupar_marco(marco_desocupado); 
+		log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d", pagina->pid, marco_desocupado * configuracion_memoria->tam_pagina);
+		ocupar_marco(marco_desocupado);
 		free(contenido_en_swap);
 		if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
 		{
@@ -676,10 +688,10 @@ void cargar_pagina_de_swap_en_memoria(int pid, int numero_de_pagina, void *conte
 	}
 
 	int marco_libre = reemplazar_pagina(pid, numero_de_pagina);
-	//entro a la tabla de paginas a leer el marco que se le asigno
+	// entro a la tabla de paginas a leer el marco que se le asigno
 	log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", pagina->pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
 	cargar_datos_de_pagina_en_memoria_real(contenido_en_swap, marco_libre);
-	log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d",pagina->pid,marco_libre*configuracion_memoria->tam_pagina);  
+	log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: ESCRIBIR - Direccion fisica : %d", pagina->pid, marco_libre * configuracion_memoria->tam_pagina);
 
 	free(contenido_en_swap);
 	if (strcmp(configuracion_memoria->algoritmo_reemplazo, "FIFO") == 0)
@@ -695,7 +707,7 @@ void actualizar_entrada_tabla_de_paginas(t_entrada_de_tabla_de_pagina *pagina, i
 	pagina->marco = marco_asignado;
 	pagina->timestamp = obtener_tiempo_actual();
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
-	
+
 	return;
 }
 
@@ -710,16 +722,16 @@ time_t obtener_tiempo_actual()
 void *buscar_contenido_marco(int numero_de_marco)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_marco_presente(numero_de_marco);
-	log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: LEER - Direccion fisica : %d",pagina->pid,numero_de_marco*configuracion_memoria->tam_pagina);
-			
+	log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: LEER - Direccion fisica : %d", pagina->pid, numero_de_marco * configuracion_memoria->tam_pagina);
+
 	void *contenido_marco = malloc(configuracion_memoria->tam_pagina);
 	void *fuente = memoria_real + (numero_de_marco * configuracion_memoria->tam_pagina);
 
 	pthread_mutex_lock(&mutex_memoria_real);
 	memcpy(contenido_marco, fuente, configuracion_memoria->tam_pagina);
-	for (int i = 0 ; i < configuracion_memoria->tam_pagina ; i++)
+	for (int i = 0; i < configuracion_memoria->tam_pagina; i++)
 	{
-		log_info(logger, "Contenido de marco %d en %d es %02x", numero_de_marco, i, ((unsigned char*)contenido_marco)[i]);
+		log_info(logger, "Contenido de marco %d en %d es %02x", numero_de_marco, i, ((unsigned char *)contenido_marco)[i]);
 	}
 	pthread_mutex_unlock(&mutex_memoria_real);
 
@@ -731,34 +743,32 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 	// Seleccionar una página víctima para reemplazo (FIFO o LRU)
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 	t_entrada_de_tabla_de_pagina *victima = encontrar_pagina_victima();
-	//entro a leer la entrada de la pagina victima
+	// entro a leer la entrada de la pagina victima
 	log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", victima->pid, victima->numero_de_pagina, victima->presencia, victima->marco);
-	
-	
-	log_info(logger,"Lectura de Pagina en SWAP: SWAP IN - PID: %d - Marco: %d - Page In: %d-%d",pagina->pid,victima->marco,pagina->pid,pagina->numero_de_pagina);
+
+	log_info(logger, "Lectura de Pagina en SWAP: SWAP IN - PID: %d - Marco: %d - Page In: %d-%d", pagina->pid, victima->marco, pagina->pid, pagina->numero_de_pagina);
 	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
 	if (es_pagina_presente(victima) == 1 && es_pagina_modificada(victima) == 1)
 	{
-		log_info(logger,"Escritura de Pagina en SWAP: SWAP OUT - PID: %d - Marco: %d - Page In: %d-%d",pagina->pid,victima->marco,victima->pid,victima->numero_de_pagina);
+		log_info(logger, "Escritura de Pagina en SWAP: SWAP OUT - PID: %d - Marco: %d - Page In: %d-%d", pagina->pid, victima->marco, victima->pid, victima->numero_de_pagina);
 		escribir_pagina_en_swap(victima);
 	}
 
 	borrar_contenido_de_marco_en_memoria_real(victima->marco);
-	log_info(logger,"Acceso a espacio de usuario: PID: %d - Accion: BORRAR - Direccion fisica : %d",pid,(victima->marco*configuracion_memoria->tam_pagina));
+	log_info(logger, "Acceso a espacio de usuario: PID: %d - Accion: BORRAR - Direccion fisica : %d", pid, (victima->marco * configuracion_memoria->tam_pagina));
 	// Actualizar entrada tabla de paginas de la victima
 	pthread_mutex_lock(&mutex_entradas_tabla_de_paginas);
 	victima->presencia = 0;
 	victima->modificado = 0;
 	pthread_mutex_unlock(&mutex_entradas_tabla_de_paginas);
-	//entro a actualizar la entrada de la pagina victima
+	// entro a actualizar la entrada de la pagina victima
 	log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", victima->pid, victima->numero_de_pagina, victima->presencia, victima->marco);
-	
 
 	int marco_libre = victima->marco;
 	actualizar_entrada_tabla_de_paginas(pagina, marco_libre);
-	//entro a actualizar la entrada de la pagina cargada
+	// entro a actualizar la entrada de la pagina cargada
 	log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", pagina->pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
-	
+
 	ocupar_marco(marco_libre);
 
 	log_info(logger, "Reemplazo pagina: REEMPLAZO - Marco: %d - Page Out: %d-%d - Page In: %d-%d", marco_libre, victima->pid, victima->numero_de_pagina, pagina->pid, pagina->numero_de_pagina);
@@ -797,7 +807,7 @@ t_entrada_de_tabla_de_pagina *obtener_entrada_de_tabla_de_pagina_por_pid_y_numer
 	};
 
 	t_entrada_de_tabla_de_pagina *pagina = list_find_thread_safe(tabla_de_paginas, (void *)_filtro_pagina_de_memoria_por_numero_y_pid, &mutex_entradas_tabla_de_paginas);
-		
+
 	return pagina;
 }
 
@@ -805,7 +815,7 @@ void enviar_numero_de_marco_a_cpu(int pid, int numero_de_pagina)
 {
 	t_entrada_de_tabla_de_pagina *pagina = obtener_entrada_de_tabla_de_pagina_por_pid_y_numero(pid, numero_de_pagina);
 	log_info(logger, "Acceso a tabla de paginas PID : %d - Pagina: %d - Precencia: %d - Marco: %d", pagina->pid, pagina->numero_de_pagina, pagina->presencia, pagina->marco);
-	
+
 	int numero_marco = -1;
 
 	if (pagina->presencia == 0)
