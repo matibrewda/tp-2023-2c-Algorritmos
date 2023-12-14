@@ -1549,7 +1549,6 @@ char *agregar_string_a_string_dinamico(char *string_dinamico, char *string_a_agr
 	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
 	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
 	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string_a_agregar);
-	string_dinamico[nuevo_tamanio] = '\0';
 	return string_dinamico;
 }
 
@@ -1575,7 +1574,6 @@ char *agregar_entero_a_string_dinamico(char *string_dinamico, int entero)
 	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
 	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
 	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), entero_como_string);
-	string_dinamico[nuevo_tamanio] = '\0';
 	return string_dinamico;
 }
 
@@ -2059,7 +2057,7 @@ bool hay_deadlock()
 			{
 				char *string_dinamico = crear_string_dinamico();
 				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, "Deadlock detectado: ");
-				// string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->pid);
+				string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->pid);
 				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recursos en posesion: ");
 
 				bool agregue_recurso_a_lista_posesion = false;
