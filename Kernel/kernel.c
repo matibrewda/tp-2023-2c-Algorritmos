@@ -1545,7 +1545,7 @@ char *crear_string_dinamico()
 char *agregar_string_a_string_dinamico(char *string_dinamico, char *string_a_agregar)
 {
 	int tamanio_anterior = strlen(string_dinamico) + 1;
-	int tamanio_a_aumentar = strlen(string_dinamico);
+	int tamanio_a_aumentar = strlen(string_a_agregar);
 	int nuevo_tamanio = tamanio_anterior + tamanio_a_aumentar;
 	string_dinamico = realloc(string_dinamico, nuevo_tamanio * sizeof(char));
 	strcpy(string_dinamico + (tamanio_anterior - 1) * sizeof(char), string_a_agregar);
@@ -2044,60 +2044,60 @@ bool hay_deadlock()
 
 		cantidad_iteraciones_realizadas++;
 	}
-	
+
 	en_deadlock = cantidad_iteraciones_realizadas < cantidad_procesos_a_analizar;
 
 	// INICIO LOG/IMPRIMIR DEADLOCK
 	if (en_deadlock)
 	{
-		// printf("\n-");
-		// iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
-		// while (list_iterator_has_next(iterador_procesos_a_analizar))
-		// {
-		// 	pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
-		// 	if (!pcb_analisis_deadlock->finalizado)
-		// 	{
-		// 		char *string_dinamico = crear_string_dinamico();
-		// 		string_dinamico = agregar_string_a_string_dinamico(string_dinamico, "Deadlock detectado: ");
-		// 		string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->pid);
-		// 		string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recursos en posesion: ");
+		printf("\n-");
+		iterador_procesos_a_analizar = list_iterator_create(procesos_a_analizar);
+		while (list_iterator_has_next(iterador_procesos_a_analizar))
+		{
+			pcb_analisis_deadlock = list_iterator_next(iterador_procesos_a_analizar);
+			if (!pcb_analisis_deadlock->finalizado)
+			{
+				char *string_dinamico = crear_string_dinamico();
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, "Deadlock detectado: ");
+				// string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->pid);
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recursos en posesion: ");
 
-		// 		bool agregue_recurso_a_lista_posesion = false;
-		// 		for (int i = 0; i < cantidad_de_recursos; i++)
-		// 		{
-		// 			t_recurso *recurso = list_get(recursos, i);
+				bool agregue_recurso_a_lista_posesion = false;
+				for (int i = 0; i < cantidad_de_recursos; i++)
+				{
+					t_recurso *recurso = list_get(recursos, i);
 
-		// 			if (recurso_esta_asignado_a_pcb(recurso, pcb_analisis_deadlock->pid))
-		// 			{
-		// 				if (agregue_recurso_a_lista_posesion)
-		// 				{
-		// 					string_dinamico = agregar_string_a_string_dinamico(string_dinamico, ",");
-		// 				}
-		// 				else
-		// 				{
-		// 					agregue_recurso_a_lista_posesion = true;
-		// 				}
+					if (recurso_esta_asignado_a_pcb(recurso, pcb_analisis_deadlock->pid))
+					{
+						if (agregue_recurso_a_lista_posesion)
+						{
+							string_dinamico = agregar_string_a_string_dinamico(string_dinamico, ",");
+						}
+						else
+						{
+							agregue_recurso_a_lista_posesion = true;
+						}
 
-		// 				pthread_mutex_lock(&recurso->mutex_recurso);
-		// 				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, recurso->nombre);
-		// 				pthread_mutex_unlock(&recurso->mutex_recurso);
-		// 			}
-		// 		}
+						pthread_mutex_lock(&recurso->mutex_recurso);
+						string_dinamico = agregar_string_a_string_dinamico(string_dinamico, recurso->nombre);
+						pthread_mutex_unlock(&recurso->mutex_recurso);
+					}
+				}
 
-		// 		string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recurso requerido: ");
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recurso requerido: ");
 
-		// 		if (pcb_analisis_deadlock->ultimo_recurso_pedido != NULL)
-		// 		{
-		// 			string_dinamico = agregar_string_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->ultimo_recurso_pedido);
-		// 		}
+				if (pcb_analisis_deadlock->ultimo_recurso_pedido != NULL)
+				{
+					string_dinamico = agregar_string_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->ultimo_recurso_pedido);
+				}
 
-		// 		log_info(logger, "%s", string_dinamico);
-		// 		printf("\n%s", string_dinamico);
-		// 		free(string_dinamico);
-		// 	}
-		// }
-		// list_iterator_destroy(iterador_procesos_a_analizar);
-		// printf("\n-\n");
+				log_info(logger, "%s", string_dinamico);
+				printf("\n%s", string_dinamico);
+				free(string_dinamico);
+			}
+		}
+		list_iterator_destroy(iterador_procesos_a_analizar);
+		printf("\n-\n");
 	}
 	else
 	{
