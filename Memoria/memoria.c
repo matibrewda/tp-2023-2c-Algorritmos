@@ -750,7 +750,7 @@ int reemplazar_pagina(int pid, int numero_de_pagina)
 	// Verifica si la página víctima está modificada y la escribe en el swap si es necesario
 	if (es_pagina_presente(victima) == 1 && es_pagina_modificada(victima) == 1)
 	{
-		log_info(logger, "Escritura de Pagina en SWAP: SWAP OUT - PID: %d - Marco: %d - Page In: %d-%d", pagina->pid, victima->marco, victima->pid, victima->numero_de_pagina);
+		log_info(logger, "Escritura de Pagina en SWAP: SWAP OUT - PID: %d - Marco: %d - Page Out: %d-%d", pagina->pid, victima->marco, victima->pid, victima->numero_de_pagina);
 		escribir_pagina_en_swap(victima);
 	}
 

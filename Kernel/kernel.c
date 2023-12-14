@@ -214,6 +214,7 @@ void *planificador_corto_plazo()
 {
 	t_pcb *pcb;
 	op_code codigo_operacion_recibido;
+	int pid_pcb = -1;
 	int tiempo_sleep = -1;
 	int motivo_interrupcion = -1;
 	int codigo_error = -1;
@@ -251,7 +252,7 @@ void *planificador_corto_plazo()
 
 		mantener_proceso_ejecutando = false;
 		correr_deteccion_deadlock = false;
-
+		pid_pcb = pcb->pid;
 		transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_EXECUTING);
 		t_contexto_de_ejecucion *contexto_de_ejecucion = recibir_paquete_de_cpu_dispatch(&codigo_operacion_recibido, &tiempo_sleep, &motivo_interrupcion, &nombre_recurso, &codigo_error, &numero_pagina, &nombre_archivo, &modo_apertura, &posicion_puntero_archivo, &direccion_fisica, &nuevo_tamanio_archivo, &fs_opcode);
 		pthread_mutex_lock(&mutex_proceso_ejecutando);
@@ -261,6 +262,25 @@ void *planificador_corto_plazo()
 		free(contexto_de_ejecucion);
 
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
+
+		if (!buscar_pcb_con_pid(pid_pcb))
+		{
+			pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
+			
+			if (nombre_recurso != NULL)
+			{
+				free(nombre_recurso);
+				nombre_recurso = NULL;
+			}
+
+			if (nombre_archivo != NULL)
+			{
+				free(nombre_archivo);
+				nombre_archivo = NULL;
+			}
+
+			continue;
+		}
 
 		if (codigo_operacion_recibido == SOLICITUD_DEVOLVER_PROCESO_POR_CORRECTA_FINALIZACION)
 		{
