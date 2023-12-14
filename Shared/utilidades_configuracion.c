@@ -48,7 +48,6 @@ char* leer_clave_string(t_log* logger, t_config* configuracion, char* clave)
 	size_t valor_len = strlen(valor) + 1;
 	char* valor_alocado = malloc(valor_len);
 	strcpy(valor_alocado, valor);
-	free(valor);
     return valor_alocado;
 }
 
