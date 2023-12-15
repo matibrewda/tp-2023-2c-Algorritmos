@@ -198,7 +198,7 @@ void *comunicacion_kernel()
 
 		case SOLICITUD_ABRIR_ARCHIVO_FS:
 			char *nombre_archivo_abrir = leer_paquete_solicitud_abrir_archivo_fs(logger, conexion_con_kernel);
-			log_info(logger, "Abrir Archivo: %s", nombre_archivo_abrir);
+			log_info(logger, "Apertura de Archivo: Abrir Archivo: %s", nombre_archivo_abrir);
 			int tamanio_archivo = abrir_archivo_fs(nombre_archivo_abrir);
 			free(nombre_archivo_abrir);
 			t_paquete *respuesta_abrir_archivo;
@@ -215,7 +215,7 @@ void *comunicacion_kernel()
 
 		case SOLICITUD_CREAR_ARCHIVO_FS:
 			char *nombre_crear = leer_paquete_solicitud_crear_archivo_fs(logger, conexion_con_kernel);
-			log_info(logger, "Crear Archivo: %s", nombre_crear);
+			log_info(logger, "Crear Archivo: Crear Archivo: %s", nombre_crear);
 			crear_archivo_fs(nombre_crear);
 			free(nombre_crear);
 			t_paquete *respuesta_crear_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CREAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
@@ -226,7 +226,7 @@ void *comunicacion_kernel()
 			char *nombre_archivo_truncar;
 			int nuevo_tamanio_archivo;
 			leer_paquete_solicitud_truncar_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_truncar, &nuevo_tamanio_archivo);
-			log_info(logger, "Truncar Archivo: %s - Tamano: %d", nombre_archivo_truncar, nuevo_tamanio_archivo);
+			log_info(logger, "Truncate de Archivo: Truncar Archivo: %s - Tamano: %d", nombre_archivo_truncar, nuevo_tamanio_archivo);
 			truncar_archivo_fs(nombre_archivo_truncar, nuevo_tamanio_archivo);
 			free(nombre_archivo_truncar);
 			t_paquete *respuesta_truncar_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_TRUNCAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
@@ -238,7 +238,7 @@ void *comunicacion_kernel()
 			int puntero_lectura;
 			int direccion_fisica_a_escribir;
 			leer_paquete_solicitud_leer_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_leer, &puntero_lectura, &direccion_fisica_a_escribir);
-			log_info(logger, "Leer Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_leer, puntero_lectura, direccion_fisica_a_escribir);
+			log_info(logger, "Lectura de Archivo: Leer Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_leer, puntero_lectura, direccion_fisica_a_escribir);
 			uint32_t numero_de_bloque_archivo_a_leer = floor(puntero_lectura / (double)(configuracion_filesystem->tam_bloques));
 			uint32_t numero_de_bloque_fs_a_leer = obtener_numero_de_bloque_fs(nombre_archivo_leer, numero_de_bloque_archivo_a_leer);
 			void *bloque_fs = leer_bloque_fs(numero_de_bloque_fs_a_leer, numero_de_bloque_archivo_a_leer, nombre_archivo_leer);
@@ -253,7 +253,7 @@ void *comunicacion_kernel()
 			int puntero_escritura;
 			int direccion_fisica_a_leer;
 			leer_paquete_solicitud_escribir_archivo_fs(logger, conexion_con_kernel, &nombre_archivo_escribir, &puntero_escritura, &direccion_fisica_a_leer);
-			log_info(logger, "Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
+			log_info(logger, "Escritura de Archivo: Escribir Archivo: %s - Puntero: %d - Memoria: %d", nombre_archivo_escribir, puntero_escritura, direccion_fisica_a_leer);
 			t_paquete *paquete_solicitud_leer_marco_de_memoria = crear_paquete_solicitud_leer_marco_de_memoria(logger, direccion_fisica_a_leer, nombre_archivo_escribir, puntero_escritura);
 			enviar_paquete(logger, conexion_con_memoria, paquete_solicitud_leer_marco_de_memoria, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_MEMORIA);
 			free(nombre_archivo_escribir);
@@ -377,7 +377,7 @@ void dar_full_permisos_a_archivo(char *path_archivo)
 void *leer_bloque_swap(int numero_de_bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
-	log_info(logger, "Acceso SWAP (LECTURA): %d", numero_de_bloque);
+	log_info(logger, "Acceso a Bloque Swap: Acceso SWAP (LECTURA): %d", numero_de_bloque);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
@@ -391,7 +391,7 @@ void *leer_bloque_swap(int numero_de_bloque)
 void escribir_bloque_swap(int numero_de_bloque, void *bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
-	log_info(logger, "Acceso SWAP (ESCRITURA): %d", numero_de_bloque);
+	log_info(logger, "Acceso a Bloque Swap: Acceso SWAP (ESCRITURA): %d", numero_de_bloque);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");
 	fseek(archivo_bloques, numero_de_bloque * configuracion_filesystem->tam_bloques, SEEK_SET);
@@ -618,14 +618,14 @@ uint32_t leer_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indic
 {
 	usleep((configuracion_filesystem->retardo_acceso_fat) * 1000);
 	uint32_t entrada_fat = puntero_tabla_fat[indice_fat];
-	log_info(logger, "Acceso FAT - Entrada: %d - Valor: %d (LECTURA)", indice_fat, entrada_fat);
+	log_info(logger, "Acceso a FAT: Acceso FAT - Entrada: %d - Valor: %d (LECTURA)", indice_fat, entrada_fat);
 	return entrada_fat;
 }
 
 void escribir_entrada_fat_por_indice(uint32_t *puntero_tabla_fat, uint32_t indice_a_escribir, uint32_t indice_donde_escribir)
 {
 	usleep((configuracion_filesystem->retardo_acceso_fat) * 1000);
-	log_info(logger, "Acceso FAT - Entrada: %d - Valor: %d (ESCRITURA)", indice_donde_escribir, indice_a_escribir);
+	log_info(logger, "Acceso a FAT: Acceso FAT - Entrada: %d - Valor: %d (ESCRITURA)", indice_donde_escribir, indice_a_escribir);
 	puntero_tabla_fat[indice_donde_escribir] = indice_a_escribir;
 }
 
@@ -674,7 +674,7 @@ uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, u_int32_t numero_de_b
 
 	abrir_tabla_fat(&puntero_memoria_tabla_fat, &puntero_archivo_tabla_fat);
 
-	log_info(logger, "OBTENIENDO NUMERO DE BLOQUE FS DE ARCHIVO %s, BLOQUE LOGICO ARCHIVO NUMERO %d, BLOQUE INICIAL ES %d", nombre_archivo, numero_de_bloque_archivo, indice_primer_bloque);
+	log_debug(logger, "OBTENIENDO NUMERO DE BLOQUE FS DE ARCHIVO %s, BLOQUE LOGICO ARCHIVO NUMERO %d, BLOQUE INICIAL ES %d", nombre_archivo, numero_de_bloque_archivo, indice_primer_bloque);
 
 	uint32_t indice_bloque = indice_primer_bloque;
 	for (int i = 0; i < (int)numero_de_bloque_archivo; i++)
@@ -690,7 +690,7 @@ uint32_t obtener_numero_de_bloque_fs(char *nombre_archivo, u_int32_t numero_de_b
 void *leer_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char *nombre_archivo)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
-	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
+	log_info(logger, "Acceso a Bloque Archivo: Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb");
@@ -706,12 +706,12 @@ void *leer_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_a
 void escribir_bloque_fs(u_int32_t numero_de_bloque_fs, u_int32_t numero_de_bloque_archivo, char *nombre_archivo, void *bloque)
 {
 	pthread_mutex_lock(&mutex_archivo_bloques);
-	log_info(logger, "Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
+	log_info(logger, "Acceso a Bloque Archivo: Acceso Bloque - Archivo: %s - Bloque Archivo: %d - Bloque FS: %d", nombre_archivo, numero_de_bloque_archivo, numero_de_bloque_fs);
 	usleep((configuracion_filesystem->retardo_acceso_bloques) * 1000);
 
 	for (int i = 0; i < configuracion_filesystem->tam_bloques; i++)
 	{
-		log_info(logger, "Contenido de marco a escribir en archivo en %d es %02x", i, ((unsigned char *)bloque)[i]);
+		log_debug(logger, "Contenido de marco a escribir en archivo en %d es %02x", i, ((unsigned char *)bloque)[i]);
 	}
 
 	FILE *archivo_bloques = fopen(configuracion_filesystem->path_bloques, "rb+");

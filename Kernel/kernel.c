@@ -314,7 +314,7 @@ void *planificador_corto_plazo()
 
 			if (fs_opcode == FOPEN_OPCODE)
 			{
-				log_info(logger, "PID: %d - Abrir Archivo: %s", pcb->pid, nombre_archivo);
+				log_info(logger, "Abrir Archivo: PID: %d - Abrir Archivo: %s", pcb->pid, nombre_archivo);
 
 				bool archivo_a_abrir_existe_y_estaba_abierto = recurso_archivo != NULL;
 				if (archivo_a_abrir_existe_y_estaba_abierto)
@@ -396,20 +396,20 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FCLOSE_OPCODE)
 			{
-				log_info(logger, "PID: %d - Cerrar Archivo: %s", pcb->pid, nombre_archivo);
+				log_info(logger, "Cerrar Archivo: PID: %d - Cerrar Archivo: %s", pcb->pid, nombre_archivo);
 				desasignar_recurso_a_pcb(recurso_archivo, pcb->pid);
 				correr_deteccion_deadlock = true;
 				mantener_proceso_ejecutando = true;
 			}
 			else if (fs_opcode == FSEEK_OPCODE)
 			{
-				log_info(logger, "PID: %d - Actualizar puntero Archivo: %s - Puntero: %d - Puntero Anterior: %d", pcb->pid, nombre_archivo, posicion_puntero_archivo, archivo_abierto_proceso->puntero);
+				log_info(logger, "Actualizar Puntero Archivo: PID: %d - Actualizar puntero Archivo: %s - Puntero: %d - Puntero Anterior: %d", pcb->pid, nombre_archivo, posicion_puntero_archivo, archivo_abierto_proceso->puntero);
 				mantener_proceso_ejecutando = true;
 				archivo_abierto_proceso->puntero = posicion_puntero_archivo;
 			}
 			else if (fs_opcode == FTRUNCATE_OPCODE)
 			{
-				log_info(logger, "PID: %d - Truncar Archivo: %s - Tamaño: %d", pcb->pid, nombre_archivo, nuevo_tamanio_archivo);
+				log_info(logger, "Truncar Archivo: PID: %d - Truncar Archivo: %s - Tamaño: %d", pcb->pid, nombre_archivo, nuevo_tamanio_archivo);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
 				crear_hilo_operacion_archivo(pcb, TRUNCAR_ARCHIVO, nombre_archivo, archivo_abierto_proceso->modo_apertura, -1, -1, nuevo_tamanio_archivo);
@@ -419,7 +419,7 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FWRITE_OPCODE)
 			{
-				log_info(logger, "PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", pcb->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
+				log_info(logger, "Escribir Archivo: PID: %d - Escribir Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", pcb->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
 				if (archivo_abierto_proceso->modo_apertura != LOCK_ESCRITURA)
 				{
 					pcb->motivo_finalizacion = FINALIZACION_INVALID_WRITE;
@@ -434,7 +434,7 @@ void *planificador_corto_plazo()
 			}
 			else if (fs_opcode == FREAD_OPCODE)
 			{
-				log_info(logger, "PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", pcb->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
+				log_info(logger, "Leer Archivo: PID: %d - Leer Archivo: %s - Puntero: %d - Direccion Memoria: %d - Tamaño: %d", pcb->pid, nombre_archivo, archivo_abierto_proceso->puntero, direccion_fisica, recurso_archivo->tamanio_archivo);
 				transicionar_proceso(pcb, CODIGO_ESTADO_PROCESO_BLOCKED);
 				queue_push_thread_safe(cola_bloqueados_operaciones_archivos, pcb, &mutex_cola_bloqueados_operaciones_archivos);
 				crear_hilo_operacion_archivo(pcb, LEER_ARCHIVO, nombre_archivo, modo_apertura, archivo_abierto_proceso->puntero, direccion_fisica, -1);
@@ -464,7 +464,7 @@ void *planificador_corto_plazo()
 			else
 			{
 				recurso_para_wait->instancias_disponibles--;
-				log_info(logger, "PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
+				log_info(logger, "Wait: PID: %d - Wait: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_wait->instancias_disponibles);
 
 				if (recurso_para_wait->instancias_disponibles < 0)
 				{
@@ -476,7 +476,7 @@ void *planificador_corto_plazo()
 					strcpy(pcb->ultimo_recurso_pedido, recurso_para_wait->nombre);
 
 					queue_push(recurso_para_wait->pcbs_bloqueados, pcb);
-					log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
+					log_info(logger, "Motivo de Bloqueo: PID: %d - Bloqueado por: %s", pcb->pid, nombre_recurso);
 					pthread_mutex_unlock(&recurso_para_wait->mutex_recurso);
 
 					correr_deteccion_deadlock = true;
@@ -499,7 +499,7 @@ void *planificador_corto_plazo()
 			else
 			{
 				pthread_mutex_lock(&recurso_para_signal->mutex_recurso);
-				log_info(logger, "PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
+				log_info(logger, "Signal: PID: %d - Signal: %s - Instancias: %d", pcb->pid, nombre_recurso, recurso_para_signal->instancias_disponibles + 1);
 				pthread_mutex_unlock(&recurso_para_signal->mutex_recurso);
 
 				mantener_proceso_ejecutando = true;
@@ -531,11 +531,11 @@ void *planificador_corto_plazo()
 void *contador_quantum(void *argumentos)
 {
 	t_arg_hilo_quantum *arg_hilo_quantum = (t_arg_hilo_quantum *)argumentos;
-	log_info(logger, "Creo hilo para interrumpir PID %d (HILO ID %d)", arg_hilo_quantum->pid_a_interrumpir, arg_hilo_quantum->id_hilo_quantum);
+	log_debug(logger, "Creo hilo para interrumpir PID %d (HILO ID %d)", arg_hilo_quantum->pid_a_interrumpir, arg_hilo_quantum->id_hilo_quantum);
 
 	usleep((configuracion_kernel->quantum) * 1000);
 
-	log_info(logger, "Soy el hilo %d y me fijo si tengo que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
+	log_debug(logger, "Soy el hilo %d y me fijo si tengo que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
 
 	t_pcb *pcb_quantum_finalizado = buscar_pcb_con_pid(arg_hilo_quantum->pid_a_interrumpir);
 	if (pcb_quantum_finalizado != NULL && pcb_quantum_finalizado->pid == arg_hilo_quantum->pid_a_interrumpir && pcb_quantum_finalizado->id_hilo_quantum == arg_hilo_quantum->id_hilo_quantum)
@@ -546,18 +546,18 @@ void *contador_quantum(void *argumentos)
 		if (pcb_ejecutando != NULL && pcb_ejecutando->pid == arg_hilo_quantum->pid_a_interrumpir && pcb_ejecutando->id_hilo_quantum == arg_hilo_quantum->id_hilo_quantum)
 		{
 			pthread_mutex_unlock(&mutex_proceso_ejecutando);
-			log_info(logger, "PID: %d - Desalojado por fin de Quantum", pcb_quantum_finalizado->pid);
+			log_info(logger, "Fin de Quantum: PID: %d - Desalojado por fin de Quantum", pcb_quantum_finalizado->pid);
 			interrumpir_proceso_en_cpu(INTERRUPCION_POR_DESALOJO);
 		}
 		else
 		{
-			log_info(logger, "Soy el hilo %d y NO tuve que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
+			log_debug(logger, "Soy el hilo %d y NO tuve que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
 			pthread_mutex_unlock(&mutex_proceso_ejecutando);
 		}
 	}
 	else
 	{
-		log_info(logger, "Soy el hilo %d y NO tuve que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
+		log_debug(logger, "Soy el hilo %d y NO tuve que interrumpir PID %d", arg_hilo_quantum->id_hilo_quantum, arg_hilo_quantum->pid_a_interrumpir);
 	}
 
 	free(arg_hilo_quantum);
@@ -635,7 +635,7 @@ void transicionar_proceso_a_new(t_pcb *pcb)
 		return;
 	}
 
-	log_info(logger, "Se crea el proceso %d en NEW", pcb->pid);
+	log_info(logger, "Creacion de Proceso: Se crea el proceso %d en NEW", pcb->pid);
 	queue_push_thread_safe(cola_new, pcb, &mutex_cola_new);
 	list_add_thread_safe(procesos, pcb, &mutex_procesos);
 	sem_post(&semaforo_hay_algun_proceso_en_cola_new);
@@ -643,14 +643,14 @@ void transicionar_proceso_a_new(t_pcb *pcb)
 
 void transicionar_proceso_de_new_a_ready(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
 	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
 	push_cola_ready(pcb);
 }
 
 void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_new, &mutex_cola_new);
 	eliminar_pcb_de_lista(pcb->pid, procesos, &mutex_procesos);
@@ -659,7 +659,7 @@ void transicionar_proceso_de_new_a_exit(t_pcb *pcb)
 
 void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXECUTING));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXECUTING));
 
 	pcb->estado = CODIGO_ESTADO_PROCESO_EXECUTING;
 
@@ -681,7 +681,7 @@ void transicionar_proceso_de_ready_a_executing(t_pcb *pcb)
 
 void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_fin_de_proceso(pcb);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
@@ -697,14 +697,14 @@ void transicionar_proceso_de_ready_a_exit(t_pcb *pcb)
 
 void transicionar_proceso_de_executing_a_ready(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
 	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
 	push_cola_ready(pcb);
 }
 
 void transicionar_proceso_de_executing_a_bloqueado(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_BLOCKED));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_BLOCKED));
 	pcb->estado = CODIGO_ESTADO_PROCESO_BLOCKED;
 }
 
@@ -715,7 +715,7 @@ void transicionar_proceso_de_executing_a_executing(t_pcb *pcb)
 
 void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_fin_de_proceso(pcb);
 	desasignar_todos_los_recursos_a_pcb(pcb->pid);
 	destruir_estructuras_de_proceso_en_memoria(pcb);
@@ -730,14 +730,14 @@ void transicionar_proceso_de_executing_a_exit(t_pcb *pcb)
 
 void transicionar_proceso_de_bloqueado_a_ready(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_READY));
 	pcb->estado = CODIGO_ESTADO_PROCESO_READY;
 	push_cola_ready(pcb);
 }
 
 void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 {
-	log_info(logger, "PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
+	log_info(logger, "Cambio de Estado: PID: %d - Estado Anterior: '%s' - Estado Actual: '%s'", pcb->pid, nombre_estado_proceso(pcb->estado), nombre_estado_proceso(CODIGO_ESTADO_PROCESO_EXIT));
 	log_fin_de_proceso(pcb);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_sleep, &mutex_cola_bloqueados_sleep);
 	eliminar_pcb_de_cola(pcb->pid, cola_bloqueados_pagefault, &mutex_cola_bloqueados_pagefault);
@@ -758,7 +758,7 @@ void transicionar_proceso_de_bloqueado_a_exit(t_pcb *pcb)
 ////////////////////////////////////////////////////////////////////////* ////////// *////////////////////////////////////////////////////////////////////////
 void crear_hilo_sleep(t_pcb *pcb, int tiempo_sleep)
 {
-	log_info(logger, "PID: %d - Bloqueado por: SLEEP", pcb->pid);
+	log_info(logger, "Motivo de Bloqueo: PID: %d - Bloqueado por: SLEEP", pcb->pid);
 	pthread_t hilo_bloqueo_sleep;
 	t_bloqueo_sleep *bloqueo_sleep_parametros = malloc(sizeof(t_bloqueo_sleep));
 	bloqueo_sleep_parametros->pcb = pcb;
@@ -789,7 +789,7 @@ void *bloqueo_sleep(void *argumentos)
 
 void crear_hilo_operacion_archivo(t_pcb *pcb, int operacion_archivo, char *nombre_archivo, int modo_apertura, int puntero, int direccion_fisica, int nuevo_tamanio)
 {
-	log_info(logger, "PID: %d - Bloqueado por: %s", pcb->pid, nombre_archivo);
+	log_info(logger, "Motivo de Bloqueo: PID: %d - Bloqueado por: %s", pcb->pid, nombre_archivo);
 	pthread_t hilo_operacion_archivo;
 	t_operacion_archivo *operacion_archivo_parametros = malloc(sizeof(t_operacion_archivo));
 
@@ -843,7 +843,7 @@ void *operacion_archivo_h(void *argumentos)
 
 void crear_hilo_page_fault(t_pcb *pcb, int numero_pagina)
 {
-	log_info(logger, "Page Fault PID: %d - Pagina: %d", pcb->pid, numero_pagina);
+	log_info(logger, "Page Fault: Page Fault PID: %d - Pagina: %d", pcb->pid, numero_pagina);
 	pthread_t hilo_bloqueo_page_fault;
 	t_bloqueo_page_fault *bloqueo_page_fault_parametros = malloc(sizeof(t_bloqueo_page_fault));
 	bloqueo_page_fault_parametros->pcb = pcb;
@@ -1092,7 +1092,7 @@ void iniciar_planificacion()
 	pthread_mutex_lock(&mutex_bool_planificacion_detenida);
 	if (planificacion_detenida)
 	{
-		log_info(logger, "INICIO DE PLANIFICACIÓN");
+		log_info(logger, "Inicio de planificacion: INICIO DE PLANIFICACIÓN");
 		planificacion_detenida = false;
 		pthread_mutex_unlock(&mutex_detener_planificacion_corto_plazo);
 		pthread_mutex_unlock(&mutex_detener_planificacion_largo_plazo);
@@ -1105,7 +1105,7 @@ void detener_planificacion()
 	pthread_mutex_lock(&mutex_bool_planificacion_detenida);
 	if (!planificacion_detenida)
 	{
-		log_info(logger, "PAUSA DE PLANIFICACIÓN");
+		log_info(logger, "Pausa planificacion: PAUSA DE PLANIFICACIÓN");
 		planificacion_detenida = true;
 		pthread_mutex_lock(&mutex_detener_planificacion_corto_plazo);
 		pthread_mutex_lock(&mutex_detener_planificacion_largo_plazo);
@@ -1117,7 +1117,7 @@ void modificar_grado_max_multiprogramacion(int nuevo_grado_max_multiprogramacion
 {
 	int grado_max_multiprogramacion_anterior = grado_max_multiprogramacion_actual;
 	grado_max_multiprogramacion_actual = nuevo_grado_max_multiprogramacion;
-	log_info(logger, "Grado anterior: %d - Grado actual: %d", grado_max_multiprogramacion_anterior, grado_max_multiprogramacion_actual);
+	log_info(logger, "Cambio de Grado de Multiprogramacion: Grado anterior: %d - Grado actual: %d", grado_max_multiprogramacion_anterior, grado_max_multiprogramacion_actual);
 	sem_destroy(&semaforo_grado_max_multiprogramacion);
 	sem_init(&semaforo_grado_max_multiprogramacion, false, nuevo_grado_max_multiprogramacion - 1);
 }
@@ -1183,6 +1183,7 @@ void listar_procesos()
 	printf("\nEstado: EXEC    - Procesos: %s", procesos_en_executing_string_dinamico);
 	printf("\nEstado: BLOCKED - Procesos: %s\n", procesos_en_blocked_string_dinamico);
 
+	log_info(logger, "Listar procesos por estado:");
 	log_info(logger, "Estado: NEW - Procesos: %s", procesos_en_new_string_dinamico);
 	log_info(logger, "Estado: READY - Procesos: %s", procesos_en_ready_string_dinamico);
 	log_info(logger, "Estado: EXEC - Procesos: %s", procesos_en_executing_string_dinamico);
@@ -1517,7 +1518,7 @@ void push_cola_ready(t_pcb *pcb)
 	{
 		string_dinamico[strlen(string_dinamico) - 1] = '\0';
 	}
-	log_info(logger, "Cola ready %s: [%s]", configuracion_kernel->algoritmo_planificacion, string_dinamico);
+	log_info(logger, "Ingreso a Ready: Cola Ready %s: [%s]", configuracion_kernel->algoritmo_planificacion, string_dinamico);
 	free(string_dinamico);
 
 	// Si planifico con prioridades y el PCB que llego tiene mayor prioridad que el que esta ejecutando, lo desalojo
@@ -1543,15 +1544,15 @@ void log_fin_de_proceso(t_pcb *pcb)
 {
 	if (pcb->motivo_finalizacion == FINALIZACION_SUCCESS)
 	{
-		log_info(logger, "Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
+		log_info(logger, "Fin de Proceso: Finaliza el proceso PID: %d - Motivo SUCCESS", pcb->pid);
 	}
 	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_RESOURCE)
 	{
-		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_RESOURCE", pcb->pid);
+		log_info(logger, "Fin de Proceso: Finaliza el proceso PID: %d - Motivo INVALID_RESOURCE", pcb->pid);
 	}
 	else if (pcb->motivo_finalizacion == FINALIZACION_INVALID_WRITE)
 	{
-		log_info(logger, "Finaliza el proceso PID: %d - Motivo INVALID_WRITE", pcb->pid);
+		log_info(logger, "Fin de Proceso: Finaliza el proceso PID: %d - Motivo INVALID_WRITE", pcb->pid);
 	}
 }
 
@@ -1976,7 +1977,7 @@ t_list *obtener_procesos_analisis_deadlock()
 		iterador_pcbs_bloqueados = list_iterator_create(recurso->pcbs_bloqueados->elements);
 		while (list_iterator_has_next(iterador_pcbs_bloqueados))
 		{
-			log_info(logger, "Analizando PCBs bloqueados de recurso %s", recurso->nombre);
+			log_debug(logger, "Analizando PCBs bloqueados de recurso %s", recurso->nombre);
 			pcb = list_iterator_next(iterador_pcbs_bloqueados);
 			pcb_a_analizar_existente = list_find(resultado, (void *)_filtro_pcb_por_id);
 
@@ -2017,7 +2018,7 @@ int *obtener_vector_recursos_disponibles()
 
 bool hay_deadlock()
 {
-	log_info(logger, "ANALISIS DE DETECCION DE DEADLOCK");
+	log_info(logger, "Proceso de deteccion de deadlock: ANALISIS DE DETECCION DE DEADLOCK");
 
 	pthread_mutex_lock(&mutex_recursos);
 	int cantidad_de_recursos = list_size(recursos);
@@ -2109,7 +2110,7 @@ bool hay_deadlock()
 			if (!pcb_analisis_deadlock->finalizado)
 			{
 				char *string_dinamico = crear_string_dinamico();
-				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, "Deadlock detectado: ");
+				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, "Deteccion de deadlock: Deadlock detectado: ");
 				string_dinamico = agregar_entero_a_string_dinamico(string_dinamico, pcb_analisis_deadlock->pid);
 				string_dinamico = agregar_string_a_string_dinamico(string_dinamico, " - Recursos en posesion: ");
 
