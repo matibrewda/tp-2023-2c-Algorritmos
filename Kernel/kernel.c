@@ -320,7 +320,7 @@ void *planificador_corto_plazo()
 				if (archivo_a_abrir_existe_y_estaba_abierto)
 				{
 					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
-					archivo_abierto_pcb->nombre_archivo = malloc(strlen(nombre_archivo));
+					archivo_abierto_pcb->nombre_archivo = malloc(strlen(nombre_archivo)+1);
 					strcpy(archivo_abierto_pcb->nombre_archivo, nombre_archivo);
 					archivo_abierto_pcb->puntero = 0;
 					archivo_abierto_pcb->modo_apertura = modo_apertura;
@@ -335,7 +335,7 @@ void *planificador_corto_plazo()
 							t_pcb_bloqueado_archivo *pcb_bloqueado_archivo = malloc(sizeof(t_pcb_bloqueado_archivo));
 							pcb_bloqueado_archivo->pcb = pcb;
 							pcb_bloqueado_archivo->lock = modo_apertura;
-							pcb->ultimo_recurso_pedido = malloc(strlen(nombre_archivo));
+							pcb->ultimo_recurso_pedido = malloc(strlen(nombre_archivo)+1);
 							strcpy(pcb->ultimo_recurso_pedido, nombre_archivo);
 							queue_push(recurso_archivo->pcbs_bloqueados_por_archivo, pcb_bloqueado_archivo);
 							correr_deteccion_deadlock = true;
@@ -358,7 +358,7 @@ void *planificador_corto_plazo()
 							t_pcb_bloqueado_archivo *pcb_bloqueado_archivo = malloc(sizeof(t_pcb_bloqueado_archivo));
 							pcb_bloqueado_archivo->pcb = pcb;
 							pcb_bloqueado_archivo->lock = modo_apertura;
-							pcb->ultimo_recurso_pedido = malloc(strlen(nombre_archivo));
+							pcb->ultimo_recurso_pedido = malloc(strlen(nombre_archivo)+1);
 							strcpy(pcb->ultimo_recurso_pedido, nombre_archivo);
 							queue_push(recurso_archivo->pcbs_bloqueados_por_archivo, pcb_bloqueado_archivo);
 							correr_deteccion_deadlock = true;
@@ -387,7 +387,7 @@ void *planificador_corto_plazo()
 					}
 					list_add_thread_safe(recursos, crear_recurso_archivo(nombre_archivo, modo_apertura, tamanio_archivo_abierto, pcb), &mutex_recursos);
 					t_archivo_abierto_proceso *archivo_abierto_pcb = malloc(sizeof(t_archivo_abierto_proceso));
-					archivo_abierto_pcb->nombre_archivo = malloc(strlen(nombre_archivo));
+					archivo_abierto_pcb->nombre_archivo = malloc(strlen(nombre_archivo)+1);
 					strcpy(archivo_abierto_pcb->nombre_archivo, nombre_archivo);
 					archivo_abierto_pcb->puntero = 0;
 					archivo_abierto_pcb->modo_apertura = modo_apertura;
@@ -472,7 +472,7 @@ void *planificador_corto_plazo()
 
 					pthread_mutex_lock(&recurso_para_wait->mutex_recurso);
 
-					pcb->ultimo_recurso_pedido = malloc(strlen(recurso_para_wait->nombre));
+					pcb->ultimo_recurso_pedido = malloc(strlen(recurso_para_wait->nombre)+1);
 					strcpy(pcb->ultimo_recurso_pedido, recurso_para_wait->nombre);
 
 					queue_push(recurso_para_wait->pcbs_bloqueados, pcb);
@@ -793,7 +793,7 @@ void crear_hilo_operacion_archivo(t_pcb *pcb, int operacion_archivo, char *nombr
 	pthread_t hilo_operacion_archivo;
 	t_operacion_archivo *operacion_archivo_parametros = malloc(sizeof(t_operacion_archivo));
 
-	operacion_archivo_parametros->nombre_archivo = malloc(strlen(nombre_archivo));
+	operacion_archivo_parametros->nombre_archivo = malloc(strlen(nombre_archivo)+1);
 	strcpy(operacion_archivo_parametros->nombre_archivo, nombre_archivo);
 
 	operacion_archivo_parametros->pcb = pcb;
@@ -1625,7 +1625,7 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tama
 {
 	t_recurso *recurso = malloc(sizeof(t_recurso));
 
-	recurso->nombre = malloc(strlen(nombre_archivo));
+	recurso->nombre = malloc(strlen(nombre_archivo)+1);
 	strcpy(recurso->nombre, nombre_archivo);
 	recurso->instancias_iniciales = 1;
 	recurso->instancias_disponibles = 0;
@@ -1889,7 +1889,7 @@ t_list *obtener_procesos_analisis_deadlock()
 
 		if (pcb->ultimo_recurso_pedido != NULL)
 		{
-			pcb_a_analizar_nuevo->ultimo_recurso_pedido = malloc(strlen(pcb->ultimo_recurso_pedido));
+			pcb_a_analizar_nuevo->ultimo_recurso_pedido = malloc(strlen(pcb->ultimo_recurso_pedido)+1);
 			strcpy(pcb_a_analizar_nuevo->ultimo_recurso_pedido, pcb->ultimo_recurso_pedido);
 		}
 

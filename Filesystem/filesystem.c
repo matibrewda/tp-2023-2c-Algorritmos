@@ -215,7 +215,7 @@ void *comunicacion_kernel()
 
 		case SOLICITUD_CREAR_ARCHIVO_FS:
 			char *nombre_crear = leer_paquete_solicitud_crear_archivo_fs(logger, conexion_con_kernel);
-			log_info(logger, "Crear Archivo: %s", nombre_archivo_abrir);
+			log_info(logger, "Crear Archivo: %s", nombre_crear);
 			crear_archivo_fs(nombre_crear);
 			free(nombre_crear);
 			t_paquete *respuesta_crear_archivo = crear_paquete_con_opcode_y_sin_contenido(logger, RESPUESTA_CREAR_ARCHIVO_FS, NOMBRE_MODULO_FILESYSTEM, NOMBRE_MODULO_KERNEL);
@@ -633,7 +633,7 @@ FCB *iniciar_fcb(char *nombre_archivo, uint32_t tamanio_archivo, uint32_t bloque
 {
 	FCB *fcb = malloc(sizeof(FCB));
 
-	fcb->nombre_archivo = malloc(strlen(nombre_archivo));
+	fcb->nombre_archivo = malloc(strlen(nombre_archivo)+1);
 	strcpy(fcb->nombre_archivo, nombre_archivo);
 	fcb->nombre_archivo = strdup(fcb->nombre_archivo);
 
