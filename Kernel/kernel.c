@@ -1670,12 +1670,39 @@ bool recurso_esta_asignado_a_pcb(t_recurso *recurso, int pid)
 		return pcb->pid == pid;
 	};
 
-	return list_find_thread_safe(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id, &recurso->mutex_recurso) != NULL;
+	bool recurso_kernel_asignado = false;
+	bool recurso_archivo_asignado = false;
+
+	pthread_mutex_lock(&recurso->mutex_recurso);
+	if (recurso->es_archivo)
+	{
+		if (recurso->pcb_lock_escritura != NULL)
+		{
+			if (recurso->pcb_lock_escritura->pid == pid)
+			{
+				recurso_archivo_asignado = true;
+			}
+		}
+
+		t_pcb *pcb_lock_lectura = list_find(recurso->pcbs_lock_lectura, (void *)_filtro_proceso_por_id);
+		if (pcb_lock_lectura != NULL)
+		{
+			recurso_archivo_asignado = true;
+		}
+	}
+	else
+	{
+		recurso_kernel_asignado = (list_find(recurso->pcbs_asignados, (void *)_filtro_proceso_por_id) != NULL);
+	}
+	pthread_mutex_unlock(&recurso->mutex_recurso);
+
+	return recurso_kernel_asignado || recurso_archivo_asignado;
 }
 
-void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
+bool desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 {
 	int pid_lectura_filtro;
+	bool elimino_el_recurso = false;
 
 	bool _filtro_proceso_por_id(t_pcb * pcb)
 	{
@@ -1752,6 +1779,7 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 			{
 				// Si me quedo TODO vacio (lock escritura, locks de lectura, pcbs bloqueados por archivo), destruyo el recurso
 				list_remove_and_destroy_by_condition_thread_safe(recursos, (void *)_filtro_recurso_por_nombre, (void *)_destruir_recurso, &mutex_recursos);
+				elimino_el_recurso = true;
 			}
 			else
 			{
@@ -1804,11 +1832,12 @@ void desasignar_recurso_a_pcb(t_recurso *recurso, int pid)
 	}
 	pthread_mutex_unlock(&recurso->mutex_recurso);
 	log_debug(logger, "Desasignado recurso a PID %d", pid);
+	return elimino_el_recurso;
 }
 
 void desasignar_todos_los_recursos_a_pcb(int pid)
 {
-	pthread_mutex_lock(&mutex_recursos);
+	//pthread_mutex_lock(&mutex_recursos);
 	for (int i = 0; i < list_size(recursos); i++)
 	{
 		t_recurso *recurso = list_get(recursos, i);
@@ -1821,10 +1850,14 @@ void desasignar_todos_los_recursos_a_pcb(int pid)
 
 		while (recurso_esta_asignado_a_pcb(recurso, pid))
 		{
-			desasignar_recurso_a_pcb(recurso, pid);
+			if (desasignar_recurso_a_pcb(recurso, pid))
+			{
+				// Si elimino el recurso, salgo
+				break;
+			}
 		}
 	}
-	pthread_mutex_unlock(&mutex_recursos);
+	//pthread_mutex_unlock(&mutex_recursos);
 }
 
 t_list *obtener_procesos_analisis_deadlock()

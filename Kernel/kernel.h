@@ -120,7 +120,7 @@ t_recurso *crear_recurso_archivo(char *nombre_archivo, int lock_actual, int tama
 t_recurso *buscar_recurso_por_nombre(char *nombre_recurso);
 
 bool recurso_esta_asignado_a_pcb(t_recurso *recurso, int pid);
-void desasignar_recurso_a_pcb(t_recurso *recurso, int pid);
+bool desasignar_recurso_a_pcb(t_recurso *recurso, int pid);
 void desasignar_todos_los_recursos_a_pcb(int pid);
 
 // Deadlock
